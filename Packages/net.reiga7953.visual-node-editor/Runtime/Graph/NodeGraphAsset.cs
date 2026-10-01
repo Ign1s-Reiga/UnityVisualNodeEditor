@@ -31,6 +31,11 @@ namespace Reiga.VisualNodeEditor
 
         public bool RemoveEdge(EdgeData edge) => _edges.Remove(edge);
 
-        public NodeData FindNode(string id) => _nodes.Find(n => n.Id == id);
+        public NodeData FindNode(string id) => _nodes.Find(n => n != null && n.Id == id);
+
+        /// <summary>指定したポート対を結ぶエッジを返す。存在しなければ null。</summary>
+        public EdgeData FindEdge(string fromNodeId, string fromPort, string toNodeId, string toPort) =>
+            _edges.Find(e => e.FromNodeId == fromNodeId && e.FromPort == fromPort
+                && e.ToNodeId == toNodeId && e.ToPort == toPort);
     }
 }
