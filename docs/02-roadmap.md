@@ -1,0 +1,29 @@
+# 02 - Roadmap
+
+## M0: スキャフォールド（完了）
+- [x] UPM パッケージ構成・asmdef
+- [x] NodeGraphAsset / NodeData / EdgeData
+- [x] 空の GraphView ウィンドウ
+
+## M1: 最小限の編集ができる
+- [ ] NodeViewFactory（型 → NodeView の自動登録）
+- [ ] NodeSearchWindow（右クリックで `[NodeMenu]` から検索・追加）
+- [ ] ポート定義とエッジの接続・切断をアセットに反映
+- [ ] Undo/Redo 対応
+- [ ] ノード移動の保存
+
+## M2: 構成ツールとして使える
+- [ ] ノード選択時のインスペクタ（フィールド編集）
+- [ ] Validation（Entry 唯一性・孤立エッジ検出）と警告表示
+- [ ] グラフ内グループ／コメント
+- [ ] Scene ノードから SceneAsset を参照
+
+## M3: ゲームから使う
+- [ ] `GraphQuery`（遷移先の列挙など）のランタイム API
+- [ ] サンプル: シーン遷移テーブルとしての利用
+- [ ] 骨組みコード生成（任意）
+
+## 未決事項
+- ポートの型システムを持つか（当面は文字列名のみ、型なし）
+- Entity / System ノードの粒度と、それが既存ゲームプロジェクトのアーキテクチャとどう対応するか
+- Git URL 配布時の `Samples~` の扱い

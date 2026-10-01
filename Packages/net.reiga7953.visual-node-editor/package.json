@@ -1,0 +1,14 @@
+{
+  "name": "net.reiga7953.visual-node-editor",
+  "version": "0.1.0",
+  "displayName": "Visual Node Editor",
+  "description": "ゲームの大まかな構成（シーン遷移・フロー・ステート・イベント・要素）をノードグラフで組み立てる Unity エディタ拡張。",
+  "unity": "6000.0",
+  "author": {
+    "name": "re1ga",
+    "url": "https://github.com/Ign1s-Reiga"
+  },
+  "keywords": ["node", "graph", "editor", "graphview", "ui-toolkit"],
+  "dependencies": {},
+  "samples": []
+}

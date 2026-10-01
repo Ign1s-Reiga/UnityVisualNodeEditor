@@ -1,0 +1,19 @@
+{
+  "name": "Reiga.VisualNodeEditor.Tests.Editor",
+  "rootNamespace": "Reiga.VisualNodeEditor.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
