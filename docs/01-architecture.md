@@ -31,16 +31,28 @@ Position などエディタ専用の情報も Runtime の型に持たせる（Un
 
 1. `Runtime/Nodes/XxxNode.cs` に `NodeData` のサブクラスを作り、必ず `[Serializable]` を付ける（属性は継承されないため、無いと `[SerializeReference]` で保存されない）
 2. `[NodeMenu("Category/Xxx")]` を付ける
-3. `Editor/Views/XxxNodeView.cs` に `NodeView` のサブクラスを作り、ポートとフィールド UI を定義する
-4. `NodeViewFactory`（未実装）に型→View の対応を登録する（Reflection による自動登録を予定）
+3. `Editor/Views/XxxNodeView.cs` に `NodeView` のサブクラスを作り、`[CustomNodeView(typeof(XxxNode))]` を付ける。
+   `CreatePorts()` をオーバーライドして `AddInputPort("in")` / `AddOutputPort("out")` でポートを定義する
+4. `NodeViewFactory` が `TypeCache` で `[CustomNodeView]` を収集し、型→View を自動登録する（手動登録は不要）。
+   対応する View が無いノード型は、最も近い基底型の View、最終的には素の `NodeView`（ポート無し）で表示される
 5. EditMode テストを追加する
+
+## ポート
+
+- ポートは `NodeView` サブクラスが定義し、`Port.portName` がそのまま `EdgeData` のポート名になる（型システムは持たない。未決事項参照）
+- 接続可否は `NodeGraphView.GetCompatiblePorts` で判定する: 向きが逆・別ノード・同じポート対が未接続であること
+- 既定のポート構成: Entry = `out` のみ / Scene・State・Event = `in` + `out` / Note = ポート無し
 
 ## エディタ ↔ アセットの同期
 
-- 開く: `NodeGraphView.Populate(asset)` が Nodes/Edges から View を生成
-- 編集: `graphViewChanged` コールバックで追加・削除・移動を即座にアセットへ反映し、`EditorUtility.SetDirty`
-- 保存: 通常の `AssetDatabase.SaveAssets`（ツールバーの Save ボタンは明示保存用）
-- Undo: `Undo.RecordObject(asset, ...)` を各変更の前に呼ぶ
+- 開く: `NodeGraphView.Populate(asset)` が Nodes/Edges から View を生成。再構築中は `graphViewChanged` を外し、アセットへ書き戻さない
+- 追加: 検索ウィンドウ（`NodeSearchWindow`、`[NodeMenu]` のパスで階層化）で選んだ型を生成し、アセットと View の両方に追加
+- 編集: `graphViewChanged` コールバックで以下を即座にアセットへ反映し、`EditorUtility.SetDirty`
+  - `edgesToCreate` → `EdgeData` を追加（View の `Edge.userData` に対応する `EdgeData` を保持）
+  - `elementsToRemove` → `NodeView` / `Edge` に対応するデータを削除
+  - `movedElements` → `NodeData.Position` を更新
+- 保存: 通常の `AssetDatabase.SaveAssets`（ツールバーの Save ボタンは `AssetDatabase.SaveAssetIfDirty` で明示保存）
+- Undo: `Undo.RecordObject(asset, ...)` を各変更の前に呼ぶ。`Undo.undoRedoPerformed` でビューを `Populate` し直す
 
 ## 検証（Validation）
 
