@@ -5,12 +5,12 @@
 - [x] NodeGraphAsset / NodeData / EdgeData
 - [x] 空の GraphView ウィンドウ
 
-## M1: 最小限の編集ができる
-- [ ] NodeViewFactory（型 → NodeView の自動登録）
-- [ ] NodeSearchWindow（右クリックで `[NodeMenu]` から検索・追加）
-- [ ] ポート定義とエッジの接続・切断をアセットに反映
-- [ ] Undo/Redo 対応
-- [ ] ノード移動の保存
+## M1: 最小限の編集ができる（完了）
+- [x] NodeViewFactory（型 → NodeView の自動登録）
+- [x] NodeSearchWindow（右クリックで `[NodeMenu]` から検索・追加）
+- [x] ポート定義とエッジの接続・切断をアセットに反映
+- [x] Undo/Redo 対応
+- [x] ノード移動の保存
 
 ## M2: 構成ツールとして使える
 - [ ] ノード選択時のインスペクタ（フィールド編集）
