@@ -17,7 +17,7 @@ UPM パッケージ `net.reiga7953.visual-node-editor` として開発してい�
 "net.reiga7953.visual-node-editor": "file:../../UnityVisualNodeEditor/Packages/net.reiga7953.visual-node-editor"
 ```
 
-（または Git URL: `https://github.com/Ign1s-Reiga/UnityVisualNodeEditor.git?path=Packages/net.reiga7953.visual-node-editor`）
+（または Git URL: `https://github.com/Ign1s-Reiga/UnityVisualNodeEditor.git?path=Packages/net.reiga7953.visual-node-editor#main`。`#` の後ろはブランチ名・コミットに変更可）
 
 ## 開発
 
@@ -26,3 +26,8 @@ UPM パッケージ `net.reiga7953.visual-node-editor` として開発してい�
 3. テストは `Window > General > Test Runner` の EditMode
 
 詳細は [CLAUDE.md](CLAUDE.md) と [docs/](docs/) を参照。
+
+## CI
+
+GitHub Actions でパッケージのコンパイルチェックを行う（Unity ライセンス不要）。
+仕組み・ローカル実行・Git ブランチからの取り込み方は [docs/03-ci.md](docs/03-ci.md) を参照。

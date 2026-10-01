@@ -1,0 +1,24 @@
+<Project>
+  <!--
+    Compile-only check of the UPM package outside Unity.
+    Mirrors the asmdef boundaries: Runtime sees UnityEngine only, Editor/Tests also see UnityEditor.
+    UnityManagedDir must point at <Unity>/Editor/Data/Managed/UnityEngine of the version in ProjectVersion.txt.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).build/$(MSBuildProjectName)/obj/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).build/$(MSBuildProjectName)/bin/</BaseOutputPath>
+    <PackageDir>$(MSBuildThisFileDirectory)../../Packages/net.reiga7953.visual-node-editor/</PackageDir>
+    <!-- Unity's module DLLs are built against mismatching framework facades; harmless for a compile check. -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <Target Name="CheckUnityManagedDir" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(UnityManagedDir)' == '' Or !Exists('$(UnityManagedDir)/UnityEngine.CoreModule.dll')"
+           Text="Pass -p:UnityManagedDir=&lt;Unity&gt;/Editor/Data/Managed/UnityEngine (got '$(UnityManagedDir)')." />
+  </Target>
+</Project>

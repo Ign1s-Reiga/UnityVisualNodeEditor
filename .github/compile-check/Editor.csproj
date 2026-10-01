@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Reiga.VisualNodeEditor.Editor</AssemblyName>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageDir)Editor/**/*.cs" />
+    <Reference Include="$(UnityManagedDir)/*.dll" Private="false" />
+    <ProjectReference Include="Runtime.csproj" />
+  </ItemGroup>
+</Project>

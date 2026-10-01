@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Reiga.VisualNodeEditor.Tests.Editor</AssemblyName>
+    <DefineConstants>$(DefineConstants);UNITY_EDITOR;UNITY_INCLUDE_TESTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageDir)Tests/Editor/**/*.cs" />
+    <Reference Include="$(UnityManagedDir)/*.dll" Private="false" />
+    <ProjectReference Include="Runtime.csproj" />
+    <ProjectReference Include="Editor.csproj" />
+    <!-- Same API level as Unity's bundled com.unity.ext.nunit (3.5). -->
+    <PackageReference Include="NUnit" Version="3.5.0" />
+  </ItemGroup>
+</Project>

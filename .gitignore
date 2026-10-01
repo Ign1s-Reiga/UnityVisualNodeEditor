@@ -43,3 +43,7 @@ Thumbs.db
 
 # FUSE mount leftovers
 .fuse_hidden*
+
+# CI compile check (projects are tracked, build output is not)
+!/.github/compile-check/*.csproj
+/.github/compile-check/.build/

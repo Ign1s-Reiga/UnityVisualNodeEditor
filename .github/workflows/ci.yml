@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: Compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read Unity version
+        id: unity
+        run: echo "version=$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')" >> "$GITHUB_OUTPUT"
+
+      # Unity's reference DLLs, taken from the GameCI editor image (no license needed to read files).
+      - name: Cache Unity DLLs
+        id: cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/unity-managed
+          key: unity-managed-${{ steps.unity.outputs.version }}
+
+      - name: Extract Unity DLLs
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          IMAGE: unityci/editor:ubuntu-${{ steps.unity.outputs.version }}-base-3
+        run: |
+          docker create --name unity "$IMAGE"
+          docker cp unity:/opt/unity/Editor/Data/Managed/UnityEngine "$RUNNER_TEMP/unity-managed"
+          docker rm unity
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Compile Runtime, Editor and Tests
+        run: dotnet build .github/compile-check/Tests.Editor.csproj -p:UnityManagedDir="$RUNNER_TEMP/unity-managed"

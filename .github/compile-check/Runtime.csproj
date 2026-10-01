@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Reiga.VisualNodeEditor</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageDir)Runtime/**/*.cs" />
+    <Reference Include="$(UnityManagedDir)/UnityEngine*.dll" Private="false" />
+  </ItemGroup>
+</Project>
