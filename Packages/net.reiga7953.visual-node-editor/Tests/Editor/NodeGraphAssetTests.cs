@@ -69,5 +69,50 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(_graph.RemoveEdge(remove), Is.True);
             Assert.That(_graph.Edges, Is.EqualTo(new[] { keep }));
         }
+
+        [Test]
+        public void RemoveNode_RemovesNodeFromGroups()
+        {
+            var a = new StateNode();
+            var b = new StateNode();
+            _graph.AddNode(a);
+            _graph.AddNode(b);
+            var group = new GroupData();
+            group.AddNode(a.Id);
+            group.AddNode(b.Id);
+            _graph.AddGroup(group);
+
+            _graph.RemoveNode(a);
+
+            Assert.That(group.NodeIds, Is.EqualTo(new[] { b.Id }));
+        }
+
+        [Test]
+        public void RemoveNode_IgnoresNull()
+        {
+            Assert.That(_graph.RemoveNode(null), Is.False);
+        }
+
+        [Test]
+        public void GroupData_DoesNotAddSameNodeTwice()
+        {
+            var group = new GroupData();
+
+            Assert.That(group.AddNode("a"), Is.True);
+            Assert.That(group.AddNode("a"), Is.False);
+            Assert.That(group.AddNode(null), Is.False);
+            Assert.That(group.NodeIds, Is.EqualTo(new[] { "a" }));
+        }
+
+        [Test]
+        public void FindGroup_ReturnsGroupWithMatchingId()
+        {
+            var group = new GroupData();
+            _graph.AddGroup(group);
+
+            Assert.That(_graph.FindGroup(group.Id), Is.SameAs(group));
+            Assert.That(_graph.RemoveGroup(group), Is.True);
+            Assert.That(_graph.FindGroup(group.Id), Is.Null);
+        }
     }
 }

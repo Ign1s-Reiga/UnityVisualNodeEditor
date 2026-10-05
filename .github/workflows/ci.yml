@@ -11,15 +11,27 @@ permissions:
 
 jobs:
   compile:
-    name: Compile check
+    name: Compile check (${{ matrix.unity }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # "project" = ProjectSettings/ProjectVersion.txt (the minimum supported version).
+        # Newer versions catch APIs that became obsolete-as-error after it.
+        unity: [project, 6000.5.2f1]
     steps:
       - uses: actions/checkout@v7
 
-      - name: Read Unity version
+      - name: Resolve Unity version
         id: unity
+        env:
+          REQUESTED: ${{ matrix.unity }}
         run: |
-          version=$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          if [ "$REQUESTED" = "project" ]; then
+            version=$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          else
+            version="$REQUESTED"
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # Unity's reference DLLs, taken from the GameCI editor image (no license needed to read files).

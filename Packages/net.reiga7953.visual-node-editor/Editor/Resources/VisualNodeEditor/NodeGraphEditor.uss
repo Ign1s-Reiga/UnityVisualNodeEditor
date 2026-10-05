@@ -6,6 +6,11 @@
   flex-grow: 1;
 }
 
+.vne-main {
+  flex-grow: 1;
+  flex-direction: row;
+}
+
 .vne-graph-container {
   flex-grow: 1;
 }
@@ -15,4 +20,65 @@ GridBackground {
   --line-color: rgba(255, 255, 255, 0.05);
   --thick-line-color: rgba(255, 255, 255, 0.1);
   --spacing: 20;
+}
+
+/* Inspector */
+
+.vne-inspector {
+  width: 300px;
+  border-left-width: 1px;
+  border-left-color: #191919;
+  background-color: #282828;
+}
+
+.vne-inspector-view {
+  padding: 6px;
+}
+
+.vne-inspector-view__header {
+  -unity-font-style: bold;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.vne-inspector-view__empty {
+  color: #888888;
+  white-space: normal;
+}
+
+/* Validation */
+
+.vne-node--warning #node-border {
+  border-color: #e0a030;
+  border-width: 2px;
+}
+
+.vne-node--error #node-border {
+  border-color: #e04040;
+  border-width: 2px;
+}
+
+.vne-issue-summary {
+  -unity-text-align: middle-left;
+  margin-right: 12px;
+}
+
+.vne-issue-list {
+  height: 100px;
+  border-top-width: 1px;
+  border-top-color: #191919;
+  background-color: #282828;
+}
+
+.vne-issue-list Label {
+  -unity-text-align: middle-left;
+  padding-left: 6px;
+}
+
+.vne-issue--warning {
+  color: #e0a030;
+}
+
+.vne-issue--error {
+  color: #e04040;
 }

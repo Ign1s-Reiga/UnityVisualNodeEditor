@@ -1,6 +1,17 @@
 # Changelog
 
-## [0.1.0] - Unreleased
+## [0.2.0] - 2026-10-06
+- M2: 構成ツールとして使える
+  - ノード選択時のインスペクタ（`NodeInspectorView`、`PropertyField` で自動生成・Undo 対応）
+  - `GraphValidator`（Entry の欠落・重複、存在しないノードへのエッジ、ID 重複、Note への接続、重複エッジ、シーン未設定）と、ノード枠の色分け・問題一覧表示
+  - グループ（右クリック → Create Group。`GroupData` として保存）
+  - `SceneReference` と SceneAsset 選択 UI（GUID で移動・改名に追従、Build Settings 未登録を警告）
+  - **破壊的変更**: `SceneNode.SceneName` の setter を削除し、`SceneNode.Scene`（`SceneReference`）に置き換え。既存の `_sceneName` の値は引き継がれない
+- 修正: 全ファイルの `.meta` を追加（Git URL で取り込むと、`.meta` の無いファイルは Unity に無視され何も表示されなかった）
+- 修正: Unity 6000.5 でコンパイルエラーになる `EditorUtility.InstanceIDToObject` の使用をやめた
+- CI: 6000.0（最小サポート）と 6000.5 の両方でコンパイルチェック
+
+## [0.1.0] - 2026-10-02
 - 初期スキャフォールド（NodeGraphAsset / NodeData / EdgeData / GraphView ウィンドウ骨組み）
 - M1: 最小限の編集
   - `NodeViewFactory` と `[CustomNodeView]` による型 → View の自動登録

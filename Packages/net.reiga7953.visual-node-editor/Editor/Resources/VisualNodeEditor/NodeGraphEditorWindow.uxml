@@ -3,8 +3,13 @@
     <uie:Toolbar name="toolbar">
       <uie:ToolbarButton name="save-button" text="Save" />
       <ui:VisualElement class="vne-toolbar-spacer" />
+      <ui:Label name="issue-summary" class="vne-issue-summary" />
       <ui:Label name="asset-name" text="(no asset)" />
     </uie:Toolbar>
-    <ui:VisualElement name="graph-container" class="vne-graph-container" />
+    <ui:VisualElement name="main" class="vne-main">
+      <ui:VisualElement name="graph-container" class="vne-graph-container" />
+      <ui:ScrollView name="inspector" class="vne-inspector" />
+    </ui:VisualElement>
+    <ui:ListView name="issue-list" class="vne-issue-list" fixed-item-height="20" selection-type="Single" />
   </ui:VisualElement>
 </ui:UXML>

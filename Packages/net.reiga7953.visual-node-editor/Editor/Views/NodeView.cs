@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -17,20 +19,43 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// <summary>標準の出力ポート名。</summary>
         public const string OutputPortName = "out";
 
+        private const string WarningClassName = "vne-node--warning";
+        private const string ErrorClassName = "vne-node--error";
+
         /// <summary>この View が表示しているノードデータ。</summary>
         public NodeData Data { get; private set; }
 
+        /// <summary>表示しているノードの ID。</summary>
+        public string NodeId => viewDataKey;
+
         internal void Initialize(NodeData data)
         {
-            Data = data;
-            title = data.Title;
             viewDataKey = data.Id;
             AddToClassList("vne-node");
             SetPosition(new Rect(data.Position, Vector2.zero));
+            Rebind(data);
 
             CreatePorts();
             RefreshExpandedState();
             RefreshPorts();
+        }
+
+        /// <summary>
+        /// 同じ ID のノードデータで表示を更新する（インスペクタでの編集後など）。
+        /// </summary>
+        internal void Rebind(NodeData data)
+        {
+            Data = data;
+            title = data.Title;
+        }
+
+        /// <summary>このノードに関する検証結果を枠の色とツールチップに反映する。空なら表示を消す。</summary>
+        public void ShowIssues(IReadOnlyList<GraphIssue> issues)
+        {
+            var hasError = issues.Any(i => i.Severity == GraphIssueSeverity.Error);
+            EnableInClassList(ErrorClassName, hasError);
+            EnableInClassList(WarningClassName, !hasError && issues.Count > 0);
+            tooltip = string.Join("\n", issues.Select(i => i.Message));
         }
 
         /// <summary>

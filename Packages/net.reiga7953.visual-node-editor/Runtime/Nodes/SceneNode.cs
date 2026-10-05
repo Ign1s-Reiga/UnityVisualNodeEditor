@@ -8,13 +8,17 @@ namespace Reiga.VisualNodeEditor
     [NodeMenu("Flow/Scene")]
     public sealed class SceneNode : NodeData
     {
-        [SerializeField] private string _sceneName;
+        [SerializeField] private SceneReference _scene = new SceneReference();
 
-        public string SceneName
+        /// <summary>このノードが表すシーン。</summary>
+        public SceneReference Scene
         {
-            get => _sceneName;
-            set => _sceneName = value;
+            get => _scene;
+            set => _scene = value ?? new SceneReference();
         }
+
+        /// <summary>シーン名。未設定なら空文字。</summary>
+        public string SceneName => _scene.Name;
 
         protected override string DefaultTitle => "Scene";
     }

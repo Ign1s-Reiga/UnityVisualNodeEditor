@@ -10,9 +10,9 @@ namespace Reiga.VisualNodeEditor
     [Serializable]
     public abstract class NodeData
     {
-        [SerializeField] private string _id = Guid.NewGuid().ToString("N");
+        [SerializeField, HideInInspector] private string _id = Guid.NewGuid().ToString("N");
         [SerializeField] private string _title;
-        [SerializeField] private Vector2 _position;
+        [SerializeField, HideInInspector] private Vector2 _position;
 
         /// <summary>グラフ内で一意な ID。</summary>
         public string Id => _id;
