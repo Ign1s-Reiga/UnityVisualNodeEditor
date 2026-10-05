@@ -18,7 +18,9 @@ jobs:
 
       - name: Read Unity version
         id: unity
-        run: echo "version=$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt | tr -d '\r')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # Unity's reference DLLs, taken from the GameCI editor image (no license needed to read files).
       - name: Cache Unity DLLs
