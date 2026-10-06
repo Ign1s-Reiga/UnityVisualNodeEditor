@@ -21,8 +21,11 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             var guidProperty = property.FindPropertyRelative(GuidPropertyName);
             var pathProperty = property.FindPropertyRelative(PathPropertyName);
 
+            // PropertyField に渡されたラベル（インスペクタは英語で統一している）を優先する
+            var label = string.IsNullOrEmpty(preferredLabel) ? property.displayName : preferredLabel;
+
             var root = new VisualElement();
-            var field = new ObjectField(property.displayName)
+            var field = new ObjectField(label)
             {
                 objectType = typeof(SceneAsset),
                 allowSceneObjects = false,

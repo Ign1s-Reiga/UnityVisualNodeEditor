@@ -2,6 +2,7 @@ using System;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor.Experimental.GraphView;
+using UnityEngine.UIElements;
 
 namespace Reiga.VisualNodeEditor.Tests
 {
@@ -11,7 +12,7 @@ namespace Reiga.VisualNodeEditor.Tests
         [TestCase(typeof(SceneNode), typeof(SceneNodeView))]
         [TestCase(typeof(StateNode), typeof(StateNodeView))]
         [TestCase(typeof(EventNode), typeof(EventNodeView))]
-        [TestCase(typeof(NoteNode), typeof(NodeView))]
+        [TestCase(typeof(NoteNode), typeof(NoteNodeView))]
         [TestCase(typeof(UnregisteredNode), typeof(NodeView))]
         public void ResolveViewType_ReturnsRegisteredViewOrFallback(Type nodeType, Type expectedViewType)
         {
@@ -56,6 +57,59 @@ namespace Reiga.VisualNodeEditor.Tests
 
             Assert.That(view.FindPort(NodeView.InputPortName, Direction.Input), Is.Null);
             Assert.That(view.FindPort(NodeView.OutputPortName, Direction.Output), Is.Null);
+        }
+
+        [TestCase(0, 0, true)]
+        [TestCase(1, 1, true)]
+        [TestCase(0, 1, true)]
+        [TestCase(2, 1, false)]
+        [TestCase(1, 2, false)]
+        public void ShouldHidePortLabels_OnlyWithAtMostOnePortEachSide(int inputs, int outputs, bool expected)
+        {
+            Assert.That(NodeView.ShouldHidePortLabels(inputs, outputs), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Create_BuiltInNodesHidePortLabelsAndHaveCategoryClass()
+        {
+            var entry = NodeViewFactory.Create(new EntryNode());
+            var evt = NodeViewFactory.Create(new EventNode());
+
+            Assert.That(entry.ClassListContains("vne-node--hide-port-labels"), Is.True);
+            Assert.That(entry.ClassListContains("vne-node--flow"), Is.True);
+            Assert.That(evt.ClassListContains("vne-node--event"), Is.True);
+        }
+
+        [Test]
+        public void Create_EventShowsEventNameAsSummary()
+        {
+            var view = NodeViewFactory.Create(new EventNode { EventName = "OnBossDefeated" });
+
+            Assert.That(view.Summary, Is.EqualTo("OnBossDefeated"));
+        }
+
+        [Test]
+        public void Create_EmptySummaryIsNotRendered()
+        {
+            var view = NodeViewFactory.Create(new EntryNode());
+
+            Assert.That(view.Summary, Is.Empty);
+            Assert.That(view.Q(className: "vne-node__summary"), Is.Null);
+        }
+
+        [Test]
+        public void Rebind_UpdatesTitleAndSummary()
+        {
+            var data = new NoteNode();
+            var view = NodeViewFactory.Create(data);
+            Assert.That(view.title, Is.EqualTo("Note"));
+
+            data.Title = "Memo";
+            data.Text = "\n  first line \nsecond line";
+            view.Rebind(data);
+
+            Assert.That(view.title, Is.EqualTo("Memo"));
+            Assert.That(view.Summary, Is.EqualTo("first line"));
         }
 
         [Test]

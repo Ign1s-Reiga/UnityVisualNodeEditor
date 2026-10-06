@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Inspector;
+using Reiga.VisualNodeEditor.Editor.Issues;
 using Reiga.VisualNodeEditor.Editor.Search;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor;
@@ -16,8 +17,11 @@ namespace Reiga.VisualNodeEditor.Editor
     public sealed class NodeGraphEditorWindow : EditorWindow
     {
         private const string NoAssetLabel = "(no asset)";
+        private const string DirtyMark = " *";
         private const string IssueErrorClassName = "vne-issue--error";
         private const string IssueWarningClassName = "vne-issue--warning";
+        private const string IssueListHiddenClassName = "vne-issue-list--hidden";
+        private const long AssetLabelRefreshIntervalMs = 500;
 
         // ドメインリロード後も同じアセットを開き直せるようシリアライズする
         [SerializeField] private NodeGraphAsset _asset;
@@ -26,9 +30,11 @@ namespace Reiga.VisualNodeEditor.Editor
         private NodeSearchWindow _searchWindow;
         private NodeInspectorView _inspector;
         private ListView _issueList;
+        private ToolbarToggle _issueToggle;
         private Label _assetNameLabel;
-        private Label _issueSummaryLabel;
-        private List<GraphIssue> _issues = new();
+        private readonly List<GraphIssue> _issues = new();
+        private readonly HashSet<string> _knownErrorKeys = new();
+        private bool _resetIssueBaseline = true;
 
         [MenuItem("Window/Visual Node Editor")]
         public static void Open() => Open(null);
@@ -59,6 +65,9 @@ namespace Reiga.VisualNodeEditor.Editor
 
         private void CreateGUI()
         {
+            // グラフとインスペクタの最小幅（USS）+ 境界線が収まる大きさ。これより狭くするとはみ出す
+            minSize = new Vector2(480f, 240f);
+
             var uxml = Resources.Load<VisualTreeAsset>("VisualNodeEditor/NodeGraphEditorWindow");
             uxml?.CloneTree(rootVisualElement);
 
@@ -87,11 +96,13 @@ namespace Reiga.VisualNodeEditor.Editor
             _issueList = rootVisualElement.Q<ListView>("issue-list");
             if (_issueList != null)
             {
-                _issueList.makeItem = () => new Label();
+                _issueList.makeItem = MakeIssueItem;
                 _issueList.bindItem = BindIssueItem;
                 _issueList.itemsSource = _issues;
-                _issueList.selectionChanged += OnIssueSelected;
             }
+
+            _issueToggle = rootVisualElement.Q<ToolbarToggle>("issue-toggle");
+            _issueToggle?.RegisterValueChangedCallback(_ => UpdateIssueListVisibility());
 
             var saveButton = rootVisualElement.Q<ToolbarButton>("save-button");
             if (saveButton != null)
@@ -100,7 +111,10 @@ namespace Reiga.VisualNodeEditor.Editor
             }
 
             _assetNameLabel = rootVisualElement.Q<Label>("asset-name");
-            _issueSummaryLabel = rootVisualElement.Q<Label>("issue-summary");
+            _assetNameLabel?.RegisterCallback<ClickEvent>(_ => PingAsset());
+
+            // 未保存状態は Ctrl+S やアセット側の変更でも変わるため、定期的に確認する
+            rootVisualElement.schedule.Execute(UpdateAssetLabel).Every(AssetLabelRefreshIntervalMs);
 
             Refresh();
         }
@@ -122,13 +136,38 @@ namespace Reiga.VisualNodeEditor.Editor
         private void Refresh()
         {
             titleContent = new GUIContent(_asset != null ? _asset.name : "Visual Node Editor");
-            if (_assetNameLabel != null)
-            {
-                _assetNameLabel.text = _asset != null ? AssetDatabase.GetAssetPath(_asset) : NoAssetLabel;
-            }
+            UpdateAssetLabel();
 
+            // アセットを開いた時点で既にあるエラーでは一覧を自動で開かない
+            _resetIssueBaseline = true;
             _inspector?.Show(null, null);
             _graphView?.Populate(_asset);
+        }
+
+        private void UpdateAssetLabel()
+        {
+            if (_assetNameLabel == null)
+            {
+                return;
+            }
+
+            if (_asset == null)
+            {
+                _assetNameLabel.text = NoAssetLabel;
+                _assetNameLabel.tooltip = string.Empty;
+                return;
+            }
+
+            _assetNameLabel.text = _asset.name + (EditorUtility.IsDirty(_asset) ? DirtyMark : string.Empty);
+            _assetNameLabel.tooltip = AssetDatabase.GetAssetPath(_asset);
+        }
+
+        private void PingAsset()
+        {
+            if (_asset != null)
+            {
+                EditorGUIUtility.PingObject(_asset);
+            }
         }
 
         private void Revalidate()
@@ -141,34 +180,69 @@ namespace Reiga.VisualNodeEditor.Editor
 
             _graphView?.ShowIssues(_issues);
             _issueList?.Rebuild();
+            UpdateIssueToggle();
+            UpdateAssetLabel();
+        }
 
-            if (_issueSummaryLabel != null)
+        private void UpdateIssueToggle()
+        {
+            var errorKeys = _issues.Where(i => i.Severity == GraphIssueSeverity.Error).Select(IssueStatus.GetKey).ToList();
+            var hasNewErrors = IssueStatus.HasNewErrors(_knownErrorKeys, errorKeys);
+            _knownErrorKeys.Clear();
+            _knownErrorKeys.UnionWith(errorKeys);
+
+            if (_issueToggle == null)
             {
-                var errors = _issues.Count(i => i.Severity == GraphIssueSeverity.Error);
-                var warnings = _issues.Count - errors;
-                _issueSummaryLabel.text = _asset == null ? string.Empty
-                    : _issues.Count == 0 ? "No issues"
-                    : $"{errors} error(s), {warnings} warning(s)";
-                _issueSummaryLabel.EnableInClassList(IssueErrorClassName, errors > 0);
-                _issueSummaryLabel.EnableInClassList(IssueWarningClassName, errors == 0 && warnings > 0);
+                return;
             }
+
+            var errors = errorKeys.Count;
+            var warnings = _issues.Count - errors;
+            var state = IssueStatus.GetState(errors, warnings);
+            _issueToggle.text = _asset == null ? string.Empty : IssueStatus.GetText(errors, warnings);
+            _issueToggle.EnableInClassList(IssueErrorClassName, state == IssueDisplayState.Error);
+            _issueToggle.EnableInClassList(IssueWarningClassName, state == IssueDisplayState.Warning);
+
+            if (hasNewErrors && !_resetIssueBaseline)
+            {
+                _issueToggle.value = true;
+            }
+
+            _resetIssueBaseline = false;
+            UpdateIssueListVisibility();
+        }
+
+        private void UpdateIssueListVisibility()
+        {
+            // 問題が無いときはトグルの状態に関わらず一覧を出さない（下部パネルが場所を取らないように）
+            var visible = _issueToggle != null && _issueToggle.value && _issues.Count > 0;
+            _issueList?.EnableInClassList(IssueListHiddenClassName, !visible);
+        }
+
+        private VisualElement MakeIssueItem()
+        {
+            var label = new Label();
+            label.AddToClassList("vne-issue-list__item");
+
+            // 選択状態に頼らずクリックごとに反応させる（同じ項目を続けてクリックしてもフォーカスし直せる）
+            label.RegisterCallback<ClickEvent>(_ =>
+            {
+                if (label.userData is GraphIssue issue && issue.NodeId != null)
+                {
+                    _graphView.FocusNode(issue.NodeId);
+                }
+            });
+            return label;
         }
 
         private void BindIssueItem(VisualElement element, int index)
         {
             var issue = _issues[index];
             var label = (Label)element;
+            label.userData = issue;
             label.text = issue.Message;
             label.EnableInClassList(IssueErrorClassName, issue.Severity == GraphIssueSeverity.Error);
             label.EnableInClassList(IssueWarningClassName, issue.Severity == GraphIssueSeverity.Warning);
-        }
-
-        private void OnIssueSelected(IEnumerable<object> selected)
-        {
-            if (selected.FirstOrDefault() is GraphIssue issue && issue.NodeId != null)
-            {
-                _graphView.FocusNode(issue.NodeId);
-            }
         }
 
         private void OnSelectedNodeChanged(NodeView view)
@@ -202,6 +276,7 @@ namespace Reiga.VisualNodeEditor.Editor
             if (_asset != null)
             {
                 AssetDatabase.SaveAssetIfDirty(_asset);
+                UpdateAssetLabel();
             }
         }
     }

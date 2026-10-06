@@ -5,7 +5,7 @@ namespace Reiga.VisualNodeEditor
 {
     /// <summary>ゲームステート（タイトル / プレイ中 / ポーズ など）。</summary>
     [Serializable]
-    [NodeMenu("Flow/State")]
+    [NodeMenu("State/State")]
     public sealed class StateNode : NodeData
     {
         [SerializeField, TextArea] private string _description;

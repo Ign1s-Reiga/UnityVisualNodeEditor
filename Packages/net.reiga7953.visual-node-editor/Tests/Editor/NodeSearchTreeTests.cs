@@ -13,7 +13,7 @@ namespace Reiga.VisualNodeEditor.Tests
             var items = NodeMenuCatalog.GetItems();
             var paths = items.Select(i => i.Path).ToList();
 
-            Assert.That(paths, Is.SupersetOf(new[] { "Flow/Entry", "Flow/Event", "Flow/Scene", "Flow/State", "Misc/Note" }));
+            Assert.That(paths, Is.SupersetOf(new[] { "Event/Event", "Flow/Entry", "Flow/Scene", "Misc/Note", "State/State" }));
             Assert.That(paths, Is.Ordered.Using<string>(System.StringComparer.Ordinal));
             Assert.That(items.Single(i => i.Path == "Flow/Scene").NodeType, Is.EqualTo(typeof(SceneNode)));
         }

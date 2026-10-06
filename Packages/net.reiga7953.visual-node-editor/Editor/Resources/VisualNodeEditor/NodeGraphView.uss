@@ -1,0 +1,13 @@
+/*
+ * Attached to NodeGraphView itself. GraphView attaches its built-in GraphView.uss to itself too,
+ * and for equal specificity the sheet closest to the element wins, so grid styles placed on the
+ * window root were silently overridden.
+ */
+
+GridBackground {
+  --grid-background-color: #1e1e1e;
+  --line-color: rgba(255, 255, 255, 0.07);
+  --thick-line-color: rgba(255, 255, 255, 0.15);
+  --spacing: 20;
+  --thick-lines: 10;
+}

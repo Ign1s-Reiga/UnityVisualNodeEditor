@@ -5,7 +5,7 @@ namespace Reiga.VisualNodeEditor
 {
     /// <summary>ステート間遷移などのトリガーとなるイベント。</summary>
     [Serializable]
-    [NodeMenu("Flow/Event")]
+    [NodeMenu("Event/Event")]
     public sealed class EventNode : NodeData
     {
         [SerializeField] private string _eventName;

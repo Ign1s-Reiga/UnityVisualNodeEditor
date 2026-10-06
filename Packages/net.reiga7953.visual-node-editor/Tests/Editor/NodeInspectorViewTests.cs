@@ -25,9 +25,27 @@ namespace Reiga.VisualNodeEditor.Tests
 
             inspector.Show(_graph, node.Id);
 
-            // Title と EventName のみ（Id / Position は HideInInspector）
+            // EventName のみ（Title はヘッダー、Id / Position は HideInInspector）
             Assert.That(inspector.NodeId, Is.EqualTo(node.Id));
-            Assert.That(inspector.Query<PropertyField>().ToList(), Has.Count.EqualTo(2));
+            var fields = inspector.Query<PropertyField>().ToList();
+            Assert.That(fields, Has.Count.EqualTo(1));
+            Assert.That(fields[0].label, Is.EqualTo("Event Name"));
+        }
+
+        [Test]
+        public void Show_HeaderHasTitleFieldWithPlaceholder()
+        {
+            var node = new EventNode();
+            _graph.AddNode(node);
+            var inspector = new NodeInspectorView();
+
+            inspector.Show(_graph, node.Id);
+
+            var title = inspector.Q<TextField>(className: "vne-inspector-view__title");
+            Assert.That(title, Is.Not.Null);
+            Assert.That(title.bindingPath, Does.EndWith("." + NodeInspectorView.TitlePropertyName));
+            Assert.That(title.textEdition.placeholder, Is.EqualTo("(Title)"));
+            Assert.That(inspector.Q(className: "vne-inspector-view__icon"), Is.Not.Null);
         }
 
         [Test]

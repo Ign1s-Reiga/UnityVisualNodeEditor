@@ -1,0 +1,64 @@
+/*
+ * Attached to each NodeView itself (not the window root) so that it reliably overrides
+ * GraphView's built-in Node.uss, which is also attached to the node.
+ * Category colors come from the variables on .vne-root (NodeGraphEditor.uss).
+ */
+
+/* Category strip along the top edge of the title */
+
+.vne-node #title {
+  border-top-width: 3px;
+  border-top-color: var(--vne-category-default);
+}
+
+.vne-node--flow #title {
+  border-top-color: var(--vne-category-flow);
+}
+
+.vne-node--state #title {
+  border-top-color: var(--vne-category-state);
+}
+
+.vne-node--event #title {
+  border-top-color: var(--vne-category-event);
+}
+
+.vne-node--entity #title {
+  border-top-color: var(--vne-category-entity);
+}
+
+.vne-node--system #title {
+  border-top-color: var(--vne-category-system);
+}
+
+/* One-line summary directly below the title */
+
+.vne-node__summary {
+  max-width: 220px;
+  padding: 2px 8px 4px 8px;
+  font-size: 11px;
+  color: #b4b4b4;
+  background-color: #2b2b2b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -unity-text-align: middle-left;
+}
+
+/* Nodes with at most one input and one output don't need "in" / "out" labels */
+
+.vne-node--hide-port-labels Port #type {
+  display: none;
+}
+
+/* Validation */
+
+.vne-node--warning #node-border {
+  border-color: #e0a030;
+  border-width: 2px;
+}
+
+.vne-node--error #node-border {
+  border-color: #e04040;
+  border-width: 2px;
+}

@@ -1,4 +1,5 @@
 using System;
+using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
@@ -14,6 +15,10 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         // NodeGraphAsset / NodeData の private フィールド名（EditMode テストで存在を検証している）
         internal const string NodesPropertyName = "_nodes";
         internal const string IdPropertyName = "_id";
+        internal const string TitlePropertyName = "_title";
+
+        private const string TitlePlaceholder = "(Title)";
+        private const string CategoryClassPrefix = "vne-category--";
 
         private SerializedObject _serializedObject;
         private int _index = -1;
@@ -52,23 +57,61 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             // 中身ごと差し替えることで、前のノードのバインディングと変更監視を確実に外す
             var content = new VisualElement();
             content.AddToClassList("vne-inspector-view__content");
-
-            var header = new Label(ObjectNames.NicifyVariableName(asset.Nodes[_index].GetType().Name));
-            header.AddToClassList("vne-inspector-view__header");
-            content.Add(header);
+            content.Add(CreateHeader(asset.Nodes[_index].GetType(), nodeProperty));
 
             var child = nodeProperty.Copy();
             var end = nodeProperty.GetEndProperty();
             var hasChild = child.NextVisible(true);
             while (hasChild && !SerializedProperty.EqualContents(child, end))
             {
-                content.Add(new PropertyField(child.Copy()));
+                // タイトルはヘッダーで編集する
+                if (child.name != TitlePropertyName)
+                {
+                    var field = new PropertyField(child.Copy(), NodeDisplay.GetFieldLabel(child.name));
+                    field.AddToClassList("vne-inspector-view__field");
+                    content.Add(field);
+                }
+
                 hasChild = child.NextVisible(false);
             }
 
             Add(content);
             content.Bind(_serializedObject);
             content.TrackSerializedObjectValue(_serializedObject, OnSerializedObjectChanged);
+        }
+
+        /// <summary>カテゴリ色のアイコン + 型の表示名 + タイトル入力欄。</summary>
+        private static VisualElement CreateHeader(Type nodeType, SerializedProperty nodeProperty)
+        {
+            var header = new VisualElement();
+            header.AddToClassList("vne-inspector-view__header");
+
+            var typeRow = new VisualElement();
+            typeRow.AddToClassList("vne-inspector-view__type-row");
+
+            var icon = new VisualElement();
+            icon.AddToClassList("vne-inspector-view__icon");
+            var category = NodeCategory.FromType(nodeType);
+            if (category.Length > 0)
+            {
+                icon.AddToClassList(CategoryClassPrefix + category);
+            }
+
+            var typeLabel = new Label(NodeDisplay.GetTypeDisplayName(nodeType));
+            typeLabel.AddToClassList("vne-inspector-view__type");
+            typeRow.Add(icon);
+            typeRow.Add(typeLabel);
+
+            var titleField = new TextField
+            {
+                bindingPath = nodeProperty.FindPropertyRelative(TitlePropertyName).propertyPath,
+            };
+            titleField.textEdition.placeholder = TitlePlaceholder;
+            titleField.AddToClassList("vne-inspector-view__title");
+
+            header.Add(typeRow);
+            header.Add(titleField);
+            return header;
         }
 
         private void ShowEmpty()

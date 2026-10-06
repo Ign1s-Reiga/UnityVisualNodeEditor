@@ -1,31 +1,74 @@
 .vne-root {
   flex-grow: 1;
+
+  /* Category colors, shared by nodes (NodeView.uss) and the inspector header */
+  --vne-category-default: #6e6e6e;
+  --vne-category-flow: #4a90d9;
+  --vne-category-state: #4caf6a;
+  --vne-category-event: #b36ad9;
+  --vne-category-entity: #2bb3a3;
+  --vne-category-system: #d19a52;
 }
+
+.vne-inspector-view__icon.vne-category--flow {
+  background-color: var(--vne-category-flow);
+}
+
+.vne-inspector-view__icon.vne-category--state {
+  background-color: var(--vne-category-state);
+}
+
+.vne-inspector-view__icon.vne-category--event {
+  background-color: var(--vne-category-event);
+}
+
+.vne-inspector-view__icon.vne-category--entity {
+  background-color: var(--vne-category-entity);
+}
+
+.vne-inspector-view__icon.vne-category--system {
+  background-color: var(--vne-category-system);
+}
+
+/* Toolbar */
 
 .vne-toolbar-spacer {
   flex-grow: 1;
 }
 
+/* Long names are cut from the start so the distinctive end and the " *" mark stay visible */
+.vne-asset-name {
+  flex-shrink: 1;
+  min-width: 40px;
+  max-width: 50%;
+  margin-left: 4px;
+  margin-right: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -unity-text-overflow-position: start;
+  -unity-text-align: middle-right;
+}
+
+.vne-asset-name:hover {
+  color: #ffffff;
+}
+
+/* Layout: TwoPaneSplitView (graph | inspector) */
+
 .vne-main {
   flex-grow: 1;
-  flex-direction: row;
 }
 
 .vne-graph-container {
   flex-grow: 1;
-}
-
-GridBackground {
-  --grid-background-color: #202020;
-  --line-color: rgba(255, 255, 255, 0.05);
-  --thick-line-color: rgba(255, 255, 255, 0.1);
-  --spacing: 20;
+  min-width: 200px;
 }
 
 /* Inspector */
 
 .vne-inspector {
-  width: 300px;
+  min-width: 220px;
   border-left-width: 1px;
   border-left-color: #191919;
   background-color: #282828;
@@ -36,9 +79,38 @@ GridBackground {
 }
 
 .vne-inspector-view__header {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom-width: 1px;
+  border-bottom-color: #191919;
+}
+
+.vne-inspector-view__type-row {
+  flex-direction: row;
+  align-items: center;
+  margin-left: 3px;
+  margin-bottom: 2px;
+}
+
+.vne-inspector-view__icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 5px;
+  flex-shrink: 0;
+  background-color: var(--vne-category-default);
+}
+
+.vne-inspector-view__type {
+  font-size: 10px;
+  color: #a0a0a0;
+  -unity-text-align: middle-left;
+}
+
+.vne-inspector-view__title > .unity-base-text-field__input {
+  font-size: 14px;
   -unity-font-style: bold;
-  font-size: 13px;
-  margin-bottom: 6px;
+  min-height: 22px;
 }
 
 .vne-inspector-view__empty {
@@ -46,33 +118,74 @@ GridBackground {
   white-space: normal;
 }
 
-/* Validation */
+/* Fields: labels take a share of the panel width and inputs may shrink, so nothing overflows at 220px */
 
-.vne-node--warning #node-border {
-  border-color: #e0a030;
-  border-width: 2px;
+.vne-inspector-view .unity-base-field {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
-.vne-node--error #node-border {
-  border-color: #e04040;
-  border-width: 2px;
+.vne-inspector-view .unity-base-field__label {
+  min-width: 0;
+  width: 38%;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.vne-issue-summary {
-  -unity-text-align: middle-left;
-  margin-right: 12px;
+.vne-inspector-view .unity-base-field__input {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.vne-inspector-view .unity-text-field__input--multiline {
+  white-space: normal;
+}
+
+/* Validation (node borders are in NodeView.uss) */
+
+.vne-issue-toggle {
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.vne-issue-toggle .unity-toggle__text {
+  margin-left: 4px;
+  margin-right: 4px;
+}
+
+.vne-issue-toggle.vne-issue--warning .unity-toggle__text {
+  color: #e0a030;
+}
+
+.vne-issue-toggle.vne-issue--error .unity-toggle__text {
+  color: #e04040;
 }
 
 .vne-issue-list {
   height: 100px;
+  flex-shrink: 0;
   border-top-width: 1px;
   border-top-color: #191919;
   background-color: #282828;
 }
 
-.vne-issue-list Label {
+.vne-issue-list--hidden {
+  display: none;
+}
+
+/* The list is hidden whenever there are no issues, so never show "List is empty" */
+.vne-issue-list .unity-list-view__empty-label {
+  display: none;
+}
+
+.vne-issue-list__item {
   -unity-text-align: middle-left;
   padding-left: 6px;
+}
+
+.vne-issue-list__item:hover {
+  background-color: #3a3a3a;
 }
 
 .vne-issue--warning {

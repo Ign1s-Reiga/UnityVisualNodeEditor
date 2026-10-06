@@ -14,6 +14,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
     /// </summary>
     public sealed class NodeGraphView : GraphView
     {
+        private const string StyleSheetPath = "VisualNodeEditor/NodeGraphView";
+
         private NodeGraphAsset _asset;
 
         // Populate やプログラムからの変更中は、GraphView のコールバックをアセットへ書き戻さない
@@ -26,7 +28,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             this.AddManipulator(new SelectionDragger());
             this.AddManipulator(new RectangleSelector());
 
-            var grid = new GridBackground();
+            // GraphView は既定 USS を自身に付けており、同じ詳細度ならより近い USS が勝つ。
+            // ウィンドウのルートに書いたグリッドのスタイルは負けて効かないため、GraphView 自身に付ける
+            var styleSheet = Resources.Load<StyleSheet>(StyleSheetPath);
+            if (styleSheet != null)
+            {
+                styleSheets.Add(styleSheet);
+            }
+
+            // グリッドは最背面（contentViewContainer より前）に置き、GraphView 全体に広げる
+            var grid = new GridBackground { name = "vne-grid" };
             Insert(0, grid);
             grid.StretchToParentSize();
 
