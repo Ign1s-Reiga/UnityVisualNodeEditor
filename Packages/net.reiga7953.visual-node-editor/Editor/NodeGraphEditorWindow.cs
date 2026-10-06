@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
+using Reiga.VisualNodeEditor.Editor.Scenes;
 using Reiga.VisualNodeEditor.Editor.Search;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor;
@@ -49,12 +50,22 @@ namespace Reiga.VisualNodeEditor.Editor
             }
         }
 
-        // InstanceIDToObject は 6000.5 でコンパイルエラー、代替の EntityIdToObject は 6000.0 に無いため、
-        // どちらにも依存しないよう、ダブルクリックで選択済みになっているアセットを使う
+        // 開こうとしているアセットそのもので判定する（選択中のアセットで判定すると、無関係なダブルクリックまで奪ってしまう）。
+        // 6000.5 から OnOpenAsset は EntityId を渡す形になり、int 版の API はコンパイルエラーになる。
+        // EntityId 自体は 6000.3 からあるが、6000.3 / 6000.4 の OnOpenAsset はまだ int を渡す。
+#if UNITY_6000_5_OR_NEWER
         [OnOpenAsset]
-        private static bool OnOpenAsset(int instanceId, int line)
+        private static bool OnOpenAsset(EntityId entityId, int line) =>
+            TryOpen(EditorUtility.EntityIdToObject(entityId));
+#else
+        [OnOpenAsset]
+        private static bool OnOpenAsset(int instanceId, int line) =>
+            TryOpen(EditorUtility.InstanceIDToObject(instanceId));
+#endif
+
+        private static bool TryOpen(UnityEngine.Object opened)
         {
-            if (Selection.activeObject is NodeGraphAsset asset)
+            if (opened is NodeGraphAsset asset)
             {
                 Open(asset);
                 return true;
@@ -136,6 +147,13 @@ namespace Reiga.VisualNodeEditor.Editor
         private void Refresh()
         {
             titleContent = new GUIContent(_asset != null ? _asset.name : "Visual Node Editor");
+
+            // エディタを閉じている間のシーン改名などは Postprocessor が拾えない場合があるので、開くときにも合わせる
+            if (_asset != null && SceneReferenceSync.Resync(_asset, AssetDatabase.GUIDToAssetPath))
+            {
+                EditorUtility.SetDirty(_asset);
+            }
+
             UpdateAssetLabel();
 
             // アセットを開いた時点で既にあるエラーでは一覧を自動で開かない

@@ -17,8 +17,9 @@ jobs:
       fail-fast: false
       matrix:
         # "project" = ProjectSettings/ProjectVersion.txt (the minimum supported version).
-        # Newer versions catch APIs that became obsolete-as-error after it.
-        unity: [project, 6000.5.2f1]
+        # One build per later minor version: APIs change (e.g. EntityId replaces instance IDs) and
+        # become obsolete-as-error across minors, and the code uses UNITY_6000_N_OR_NEWER branches.
+        unity: [project, 6000.3.25f1, 6000.4.12f1, 6000.5.2f1]
     steps:
       - uses: actions/checkout@v7
 
@@ -56,4 +57,9 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Compile Runtime, Editor and Tests
-        run: dotnet build .github/compile-check/Tests.Editor.csproj -p:UnityManagedDir="$RUNNER_TEMP/unity-managed"
+        env:
+          UNITY_VERSION: ${{ steps.unity.outputs.version }}
+        run: >-
+          dotnet build .github/compile-check/Tests.Editor.csproj
+          -p:UnityManagedDir="$RUNNER_TEMP/unity-managed"
+          -p:UnityVersion="$UNITY_VERSION"

@@ -26,7 +26,12 @@
 - `EdgeData` : `(FromNodeId, FromPort, ToNodeId, ToPort)` の 4 つ組。ポートは文字列名で識別する。
 - `GroupData` : `Id`, `Title`, `Position` と、所属ノードの ID リスト。ノードは高々 1 つのグループに属する。ノード削除時は全グループから ID を外す。
 - `SceneReference` : シーンの `Guid` と `Path`（`Name` は Path から導出）。Runtime は `SceneAsset` 型に触れず文字列だけを持つ。
-  `SceneAsset` との相互変換は Editor の `SceneReferenceDrawer` が行い、シーンの移動・改名は GUID から Path を引き直して追従する。
+  `SceneAsset` との相互変換は Editor の `SceneReferenceDrawer` が行う。
+  ランタイムは Path（と Name）でシーンを読むため、Path は常に GUID から引き直して最新に保つ（`SceneReferenceSync`）:
+  - シーンの移動・改名・再インポート時: `SceneReferencePostprocessor` が全グラフを更新して保存する
+  - グラフをエディタで開いたとき: 取りこぼし（Unity を閉じている間の変更など）を更新し、未保存状態にする
+  - ドロワーの描画時: 表示中の参照を更新する
+  - GUID から Path が引けない（シーンが削除された）参照は変更しない
 
 Position などエディタ専用の情報も Runtime の型に持たせる（UnityEditor API は使わないため問題ない）。
 ビルドサイズが気になる段階になったら `#if UNITY_EDITOR` で strip するのではなく、別の EditorData に分離する。

@@ -2,8 +2,26 @@
   <!--
     Compile-only check of the UPM package outside Unity.
     Mirrors the asmdef boundaries: Runtime sees UnityEngine only, Editor/Tests also see UnityEditor.
-    UnityManagedDir must point at <Unity>/Editor/Data/Managed/UnityEngine of the version in ProjectVersion.txt.
+    UnityManagedDir must point at <Unity>/Editor/Data/Managed/UnityEngine of the version in ProjectVersion.txt,
+    and UnityVersion must be that version (e.g. 6000.5.2f1) so the UNITY_6000_N_OR_NEWER symbols Unity defines
+    are defined here too and version-specific #if branches are checked.
   -->
+  <PropertyGroup>
+    <UnityMinor>$([System.Text.RegularExpressions.Regex]::Replace('$(UnityVersion)', '^6000\.(\d+)\..*$', '$1'))</UnityMinor>
+    <!-- Missing or unparsable version: -1 keeps the comparisons below numeric; CheckUnityManagedDir reports it. -->
+    <UnityMinor Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(UnityMinor)', '^\d+$'))">-1</UnityMinor>
+    <DefineConstants>$(DefineConstants);UNITY_6000_0_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '1'">$(DefineConstants);UNITY_6000_1_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '2'">$(DefineConstants);UNITY_6000_2_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '3'">$(DefineConstants);UNITY_6000_3_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '4'">$(DefineConstants);UNITY_6000_4_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '5'">$(DefineConstants);UNITY_6000_5_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '6'">$(DefineConstants);UNITY_6000_6_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '7'">$(DefineConstants);UNITY_6000_7_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '8'">$(DefineConstants);UNITY_6000_8_OR_NEWER</DefineConstants>
+    <DefineConstants Condition="'$(UnityMinor)' &gt;= '9'">$(DefineConstants);UNITY_6000_9_OR_NEWER</DefineConstants>
+  </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -20,5 +38,7 @@
   <Target Name="CheckUnityManagedDir" BeforeTargets="ResolveAssemblyReferences">
     <Error Condition="'$(UnityManagedDir)' == '' Or !Exists('$(UnityManagedDir)/UnityEngine.CoreModule.dll')"
            Text="Pass -p:UnityManagedDir=&lt;Unity&gt;/Editor/Data/Managed/UnityEngine (got '$(UnityManagedDir)')." />
+    <Error Condition="'$(UnityMinor)' == '-1'"
+           Text="Pass -p:UnityVersion=&lt;6000.x.yfz&gt; matching UnityManagedDir (got '$(UnityVersion)')." />
   </Target>
 </Project>
