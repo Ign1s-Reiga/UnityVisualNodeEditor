@@ -27,6 +27,9 @@ namespace Reiga.VisualNodeEditor.Editor
         // ドメインリロード後も同じアセットを開き直せるようシリアライズする
         [SerializeField] private NodeGraphAsset _asset;
 
+        // ミニマップの表示状態もドメインリロード後に保つ
+        [SerializeField] private bool _miniMapVisible;
+
         private NodeGraphView _graphView;
         private NodeSearchWindow _searchWindow;
         private NodeInspectorView _inspector;
@@ -119,6 +122,30 @@ namespace Reiga.VisualNodeEditor.Editor
             if (saveButton != null)
             {
                 saveButton.clicked += Save;
+            }
+
+            var frameAllButton = rootVisualElement.Q<ToolbarButton>("frame-all-button");
+            if (frameAllButton != null)
+            {
+                frameAllButton.clicked += () => _graphView.FrameAll();
+            }
+
+            var frameSelectionButton = rootVisualElement.Q<ToolbarButton>("frame-selection-button");
+            if (frameSelectionButton != null)
+            {
+                frameSelectionButton.clicked += _graphView.FrameSelectionOrAll;
+            }
+
+            _graphView.MiniMapVisible = _miniMapVisible;
+            var miniMapToggle = rootVisualElement.Q<ToolbarToggle>("minimap-toggle");
+            if (miniMapToggle != null)
+            {
+                miniMapToggle.SetValueWithoutNotify(_miniMapVisible);
+                miniMapToggle.RegisterValueChangedCallback(evt =>
+                {
+                    _miniMapVisible = evt.newValue;
+                    _graphView.MiniMapVisible = evt.newValue;
+                });
             }
 
             _assetNameLabel = rootVisualElement.Q<Label>("asset-name");

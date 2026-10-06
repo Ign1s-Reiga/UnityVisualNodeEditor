@@ -32,5 +32,8 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>タイトル未設定時に表示される既定名。</summary>
         protected abstract string DefaultTitle { get; }
+
+        /// <summary>新しい ID を振り直す（貼り付け・複製でコピーを作るときに使う）。</summary>
+        internal void AssignNewId() => _id = Guid.NewGuid().ToString("N");
     }
 }

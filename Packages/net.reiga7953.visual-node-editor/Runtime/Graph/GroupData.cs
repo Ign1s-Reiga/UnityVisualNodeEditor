@@ -47,5 +47,18 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>ノードの所属を外す。</summary>
         public bool RemoveNode(string nodeId) => _nodeIds.Remove(nodeId);
+
+        /// <summary>新しい ID を振り直す（貼り付け・複製でコピーを作るときに使う）。</summary>
+        internal void AssignNewId() => _id = Guid.NewGuid().ToString("N");
+
+        /// <summary>所属ノードの ID をまとめて置き換える（貼り付け時に新しいノード ID へ付け替える）。</summary>
+        internal void ReplaceNodeIds(IEnumerable<string> nodeIds)
+        {
+            _nodeIds.Clear();
+            foreach (var nodeId in nodeIds)
+            {
+                AddNode(nodeId);
+            }
+        }
     }
 }

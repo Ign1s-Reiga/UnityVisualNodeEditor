@@ -2,6 +2,10 @@
   <ui:VisualElement name="root" class="vne-root">
     <uie:Toolbar name="toolbar" class="vne-toolbar">
       <uie:ToolbarButton name="save-button" text="Save" />
+      <uie:ToolbarSpacer />
+      <uie:ToolbarButton name="frame-all-button" text="Frame All" tooltip="Show the whole graph (A)" />
+      <uie:ToolbarButton name="frame-selection-button" text="Frame Selection" tooltip="Show the selection, or the whole graph if nothing is selected (F)" />
+      <uie:ToolbarToggle name="minimap-toggle" text="MiniMap" tooltip="Show or hide the minimap" />
       <ui:VisualElement class="vne-toolbar-spacer" />
       <uie:ToolbarToggle name="issue-toggle" class="vne-issue-toggle" tooltip="Show or hide the issue list" />
       <ui:Label name="asset-name" class="vne-asset-name" text="(no asset)" />

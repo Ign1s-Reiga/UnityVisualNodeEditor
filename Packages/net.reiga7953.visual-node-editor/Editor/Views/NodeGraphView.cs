@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Clipboard;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -15,6 +16,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
     public sealed class NodeGraphView : GraphView
     {
         private const string StyleSheetPath = "VisualNodeEditor/NodeGraphView";
+
+        // 貼り付けた要素を元の位置から少しずらす量。同じ内容を続けて貼るたびに、さらにこの分ずらす
+        private static readonly Vector2 PasteOffset = new Vector2(30f, 30f);
+
+        private string _lastPastedData;
+        private int _pasteCount;
+
+        // 位置・大きさは NodeGraphView.uss（#vne-minimap）で決める
+        private readonly MiniMap _miniMap = new MiniMap { anchored = true, name = "vne-minimap" };
 
         private NodeGraphAsset _asset;
 
@@ -41,10 +51,17 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             Insert(0, grid);
             grid.StretchToParentSize();
 
+            // Ctrl+C / X / V / D と右クリックの Copy / Cut / Paste / Duplicate は GraphView が処理し、ここに委ねる
+            serializeGraphElements = SerializeElements;
+            canPasteSerializedData = GraphClipboard.CanPaste;
+            unserializeAndPaste = PasteElements;
+
             graphViewChanged = OnGraphViewChanged;
             elementsAddedToGroup = OnElementsAddedToGroup;
             elementsRemovedFromGroup = OnElementsRemovedFromGroup;
             groupTitleChanged = OnGroupTitleChanged;
+            _miniMap.graphView = this;
+            RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
         }
@@ -57,6 +74,36 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         /// <summary>現在表示しているアセット。</summary>
         public NodeGraphAsset Asset => _asset;
+
+        /// <summary>ミニマップを表示するか。</summary>
+        public bool MiniMapVisible
+        {
+            get => _miniMap.parent == this;
+            set
+            {
+                if (value && _miniMap.parent != this)
+                {
+                    Add(_miniMap);
+                }
+                else if (!value)
+                {
+                    _miniMap.RemoveFromHierarchy();
+                }
+            }
+        }
+
+        /// <summary>選択中の要素が収まるように表示する。何も選択していなければ全体を表示する。</summary>
+        public void FrameSelectionOrAll()
+        {
+            if (selection.Count == 0)
+            {
+                FrameAll();
+            }
+            else
+            {
+                FrameSelection();
+            }
+        }
 
         /// <summary>アセットの内容でビューを再構築する。再構築中の変更はアセットへ書き戻さない。</summary>
         public void Populate(NodeGraphAsset asset)
@@ -211,6 +258,26 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             var position = contentViewContainer.WorldToLocal(evt.mousePosition);
             evt.menu.AppendSeparator();
             evt.menu.AppendAction("Create Group", _ => CreateGroup(position));
+            evt.menu.AppendAction("Create Sticky Note", _ => CreateStickyNote(position));
+        }
+
+        /// <summary><paramref name="position"/>（グラフ座標）に付箋を追加する。アセット未設定のときは何もせず null を返す。</summary>
+        public StickyNoteView CreateStickyNote(Vector2 position)
+        {
+            if (_asset == null)
+            {
+                return null;
+            }
+
+            var data = new StickyNoteData { Rect = new Rect(position, StickyNoteData.DefaultSize) };
+
+            Undo.RecordObject(_asset, "Create Sticky Note");
+            _asset.AddStickyNote(data);
+            EditorUtility.SetDirty(_asset);
+
+            var view = AddStickyNoteView(data);
+            GraphChanged?.Invoke();
+            return view;
         }
 
         public override void AddToSelection(ISelectable selectable)
@@ -288,6 +355,11 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
                 groupView.AddElements(members);
             }
+
+            foreach (var stickyNote in asset.StickyNotes)
+            {
+                AddStickyNoteView(stickyNote);
+            }
         }
 
         private GraphViewChange OnGraphViewChanged(GraphViewChange change)
@@ -314,6 +386,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                             break;
                         case GroupView groupView:
                             _asset.RemoveGroup(_asset.FindGroup(groupView.GroupId));
+                            break;
+                        case StickyNoteView stickyNoteView:
+                            _asset.RemoveStickyNote(_asset.FindStickyNote(stickyNoteView.StickyNoteId));
                             break;
                     }
                 }
@@ -372,6 +447,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 case GroupView groupView when _asset.FindGroup(groupView.GroupId) is GroupData group:
                     group.Position = position;
                     break;
+                case StickyNoteView stickyNoteView when _asset.FindStickyNote(stickyNoteView.StickyNoteId) is StickyNoteData stickyNote:
+                    stickyNote.Rect = new Rect(position, stickyNote.Rect.size);
+                    break;
             }
         }
 
@@ -422,6 +500,147 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             Undo.RecordObject(_asset, "Rename Group");
             data.Title = title;
+            EditorUtility.SetDirty(_asset);
+        }
+
+        /// <summary>F = 選択範囲（無ければ全体）、A = 全体。付箋のタイトルなどを入力中は文字入力を優先する。</summary>
+        private void OnKeyDown(KeyDownEvent evt)
+        {
+            if (evt.modifiers != EventModifiers.None || IsEditingText(evt.target as VisualElement))
+            {
+                return;
+            }
+
+            switch (evt.keyCode)
+            {
+                case KeyCode.F:
+                    FrameSelectionOrAll();
+                    break;
+                case KeyCode.A:
+                    FrameAll();
+                    break;
+                default:
+                    return;
+            }
+
+            evt.StopPropagation();
+        }
+
+        private static bool IsEditingText(VisualElement target) =>
+            target is TextField || target?.GetFirstAncestorOfType<TextField>() != null;
+
+        private string SerializeElements(IEnumerable<GraphElement> elements)
+        {
+            var list = elements.ToList();
+            return GraphClipboard.Serialize(
+                _asset,
+                list.OfType<NodeView>().Select(v => v.NodeId),
+                list.OfType<GroupView>().Select(v => v.GroupId),
+                list.OfType<StickyNoteView>().Select(v => v.StickyNoteId));
+        }
+
+        private void PasteElements(string operationName, string data)
+        {
+            if (_asset == null)
+            {
+                return;
+            }
+
+            _pasteCount = data == _lastPastedData ? _pasteCount + 1 : 1;
+            _lastPastedData = data;
+
+            var content = GraphClipboard.Deserialize(data, PasteOffset * _pasteCount);
+            if (content == null || content.IsEmpty)
+            {
+                return;
+            }
+
+            Undo.RecordObject(_asset, operationName);
+            foreach (var node in content.Nodes)
+            {
+                _asset.AddNode(node);
+            }
+
+            foreach (var edge in content.Edges)
+            {
+                _asset.AddEdge(edge);
+            }
+
+            foreach (var group in content.Groups)
+            {
+                _asset.AddGroup(group);
+            }
+
+            foreach (var stickyNote in content.StickyNotes)
+            {
+                _asset.AddStickyNote(stickyNote);
+            }
+
+            EditorUtility.SetDirty(_asset);
+
+            // 再構築してから、貼り付けた要素だけを選択状態にする
+            Populate(_asset);
+            ClearSelection();
+            var pastedKeys = content.Nodes.Select(n => n.Id)
+                .Concat(content.Groups.Select(g => g.Id))
+                .Concat(content.StickyNotes.Select(s => s.Id));
+            foreach (var key in pastedKeys)
+            {
+                if (GetElementByGuid(key) is GraphElement element)
+                {
+                    AddToSelection(element);
+                }
+            }
+        }
+
+        private StickyNoteView AddStickyNoteView(StickyNoteData data)
+        {
+            var view = new StickyNoteView(data);
+            view.RegisterCallback<StickyNoteChangeEvent>(evt => OnStickyNoteChanged(view, evt.change));
+            view.Resized += SaveStickyNoteRect;
+            AddElement(view);
+            return view;
+        }
+
+        private void OnStickyNoteChanged(StickyNoteView view, StickyNoteChange change)
+        {
+            if (_suppressSync || _asset == null || !(_asset.FindStickyNote(view.StickyNoteId) is StickyNoteData data))
+            {
+                return;
+            }
+
+            Undo.RecordObject(_asset, "Edit Sticky Note");
+            switch (change)
+            {
+                case StickyNoteChange.Title:
+                    data.Title = view.title;
+                    break;
+                case StickyNoteChange.Contents:
+                    data.Contents = view.contents;
+                    break;
+                case StickyNoteChange.Theme:
+                    data.Theme = StickyNoteView.FromGraphView(view.theme);
+                    break;
+                case StickyNoteChange.FontSize:
+                    data.FontSize = StickyNoteView.FromGraphView(view.fontSize);
+                    break;
+                case StickyNoteChange.Position:
+                    data.Rect = view.GetPosition();
+                    break;
+            }
+
+            EditorUtility.SetDirty(_asset);
+        }
+
+        private void SaveStickyNoteRect(StickyNoteView view)
+        {
+            if (_suppressSync || _asset == null || !(_asset.FindStickyNote(view.StickyNoteId) is StickyNoteData data))
+            {
+                return;
+            }
+
+            Undo.RecordObject(_asset, "Resize Sticky Note");
+            data.Rect = view.GetPosition();
             EditorUtility.SetDirty(_asset);
         }
 

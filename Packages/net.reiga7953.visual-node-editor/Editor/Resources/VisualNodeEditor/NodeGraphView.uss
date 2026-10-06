@@ -11,3 +11,15 @@ GridBackground {
   --spacing: 20;
   --thick-lines: 10;
 }
+
+/* MiniMap: anchored to the bottom-right corner of the graph */
+#vne-minimap {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 200px;
+  height: 140px;
+  background-color: rgba(20, 20, 20, 0.85);
+  border-width: 1px;
+  border-color: #3a3a3a;
+}

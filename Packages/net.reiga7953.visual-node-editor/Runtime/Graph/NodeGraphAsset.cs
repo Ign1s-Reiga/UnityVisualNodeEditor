@@ -13,6 +13,7 @@ namespace Reiga.VisualNodeEditor
         [SerializeReference] private List<NodeData> _nodes = new();
         [SerializeField] private List<EdgeData> _edges = new();
         [SerializeField] private List<GroupData> _groups = new();
+        [SerializeField] private List<StickyNoteData> _stickyNotes = new();
 
         /// <summary>グラフに含まれる全ノード。型を読み込めなかった要素は null になりうる。</summary>
         public IReadOnlyList<NodeData> Nodes => _nodes;
@@ -22,6 +23,9 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>グラフに含まれる全グループ。</summary>
         public IReadOnlyList<GroupData> Groups => _groups;
+
+        /// <summary>グラフに含まれる全付箋。</summary>
+        public IReadOnlyList<StickyNoteData> StickyNotes => _stickyNotes;
 
         public void AddNode(NodeData node) => _nodes.Add(node);
 
@@ -58,5 +62,11 @@ namespace Reiga.VisualNodeEditor
                 && e.ToNodeId == toNodeId && e.ToPort == toPort);
 
         public GroupData FindGroup(string id) => _groups.Find(g => g.Id == id);
+
+        public void AddStickyNote(StickyNoteData stickyNote) => _stickyNotes.Add(stickyNote);
+
+        public bool RemoveStickyNote(StickyNoteData stickyNote) => _stickyNotes.Remove(stickyNote);
+
+        public StickyNoteData FindStickyNote(string id) => _stickyNotes.Find(s => s.Id == id);
     }
 }
