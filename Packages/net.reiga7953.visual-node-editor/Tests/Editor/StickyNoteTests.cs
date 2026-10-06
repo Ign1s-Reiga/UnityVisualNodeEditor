@@ -70,5 +70,18 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(view.theme, Is.EqualTo(GraphViewTheme.Black));
             Assert.That(view.fontSize, Is.EqualTo(GraphViewFontSize.Large));
         }
+
+        [Test]
+        public void Group_RejectsStickyNotesButAcceptsNodes()
+        {
+            var group = new GroupView(new GroupData());
+            var reason = string.Empty;
+
+            Assert.That(group.AcceptsElement(new StickyNoteView(new StickyNoteData()), ref reason), Is.False);
+            Assert.That(reason, Is.Not.Empty);
+
+            reason = string.Empty;
+            Assert.That(group.AcceptsElement(NodeViewFactory.Create(new StateNode()), ref reason), Is.True);
+        }
     }
 }

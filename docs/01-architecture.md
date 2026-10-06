@@ -26,13 +26,14 @@
 - `EdgeData` : `(FromNodeId, FromPort, ToNodeId, ToPort)` の 4 つ組。ポートは文字列名で識別する。
 - `GroupData` : `Id`, `Title`, `Position` と、所属ノードの ID リスト。ノードは高々 1 つのグループに属する。ノード削除時は全グループから ID を外す。
 - `StickyNoteData` : 付箋（グラフ上のコメント）。`Id`, `Title`, `Contents`, `Rect`（位置とサイズ）, `Theme`, `FontSize`。
-  ポートを持たずエッジも繋がらない。グループには属さない（GraphView 上でグループに入れても保存しない）。
+  ポートを持たずエッジも繋がらない。グループには入れられない（`GroupView` が付箋を受け付けない）。
   `Theme` / `FontSize` は GraphView の enum に依存しないよう Runtime 側に同じ値の enum（`StickyNoteTheme` / `StickyNoteFontSize`）を持つ。
   ポート無しの Note ノードとは役割を分ける: Note は構成要素としてのメモ（検索・検証の対象）、付箋は自由に置けるレイアウト上の注釈
 - `SceneReference` : シーンの `Guid` と `Path`（`Name` は Path から導出）。Runtime は `SceneAsset` 型に触れず文字列だけを持つ。
   `SceneAsset` との相互変換は Editor の `SceneReferenceDrawer` が行う。
   ランタイムは Path（と Name）でシーンを読むため、Path は常に GUID から引き直して最新に保つ（`SceneReferenceSync`）:
-  - シーンの移動・改名・再インポート時: `SceneReferencePostprocessor` が全グラフを更新して保存する
+  - シーンの移動・改名・再インポート時: `SceneReferencePostprocessor` が全グラフを更新する。未保存の変更が無かったグラフはそのまま保存し、
+    未保存の変更があるグラフ（エディタで編集中など）は保存せず未保存状態にする（ユーザーの編集を勝手に書き込まないため）
   - グラフをエディタで開いたとき: 取りこぼし（Unity を閉じている間の変更など）を更新し、未保存状態にする
   - ドロワーの描画時: 表示中の参照を更新する
   - GUID から Path が引けない（シーンが削除された）参照は変更しない
@@ -78,7 +79,8 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 `serializeGraphElements` / `canPasteSerializedData` / `unserializeAndPaste` に処理を渡して有効にする。
 
 - クリップボードの中身は `GraphClipboard`（Editor）が作る JSON。ノードは `[SerializeReference]` のまま `JsonUtility` で多態シリアライズする
-  - 先頭に識別子を持たせ、他ツールの文字列やこのツール以外の JSON は貼り付け不可と判定する
+  - 先頭に識別子を持たせ、他ツールの文字列やこのツール以外の JSON は貼り付け不可と判定する。
+    識別子に改行を含めない（OS のクリップボードで改行コードが変わっても判定がずれないように）
 - コピー対象: 選択中のノード・グループ・付箋。グループを選ぶと中のノードも含める。エッジは両端のノードが対象に含まれるものだけ
 - 貼り付け: すべての要素に新しい ID を振り、エッジ・グループの参照を新しい ID に付け替える。位置は元から少しずらす（同じ内容を続けて貼ると、さらにずらす）
 - 貼り付けた要素を選択状態にする。1 回の貼り付け・複製・切り取りは 1 回の Undo で戻せる

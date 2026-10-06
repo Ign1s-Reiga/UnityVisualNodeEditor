@@ -121,6 +121,23 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Paste_SurvivesClipboardLineEndingConversion()
+        {
+            // 本文に改行を含め、OS のクリップボードが LF を CRLF に変えた場合を再現する
+            var note = new StickyNoteData { Contents = "line 1\nline 2" };
+            _graph.AddStickyNote(note);
+            var data = GraphClipboard.Serialize(_graph, new[] { _event.Id }, null, new[] { note.Id });
+
+            var converted = data.Replace("\n", "\r\n");
+
+            Assert.That(GraphClipboard.CanPaste(converted), Is.True);
+            var content = GraphClipboard.Deserialize(converted, Offset);
+            Assert.That(content.Nodes, Has.Count.EqualTo(1));
+            Assert.That(content.StickyNotes.Single().Contents, Is.EqualTo("line 1\nline 2"),
+                "newlines inside values are escaped in the JSON, so they are not affected");
+        }
+
+        [Test]
         public void NothingSelected_SerializesToEmpty()
         {
             Assert.That(GraphClipboard.Serialize(_graph, new string[0], null, null), Is.Empty);

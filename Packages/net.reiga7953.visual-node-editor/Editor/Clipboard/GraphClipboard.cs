@@ -14,8 +14,11 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
     /// </summary>
     public static class GraphClipboard
     {
-        /// <summary>クリップボード文字列の先頭に付ける識別子。これで始まらない文字列は貼り付けない。</summary>
-        public const string Header = "Reiga.VisualNodeEditor/clipboard/v1\n";
+        /// <summary>
+        /// クリップボード文字列の先頭に付ける識別子。これで始まらない文字列は貼り付けない。
+        /// OS のクリップボードで改行コードが変わっても一致するよう、改行を含めない。
+        /// </summary>
+        public const string Header = "Reiga.VisualNodeEditor/clipboard/v1:";
 
         /// <summary>
         /// 指定した要素をクリップボード文字列にする。グループを含めるとその所属ノードも含める。
