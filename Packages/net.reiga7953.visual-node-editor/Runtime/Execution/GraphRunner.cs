@@ -237,6 +237,17 @@ namespace Reiga.VisualNodeEditor
                     _pending.Dequeue()();
                 }
             }
+            catch
+            {
+                // 通知の中で例外が出たら、この遷移の間に積まれた Raise / Advance を捨てる。
+                // 残すと、後の無関係な Raise / Advance のついでに実行されてしまう
+                if (!wasMoving)
+                {
+                    _pending.Clear();
+                }
+
+                throw;
+            }
             finally
             {
                 _isMoving = wasMoving;

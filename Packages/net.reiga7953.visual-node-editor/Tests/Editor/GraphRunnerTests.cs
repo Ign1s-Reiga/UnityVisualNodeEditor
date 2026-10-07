@@ -314,6 +314,53 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ExceptionInHandler_DropsQueuedMoves()
+        {
+            var entry = Add(new EntryNode());
+            var a = Add(new StateNode { Title = "A" });
+            var b = Add(new StateNode { Title = "B" });
+            var c = Add(new StateNode { Title = "C" });
+            var ping = Add(new EventNode { EventName = "Ping" });
+            Connect(entry, a);
+            Connect(a, b);
+            Connect(b, c);
+            Connect(b, ping);
+
+            _runner = new GraphRunner(_graph, _loader);
+            var throwOnB = true;
+            _runner.NodeEntered += node =>
+            {
+                if (node == b && throwOnB)
+                {
+                    throwOnB = false;
+                    _runner.Advance();
+                    throw new System.InvalidOperationException("handler failed");
+                }
+            };
+            _runner.Start();
+
+            Assert.Throws<System.InvalidOperationException>(() => _runner.Advance());
+            Assert.That(_runner.Current, Is.SameAs(b));
+
+            // 捨てられた Advance が、無関係な Raise のついでに実行されないこと
+            Assert.That(_runner.Raise("Ping"), Is.True);
+            Assert.That(_runner.Current, Is.SameAs(b));
+        }
+
+        [TestCase(null, "Assets/A.unity", "Assets/A.unity", false)]
+        [TestCase(null, "Assets/A.unity", "Assets/B.unity", true)]
+        [TestCase("Assets/B.unity", "Assets/A.unity", "Assets/A.unity", true)]
+        [TestCase("Assets/A.unity", "Assets/A.unity", "Assets/B.unity", false)]
+        public void SceneLoader_ComparesWithLoadingSceneFirst(string loadingKey, string requested, string active, bool expected)
+        {
+            // 3 行目: B を読み込み中に A へ戻る（アクティブはまだ A）→ A を読み込む必要がある
+            // 4 行目: A を読み込み中にもう一度 A → 二重に読み込まない
+            var scene = new SceneReference("g", requested);
+
+            Assert.That(SceneManagerSceneLoader.ShouldLoad(scene, loadingKey, active, "x"), Is.EqualTo(expected));
+        }
+
+        [Test]
         public void SceneLoader_KeyAndSameSceneDetection()
         {
             var withPath = new SceneReference("g", "Assets/Scenes/Title.unity");

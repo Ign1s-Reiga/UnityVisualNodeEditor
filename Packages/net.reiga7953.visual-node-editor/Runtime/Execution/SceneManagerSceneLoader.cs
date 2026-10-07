@@ -1,29 +1,52 @@
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Reiga.VisualNodeEditor
 {
     /// <summary>
     /// <see cref="SceneManager.LoadSceneAsync(string, LoadSceneMode)"/>（Single）でシーンを読み込む。
-    /// シーンは Build Settings に入っている必要がある。すでにアクティブなシーンと同じなら読み込まない。
+    /// シーンは Build Settings に入っている必要がある。
+    /// 読み込み中のシーンが無ければ、すでにアクティブなシーンと同じなら読み込まない。
+    /// 読み込み中なら、アクティブなシーンではなく読み込み中のシーンと比べる。
     /// </summary>
     public sealed class SceneManagerSceneLoader : ISceneLoader
     {
+        private AsyncOperation _loading;
+        private string _loadingKey;
+
         /// <inheritdoc />
         public void LoadScene(SceneReference scene)
+        {
+            var loadingKey = _loading != null && !_loading.isDone ? _loadingKey : null;
+            var active = SceneManager.GetActiveScene();
+            if (!ShouldLoad(scene, loadingKey, active.path, active.name))
+            {
+                return;
+            }
+
+            var key = GetLoadKey(scene);
+            _loading = SceneManager.LoadSceneAsync(key, LoadSceneMode.Single);
+            _loadingKey = _loading != null ? key : null;
+        }
+
+        /// <summary>
+        /// 読み込みを始めるべきか。
+        /// 読み込み中のシーン（<paramref name="loadingKey"/>）があればそれと同じでないときだけ読み込む。
+        /// 無ければ、アクティブなシーンと同じでないときだけ読み込む。
+        /// 読み込み中はアクティブなシーンがまだ古いので、A → B → A と素早く戻ったときに A を飛ばさないためにこの順で比べる。
+        /// </summary>
+        /// <param name="loadingKey">読み込み中のシーンの <see cref="GetLoadKey"/>。読み込み中でなければ null。</param>
+        public static bool ShouldLoad(SceneReference scene, string loadingKey, string activeScenePath, string activeSceneName)
         {
             var key = GetLoadKey(scene);
             if (string.IsNullOrEmpty(key))
             {
-                return;
+                return false;
             }
 
-            var active = SceneManager.GetActiveScene();
-            if (IsSameScene(scene, active.path, active.name))
-            {
-                return;
-            }
-
-            SceneManager.LoadSceneAsync(key, LoadSceneMode.Single);
+            return loadingKey != null
+                ? loadingKey != key
+                : !IsSameScene(scene, activeScenePath, activeSceneName);
         }
 
         /// <summary><see cref="SceneManager"/> に渡す文字列。Path があれば Path（同名シーンを区別できる）、無ければ Name。</summary>
