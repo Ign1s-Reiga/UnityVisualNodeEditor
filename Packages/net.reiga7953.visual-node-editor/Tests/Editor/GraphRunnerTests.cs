@@ -314,6 +314,70 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void StepRequestedInNodeExitedDuringStop_IsNotRunAfterRestart()
+        {
+            var entry = Add(new EntryNode());
+            var a = Add(new StateNode { Title = "A" });
+            var b = Add(new StateNode { Title = "B" });
+            Connect(entry, a);
+            Connect(a, b);
+
+            _runner = new GraphRunner(_graph, _loader);
+            var stopOnA = true;
+            bool? advancedDuringStop = null;
+            _runner.NodeEntered += node =>
+            {
+                if (node == a && stopOnA)
+                {
+                    stopOnA = false;
+                    _runner.Stop();
+                }
+            };
+            _runner.NodeExited += node =>
+            {
+                if (node == a && advancedDuringStop == null)
+                {
+                    advancedDuringStop = _runner.Advance();
+                }
+            };
+            _runner.Start();
+            Assert.That(advancedDuringStop, Is.False, "a stopping runner must refuse instead of queueing");
+
+            _runner.Start();
+
+            Assert.That(_runner.Current, Is.SameAs(a), "no stale Advance after restart");
+        }
+
+        [Test]
+        public void EventChainEndingInDeadEndEvent_NotifiesAndStaysOnWaitNode()
+        {
+            var entry = Add(new EntryNode());
+            var a = Add(new StateNode { Title = "A" });
+            var x = Add(new EventNode { EventName = "X" });
+            var y = Add(new EventNode { EventName = "Y" });
+            var b = Add(new StateNode { Title = "B" });
+            Connect(entry, a);
+            Connect(a, x);
+            Connect(x, y);
+            Connect(a, b);
+
+            _runner = new GraphRunner(_graph, _loader);
+            var triggered = new List<string>();
+            var entered = new List<NodeData>();
+            _runner.EventTriggered += triggered.Add;
+            _runner.Start();
+            _runner.NodeEntered += entered.Add;
+
+            Assert.That(_runner.Raise("X"), Is.True);
+
+            Assert.That(_runner.Current, Is.SameAs(a), "must not get stuck on an Event node");
+            Assert.That(entered, Is.Empty);
+            Assert.That(triggered, Is.EqualTo(new[] { "X", "Y" }));
+            Assert.That(_runner.Advance(), Is.True, "the graph can still move on");
+            Assert.That(_runner.Current, Is.SameAs(b));
+        }
+
+        [Test]
         public void ExceptionInHandler_DropsQueuedMoves()
         {
             var entry = Add(new EntryNode());

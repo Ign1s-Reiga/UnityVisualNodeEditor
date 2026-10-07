@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.1] - 2026-10-07
+- 修正: `NodeExited` の通知の中（`Stop()` の途中）で `Raise` / `Advance` すると積まれたまま残り、次の `Start()` の後に勝手に実行されていた。停止状態にしてから通知するようにし、その呼び出しは false を返す
+- 修正: Event → Event と連鎖した先が出力の無い Event だと、その Event に入ったまま動けなくなっていた。連鎖全体を通知として扱い、直前の待機ノードに留まる
+
 ## [0.5.0] - 2026-10-07
 - ランタイム実行: `GraphQuery`（遷移先・シーン一覧などの読み取り）と `GraphRunner`（Scene・State で待機、Entry・Event は通過、`Raise` / `Advance` で遷移、`SceneManager` でシーンを読み込む）
 - `Graph Runner` コンポーネント（`GraphRunnerBehaviour`）: グラフを指定して開始。シーンを切り替えても残り、重複しない

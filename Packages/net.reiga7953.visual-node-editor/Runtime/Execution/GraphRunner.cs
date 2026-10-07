@@ -134,8 +134,13 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
+            // 通知より先に停止状態にする。NodeExited の中で Raise / Advance されても積まずに false を返し、
+            // 次の Start() の後に古い操作が実行されないようにする
             _pending.Clear();
             _generation++;
+            IsRunning = false;
+            _running.Remove(this);
+
             var current = Current;
             Current = null;
             if (current != null)
@@ -143,8 +148,6 @@ namespace Reiga.VisualNodeEditor
                 NodeExited?.Invoke(current);
             }
 
-            IsRunning = false;
-            _running.Remove(this);
             Stopped?.Invoke(this);
         }
 
@@ -200,13 +203,7 @@ namespace Reiga.VisualNodeEditor
                 return false;
             }
 
-            // 出力エッジの無い Event は通知だけで、現在のノードは変わらない
-            if (Query.GetNext(eventNode.Id).Count == 0)
-            {
-                TriggerEvent(eventNode.EventName);
-                return true;
-            }
-
+            // 出力エッジの無い Event（通知だけのイベント）の扱いは MoveTo が行う
             MoveTo(eventNode);
             return true;
         }
@@ -257,28 +254,73 @@ namespace Reiga.VisualNodeEditor
         private void MoveTo(NodeData target)
         {
             var generation = _generation;
+            var path = ResolvePath(target, out var endsInDeadEndEvent);
+
+            // 通過ノードの連鎖が出力の無い Event で終わるなら、どこにも入らず通知だけ行い、いまの待機ノードに留まる
+            // （入ってしまうと出口が無く、以後どの Raise / Advance でも動けなくなる）
+            if (endsInDeadEndEvent)
+            {
+                foreach (var eventNode in path.OfType<EventNode>())
+                {
+                    if (!IsCurrentGeneration(generation))
+                    {
+                        return;
+                    }
+
+                    TriggerEvent(eventNode.EventName);
+                }
+
+                return;
+            }
+
+            foreach (var node in path)
+            {
+                if (!IsCurrentGeneration(generation) || !Enter(node, generation))
+                {
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="target"/> から通過ノード（Entry・Event）をたどり、入るノードを順に返す。
+        /// 待機ノードに着くか、Entry の先に Event 以外が無ければそこで終わる。
+        /// 出力の無い Event に行き着いたら <paramref name="endsInDeadEndEvent"/> を true にする（その Event も含めて返し、通知に使う）。
+        /// 通過ノードが輪になっていたら、警告を出して輪に入る手前までで止める。
+        /// </summary>
+        private List<NodeData> ResolvePath(NodeData target, out bool endsInDeadEndEvent)
+        {
+            endsInDeadEndEvent = false;
+            var path = new List<NodeData>();
             var visited = new HashSet<string>();
             var node = target;
-            while (node != null && IsRunning && generation == _generation)
+            while (node != null)
             {
                 if (!visited.Add(node.Id))
                 {
                     Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': Entry/Event nodes form a loop at '{node.Title}'. Stopped there.");
-                    return;
+                    break;
                 }
 
-                if (!Enter(node, generation))
+                if (node is EventNode eventNode)
                 {
-                    return;
+                    var next = Query.GetNext(eventNode.Id).FirstOrDefault();
+                    path.Add(node);
+                    if (next == null)
+                    {
+                        endsInDeadEndEvent = true;
+                        break;
+                    }
+
+                    node = next;
+                    continue;
                 }
 
-                node = node switch
-                {
-                    EventNode eventNode => Query.GetNext(eventNode.Id).FirstOrDefault(),
-                    EntryNode entryNode => Query.GetFirstNonEventNext(entryNode.Id),
-                    _ => null,
-                };
+                path.Add(node);
+                node = node is EntryNode entryNode ? Query.GetFirstNonEventNext(entryNode.Id) : null;
             }
+
+            return path;
         }
 
         /// <summary>
