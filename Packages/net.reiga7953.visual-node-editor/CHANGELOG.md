@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0] - 2026-10-07
+- ランタイム実行: `GraphQuery`（遷移先・シーン一覧などの読み取り）と `GraphRunner`（Scene・State で待機、Entry・Event は通過、`Raise` / `Advance` で遷移、`SceneManager` でシーンを読み込む）
+- `Graph Runner` コンポーネント（`GraphRunnerBehaviour`）: グラフを指定して開始。シーンを切り替えても残り、重複しない
+- イベントのフック: C# の `EventTriggered` / `On` / `Off` と、インスペクタの UnityEvent（On Node Entered、イベント名ごとのバインド）
+- Build Settings 連携: ツールバー「Add Scenes to Build」/ `Assets > Visual Node Editor > Add Graph Scenes to Build Settings`。Build Settings に無いシーンを警告
+- Play Mode 中、実行中のノードをグラフウィンドウで強調表示
+- 検証: イベント名が空の Event ノードを警告
+
 ## [0.4.1] - 2026-10-07
 - 修正: クリップボードの識別子が改行で終わっていたため、OS のクリップボードで改行コードが変わると貼り付けが何も起きなかった可能性がある。識別子から改行を除いた
 - 修正: 付箋をグループへドラッグで入れられたが保存されず、再読み込み後に外へ出ていた。グループが付箋を受け付けないようにした
