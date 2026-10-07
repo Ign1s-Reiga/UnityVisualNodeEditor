@@ -20,6 +20,8 @@ namespace Reiga.VisualNodeEditor
         private readonly ISceneLoader _sceneLoader;
         private readonly Queue<Action> _pending = new();
         private readonly Dictionary<string, Action> _eventHandlers = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, GraphParameterType> _parameterTypes = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, object> _parameterValues = new(StringComparer.Ordinal);
         private bool _isMoving;
 
         // Start / Stop のたびに進める。通知の中で止めたり再開したりされたら、古い遷移はこれを見て打ち切る
@@ -31,6 +33,78 @@ namespace Reiga.VisualNodeEditor
         {
             Query = new GraphQuery(graph);
             _sceneLoader = sceneLoader;
+            ResetParameters();
+        }
+
+        /// <summary>パラメータの値が <see cref="SetBool"/> などで変わったとき。引数はパラメータ名。</summary>
+        public event Action<string> ParameterChanged;
+
+        /// <summary>その名前のパラメータがあるか。</summary>
+        public bool HasParameter(string name) => name != null && _parameterTypes.ContainsKey(name);
+
+        public bool GetBool(string name) => (bool)GetParameter(name, GraphParameterType.Bool);
+
+        public int GetInt(string name) => (int)GetParameter(name, GraphParameterType.Int);
+
+        public float GetFloat(string name) => (float)GetParameter(name, GraphParameterType.Float);
+
+        public string GetString(string name) => (string)GetParameter(name, GraphParameterType.String);
+
+        public void SetBool(string name, bool value) => SetParameter(name, GraphParameterType.Bool, value);
+
+        public void SetInt(string name, int value) => SetParameter(name, GraphParameterType.Int, value);
+
+        public void SetFloat(string name, float value) => SetParameter(name, GraphParameterType.Float, value);
+
+        public void SetString(string name, string value) => SetParameter(name, GraphParameterType.String, value ?? string.Empty);
+
+        /// <summary>
+        /// パラメータの値をアセットの既定値に戻す（<see cref="Start"/> のたびにも行う）。
+        /// 名前が空・重複するパラメータは、検証で Error になる状態なので最初のものだけを使う。
+        /// </summary>
+        public void ResetParameters()
+        {
+            _parameterTypes.Clear();
+            _parameterValues.Clear();
+            foreach (var parameter in Graph.Parameters)
+            {
+                if (parameter != null && !string.IsNullOrEmpty(parameter.Name) && !_parameterTypes.ContainsKey(parameter.Name))
+                {
+                    _parameterTypes.Add(parameter.Name, parameter.Type);
+                    _parameterValues.Add(parameter.Name, parameter.DefaultValue);
+                }
+            }
+        }
+
+        private object GetParameter(string name, GraphParameterType requested)
+        {
+            CheckParameter(name, requested);
+            return _parameterValues[name];
+        }
+
+        private void SetParameter(string name, GraphParameterType requested, object value)
+        {
+            CheckParameter(name, requested);
+            if (Equals(_parameterValues[name], value))
+            {
+                return;
+            }
+
+            _parameterValues[name] = value;
+            ParameterChanged?.Invoke(name);
+        }
+
+        private void CheckParameter(string name, GraphParameterType requested)
+        {
+            if (name == null || !_parameterTypes.TryGetValue(name, out var actual))
+            {
+                throw new KeyNotFoundException($"Graph '{Graph.name}' has no parameter named '{name}'.");
+            }
+
+            if (actual != requested)
+            {
+                throw new InvalidOperationException($"Parameter '{name}' is {actual}, not {requested}.");
+            }
         }
 
         /// <summary>実行中のすべての Runner（エディタの強調表示などが使う）。</summary>
@@ -110,6 +184,8 @@ namespace Reiga.VisualNodeEditor
                 throw new InvalidOperationException($"Graph '{Graph.name}' has no Entry node.");
             }
 
+            // 毎回の実行をアセットの既定値から始める
+            ResetParameters();
             IsRunning = true;
             _generation++;
             _running.Add(this);

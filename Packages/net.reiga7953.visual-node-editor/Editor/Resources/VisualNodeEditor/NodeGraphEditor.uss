@@ -142,6 +142,21 @@
   white-space: normal;
 }
 
+/* Node search */
+
+.vne-node-search {
+  width: 160px;
+  min-width: 80px;
+  flex-shrink: 1;
+}
+
+.vne-search-count {
+  color: #a0a0a0;
+  margin-right: 6px;
+  -unity-text-align: middle-left;
+  flex-shrink: 0;
+}
+
 /* Validation (node borders are in NodeView.uss) */
 
 .vne-issue-toggle {

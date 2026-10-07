@@ -13,6 +13,7 @@ namespace Reiga.VisualNodeEditor
         [SerializeField, HideInInspector] private string _id = Guid.NewGuid().ToString("N");
         [SerializeField] private string _title;
         [SerializeField, HideInInspector] private Vector2 _position;
+        [SerializeField, HideInInspector] private bool _collapsed;
 
         /// <summary>グラフ内で一意な ID。</summary>
         public string Id => _id;
@@ -28,6 +29,13 @@ namespace Reiga.VisualNodeEditor
         {
             get => _position;
             set => _position = value;
+        }
+
+        /// <summary>エディタ上で折りたたまれているか（Runtime では無視される）。</summary>
+        public bool Collapsed
+        {
+            get => _collapsed;
+            set => _collapsed = value;
         }
 
         /// <summary>タイトル未設定時に表示される既定名。</summary>

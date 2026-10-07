@@ -6,7 +6,39 @@ namespace Reiga.VisualNodeEditor
     public static class GraphValidator
     {
         /// <summary><paramref name="graph"/> を検査して問題の一覧を返す。問題が無ければ空。</summary>
-        public static List<GraphIssue> Validate(NodeGraphAsset graph) => Validate(graph.Nodes, graph.Edges);
+        public static List<GraphIssue> Validate(NodeGraphAsset graph)
+        {
+            var issues = Validate(graph.Nodes, graph.Edges);
+            issues.AddRange(ValidateParameters(graph.Parameters));
+            return issues;
+        }
+
+        /// <summary>パラメータ（Blackboard）を検査する: 空の名前・重複する名前は Error。</summary>
+        public static List<GraphIssue> ValidateParameters(IReadOnlyList<GraphParameter> parameters)
+        {
+            var issues = new List<GraphIssue>();
+            var names = new HashSet<string>();
+            var reportedDuplicates = new HashSet<string>();
+            foreach (var parameter in parameters)
+            {
+                if (parameter == null)
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(parameter.Name))
+                {
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Error, "A parameter has an empty name."));
+                }
+                else if (!names.Add(parameter.Name) && reportedDuplicates.Add(parameter.Name))
+                {
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Error,
+                        $"More than one parameter is named '{parameter.Name}'."));
+                }
+            }
+
+            return issues;
+        }
 
         /// <summary>ノードとエッジの組を検査して問題の一覧を返す。問題が無ければ空。</summary>
         public static List<GraphIssue> Validate(IReadOnlyList<NodeData> nodes, IReadOnlyList<EdgeData> edges)

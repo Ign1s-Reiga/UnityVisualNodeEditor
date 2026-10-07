@@ -45,6 +45,12 @@
   -unity-text-align: middle-left;
 }
 
+/* Collapsed nodes (title ▼ button) also hide the summary line */
+
+.vne-node--collapsed .vne-node__summary {
+  display: none;
+}
+
 /* Nodes with at most one input and one output don't need "in" / "out" labels */
 
 .vne-node--hide-port-labels Port #type {
@@ -60,6 +66,17 @@
 
 .vne-node--error #node-border {
   border-color: #e04040;
+  border-width: 2px;
+}
+
+/* Node search: matches stand out, the rest fade (before Play Mode so the running node still wins) */
+
+.vne-node--search-dimmed {
+  opacity: 0.35;
+}
+
+.vne-node--search-match #node-border {
+  border-color: #5aa9ff;
   border-width: 2px;
 }
 

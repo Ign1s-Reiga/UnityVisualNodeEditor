@@ -23,3 +23,22 @@ GridBackground {
   border-width: 1px;
   border-color: #3a3a3a;
 }
+
+/* Blackboard (graph parameters): overlaid at the top-left of the graph */
+#vne-blackboard {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 240px;
+  max-height: 70%;
+}
+
+.vne-blackboard__value {
+  margin-left: 8px;
+  margin-right: 4px;
+}
+
+.vne-blackboard__value > .unity-base-field__label {
+  min-width: 50px;
+  width: 50px;
+}

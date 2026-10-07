@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Build;
@@ -28,14 +29,20 @@ namespace Reiga.VisualNodeEditor.Editor
         // ドメインリロード後も同じアセットを開き直せるようシリアライズする
         [SerializeField] private NodeGraphAsset _asset;
 
-        // ミニマップの表示状態もドメインリロード後に保つ
+        // View メニューの表示状態もドメインリロード後に保つ
         [SerializeField] private bool _miniMapVisible;
+        [SerializeField] private bool _blackboardVisible = true;
+        [SerializeField] private bool _snapToGrid;
 
         private NodeGraphView _graphView;
         private NodeSearchWindow _searchWindow;
         private NodeInspectorView _inspector;
         private ListView _issueList;
         private ToolbarToggle _issueToggle;
+        private ToolbarSearchField _searchField;
+        private Label _searchCountLabel;
+        private List<string> _searchMatches = new();
+        private int _searchIndex = -1;
         private Label _assetNameLabel;
         private readonly List<GraphIssue> _issues = new();
         private readonly HashSet<string> _knownErrorKeys = new();
@@ -119,6 +126,15 @@ namespace Reiga.VisualNodeEditor.Editor
                 _issueList.itemsSource = _issues;
             }
 
+            _searchField = rootVisualElement.Q<ToolbarSearchField>("node-search");
+            _searchCountLabel = rootVisualElement.Q<Label>("search-count");
+            if (_searchField != null)
+            {
+                _searchField.RegisterValueChangedCallback(_ => RefreshSearch(resetIndex: true));
+                // 入力欄が Enter / Esc を処理する前に受け取る
+                _searchField.RegisterCallback<KeyDownEvent>(OnSearchKeyDown, TrickleDown.TrickleDown);
+            }
+
             _issueToggle = rootVisualElement.Q<ToolbarToggle>("issue-toggle");
             _issueToggle?.RegisterValueChangedCallback(_ => UpdateIssueListVisibility());
 
@@ -141,14 +157,25 @@ namespace Reiga.VisualNodeEditor.Editor
             }
 
             _graphView.MiniMapVisible = _miniMapVisible;
-            var miniMapToggle = rootVisualElement.Q<ToolbarToggle>("minimap-toggle");
-            if (miniMapToggle != null)
+            _graphView.BlackboardVisible = _blackboardVisible;
+            _graphView.SnapToGrid = _snapToGrid;
+            var viewMenu = rootVisualElement.Q<ToolbarMenu>("view-menu");
+            if (viewMenu != null)
             {
-                miniMapToggle.SetValueWithoutNotify(_miniMapVisible);
-                miniMapToggle.RegisterValueChangedCallback(evt =>
+                AddViewToggle(viewMenu, "MiniMap", () => _miniMapVisible, value =>
                 {
-                    _miniMapVisible = evt.newValue;
-                    _graphView.MiniMapVisible = evt.newValue;
+                    _miniMapVisible = value;
+                    _graphView.MiniMapVisible = value;
+                });
+                AddViewToggle(viewMenu, "Blackboard", () => _blackboardVisible, value =>
+                {
+                    _blackboardVisible = value;
+                    _graphView.BlackboardVisible = value;
+                });
+                AddViewToggle(viewMenu, "Snap to Grid", () => _snapToGrid, value =>
+                {
+                    _snapToGrid = value;
+                    _graphView.SnapToGrid = value;
                 });
             }
 
@@ -289,6 +316,14 @@ namespace Reiga.VisualNodeEditor.Editor
             _assetNameLabel.tooltip = AssetDatabase.GetAssetPath(_asset);
         }
 
+        /// <summary>View メニューにチェック付きの切り替え項目を足す。</summary>
+        private static void AddViewToggle(ToolbarMenu menu, string label, Func<bool> isOn, Action<bool> set)
+        {
+            menu.menu.AppendAction(label,
+                _ => set(!isOn()),
+                _ => isOn() ? DropdownMenuAction.Status.Checked : DropdownMenuAction.Status.Normal);
+        }
+
         private void AddScenesToBuildSettings()
         {
             ShowNotification(new GUIContent(BuildSettingsSync.Apply(_asset)));
@@ -316,7 +351,57 @@ namespace Reiga.VisualNodeEditor.Editor
             _graphView?.ShowIssues(_issues);
             _issueList?.Rebuild();
             UpdateIssueToggle();
+
+            // ノードの追加・削除・改名で一致するノードが変わるので、検索結果も更新する
+            RefreshSearch(resetIndex: false);
             UpdateAssetLabel();
+        }
+
+        private void RefreshSearch(bool resetIndex)
+        {
+            if (_graphView == null)
+            {
+                return;
+            }
+
+            var query = _searchField?.value ?? string.Empty;
+            _searchMatches = _graphView.ApplySearch(query);
+            if (resetIndex || _searchIndex >= _searchMatches.Count)
+            {
+                _searchIndex = -1;
+            }
+
+            UpdateSearchCount(query);
+        }
+
+        private void OnSearchKeyDown(KeyDownEvent evt)
+        {
+            switch (evt.keyCode)
+            {
+                case KeyCode.Return:
+                case KeyCode.KeypadEnter:
+                    _searchIndex = NodeSearch.NextIndex(_searchIndex, _searchMatches.Count);
+                    if (_searchIndex >= 0)
+                    {
+                        _graphView.FocusNode(_searchMatches[_searchIndex]);
+                    }
+
+                    UpdateSearchCount(_searchField.value);
+                    evt.StopPropagation();
+                    break;
+                case KeyCode.Escape:
+                    _searchField.value = string.Empty;
+                    evt.StopPropagation();
+                    break;
+            }
+        }
+
+        private void UpdateSearchCount(string query)
+        {
+            if (_searchCountLabel != null)
+            {
+                _searchCountLabel.text = NodeSearch.GetCountText(query, _searchMatches.Count, _searchIndex);
+            }
         }
 
         private void UpdateIssueToggle()

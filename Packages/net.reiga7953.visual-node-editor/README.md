@@ -25,5 +25,6 @@ runner.Raise("StartGame");
 
 - Scene・State ノードで止まり、Entry・Event ノードは通過する。`Advance()` はイベントを介さずに次のノードへ進む
 - Play 中は、グラフウィンドウで実行中のノードが緑色に強調される
+- Blackboard（View メニュー）で定義したパラメータは、実行中に `runner.GetInt("Lives")` / `runner.SetInt("Lives", 2)` のように読み書きできる（値は Runner ごと、`Start()` のたびに既定値へ戻る）
 
 詳しい規則はリポジトリの `docs/01-architecture.md`「ランタイム実行（GraphRunner）」を参照。

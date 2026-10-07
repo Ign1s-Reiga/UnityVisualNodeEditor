@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.Experimental.GraphView;
@@ -25,6 +26,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private const string WarningClassName = "vne-node--warning";
         private const string ErrorClassName = "vne-node--error";
         private const string RunningClassName = "vne-node--running";
+        private const string CollapsedClassName = "vne-node--collapsed";
+        private const string SearchMatchClassName = "vne-node--search-match";
+        private const string SearchDimmedClassName = "vne-node--search-dimmed";
 
         private static StyleSheet _styleSheet;
 
@@ -63,8 +67,29 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             CreatePorts();
             EnableInClassList(HidePortLabelsClassName,
                 ShouldHidePortLabels(inputContainer.Query<Port>().ToList().Count, outputContainer.Query<Port>().ToList().Count));
-            RefreshExpandedState();
+            SetCollapsed(data.Collapsed);
             RefreshPorts();
+        }
+
+        /// <summary>タイトルの ▼ ボタンで折りたたみ・展開したとき（プログラムからの <see cref="SetCollapsed"/> では呼ばれない）。</summary>
+        public event Action<NodeView> CollapsedChanged;
+
+        /// <summary>折りたたまれているか。</summary>
+        public bool IsCollapsed => !expanded;
+
+        /// <summary>折りたたみ状態を変える（通知はしない）。折りたたむとサマリー行も隠す。</summary>
+        public void SetCollapsed(bool collapsed)
+        {
+            expanded = !collapsed;
+            EnableInClassList(CollapsedClassName, collapsed);
+            RefreshExpandedState();
+        }
+
+        protected override void ToggleCollapse()
+        {
+            base.ToggleCollapse();
+            EnableInClassList(CollapsedClassName, !expanded);
+            CollapsedChanged?.Invoke(this);
         }
 
         /// <summary>
@@ -84,6 +109,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             EnableInClassList(ErrorClassName, hasError);
             EnableInClassList(WarningClassName, !hasError && issues.Count > 0);
             tooltip = string.Join("\n", issues.Select(i => i.Message));
+        }
+
+        /// <summary>
+        /// 検索結果を表示に反映する。検索中（<paramref name="searching"/>）なら一致するノードを強調し、それ以外を薄くする。
+        /// </summary>
+        public void ShowSearchResult(bool searching, bool isMatch)
+        {
+            EnableInClassList(SearchMatchClassName, searching && isMatch);
+            EnableInClassList(SearchDimmedClassName, searching && !isMatch);
         }
 
         /// <summary>Play 中に GraphRunner が今いるノードとして強調するか。</summary>

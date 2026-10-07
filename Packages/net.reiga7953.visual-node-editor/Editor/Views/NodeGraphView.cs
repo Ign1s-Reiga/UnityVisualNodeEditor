@@ -17,14 +17,21 @@ namespace Reiga.VisualNodeEditor.Editor.Views
     {
         private const string StyleSheetPath = "VisualNodeEditor/NodeGraphView";
 
+        /// <summary>グリッドの間隔。NodeGraphView.uss の GridBackground（--spacing）と同じ値にすること。</summary>
+        public const float GridSpacing = 20f;
+
         // 貼り付けた要素を元の位置から少しずらす量。同じ内容を続けて貼るたびに、さらにこの分ずらす
         private static readonly Vector2 PasteOffset = new Vector2(30f, 30f);
 
         private string _lastPastedData;
         private int _pasteCount;
+        private string _searchQuery;
 
         // 位置・大きさは NodeGraphView.uss（#vne-minimap）で決める
         private readonly MiniMap _miniMap = new MiniMap { anchored = true, name = "vne-minimap" };
+
+        // 位置・大きさは NodeGraphView.uss（#vne-blackboard）で決める
+        private readonly ParameterBlackboard _blackboard;
 
         private NodeGraphAsset _asset;
 
@@ -61,6 +68,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             elementsRemovedFromGroup = OnElementsRemovedFromGroup;
             groupTitleChanged = OnGroupTitleChanged;
             _miniMap.graphView = this;
+            _blackboard = new ParameterBlackboard(this);
+            _blackboard.Changed += () => GraphChanged?.Invoke();
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
@@ -74,6 +83,43 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         /// <summary>現在表示しているアセット。</summary>
         public NodeGraphAsset Asset => _asset;
+
+        /// <summary>
+        /// ノードを検索し、一致するノードを強調・それ以外を薄くする。一致したノードの ID をアセット内の順で返す。
+        /// 空の検索語で表示を元に戻す。再構築（Undo など）の後も同じ検索語で表示を保つ。
+        /// </summary>
+        public List<string> ApplySearch(string query)
+        {
+            _searchQuery = query;
+            var searching = !string.IsNullOrWhiteSpace(query);
+            var matches = new List<string>();
+            foreach (var view in nodes.ToList().OfType<NodeView>())
+            {
+                var isMatch = searching && NodeSearch.Matches(query, view.title, NodeDisplay.GetTypeDisplayName(view.Data.GetType()));
+                view.ShowSearchResult(searching, isMatch);
+                if (isMatch)
+                {
+                    matches.Add(view.NodeId);
+                }
+            }
+
+            if (_asset != null)
+            {
+                // ID が重複していても（検証で Error になる状態）落ちないよう、先に出てきた位置を使う
+                var order = new Dictionary<string, int>();
+                for (var i = 0; i < _asset.Nodes.Count; i++)
+                {
+                    if (_asset.Nodes[i] != null)
+                    {
+                        order.TryAdd(_asset.Nodes[i].Id, i);
+                    }
+                }
+
+                matches.Sort((x, y) => order.GetValueOrDefault(x).CompareTo(order.GetValueOrDefault(y)));
+            }
+
+            return matches;
+        }
 
         /// <summary>Play 中に強調しているノードの ID。無ければ null。</summary>
         public string RunningNodeId { get; private set; }
@@ -112,6 +158,29 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
+        /// <summary>ノード・付箋を動かし終えたときにグリッドへ吸着させるか。</summary>
+        public bool SnapToGrid { get; set; }
+
+        /// <summary>パラメータの Blackboard を表示するか。</summary>
+        public bool BlackboardVisible
+        {
+            get => _blackboard.parent == this;
+            set
+            {
+                if (value && _blackboard.parent != this)
+                {
+                    Add(_blackboard);
+                }
+                else if (!value)
+                {
+                    _blackboard.RemoveFromHierarchy();
+                }
+            }
+        }
+
+        /// <summary>パラメータの Blackboard（テストや拡張から操作するため）。</summary>
+        public ParameterBlackboard Blackboard => _blackboard;
+
         /// <summary>選択中の要素が収まるように表示する。何も選択していなければ全体を表示する。</summary>
         public void FrameSelectionOrAll()
         {
@@ -144,6 +213,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 _suppressSync = false;
             }
 
+            _blackboard.Rebuild(asset);
+
             NotifySelectionChanged();
             GraphChanged?.Invoke();
         }
@@ -167,6 +238,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             EditorUtility.SetDirty(_asset);
 
             var view = NodeViewFactory.Create(data);
+            view.CollapsedChanged += OnNodeCollapsedChanged;
             AddElement(view);
             GraphChanged?.Invoke();
             return view;
@@ -279,6 +351,116 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             evt.menu.AppendSeparator();
             evt.menu.AppendAction("Create Group", _ => CreateGroup(position));
             evt.menu.AppendAction("Create Sticky Note", _ => CreateStickyNote(position));
+            evt.menu.AppendSeparator();
+            evt.menu.AppendAction("Collapse All", _ => SetCollapsedForSelectionOrAll(true));
+            evt.menu.AppendAction("Expand All", _ => SetCollapsedForSelectionOrAll(false));
+
+            var selectedNodes = selection.OfType<NodeView>().Count();
+            if (selectedNodes >= 2)
+            {
+                evt.menu.AppendSeparator();
+                AppendAlign(evt, "Left", AlignMode.Left);
+                AppendAlign(evt, "Right", AlignMode.Right);
+                AppendAlign(evt, "Top", AlignMode.Top);
+                AppendAlign(evt, "Bottom", AlignMode.Bottom);
+                AppendAlign(evt, "Center Horizontally", AlignMode.CenterHorizontally);
+                AppendAlign(evt, "Center Vertically", AlignMode.CenterVertically);
+                var distributeStatus = selectedNodes >= 3
+                    ? DropdownMenuAction.Status.Normal
+                    : DropdownMenuAction.Status.Disabled;
+                evt.menu.AppendAction("Distribute/Horizontally", _ => DistributeSelection(DistributeAxis.Horizontal), distributeStatus);
+                evt.menu.AppendAction("Distribute/Vertically", _ => DistributeSelection(DistributeAxis.Vertical), distributeStatus);
+            }
+        }
+
+        /// <summary>選択中のノードを揃える。1 回の Undo で戻せる。</summary>
+        public void AlignSelection(AlignMode mode) =>
+            MoveSelectedNodes("Align Nodes", rects => NodeAlignment.Align(rects, mode));
+
+        /// <summary>選択中のノード（3 つ以上）を等間隔に並べる。1 回の Undo で戻せる。</summary>
+        public void DistributeSelection(DistributeAxis axis) =>
+            MoveSelectedNodes("Distribute Nodes", rects => NodeAlignment.Distribute(rects, axis));
+
+        private void AppendAlign(ContextualMenuPopulateEvent evt, string label, AlignMode mode) =>
+            evt.menu.AppendAction("Align/" + label, _ => AlignSelection(mode));
+
+        private void MoveSelectedNodes(string undoName, Func<IReadOnlyList<Rect>, Vector2[]> layout)
+        {
+            if (_asset == null)
+            {
+                return;
+            }
+
+            var views = selection.OfType<NodeView>().ToList();
+            if (views.Count < 2)
+            {
+                return;
+            }
+
+            var rects = views.Select(v => v.GetPosition()).ToList();
+            var positions = layout(rects);
+
+            Undo.RecordObject(_asset, undoName);
+            for (var i = 0; i < views.Count; i++)
+            {
+                views[i].SetPosition(new Rect(positions[i], rects[i].size));
+                if (_asset.FindNode(views[i].NodeId) is NodeData data)
+                {
+                    data.Position = positions[i];
+                }
+            }
+
+            EditorUtility.SetDirty(_asset);
+        }
+
+        private void SnapIfEnabled(GraphElement element)
+        {
+            if (!SnapToGrid || !(element is NodeView || element is StickyNoteView))
+            {
+                return;
+            }
+
+            var rect = element.GetPosition();
+            element.SetPosition(new Rect(GridSnap.Snap(rect.position, GridSpacing), rect.size));
+        }
+
+        /// <summary>選択中のノード（無ければ全ノード）を折りたたむ・展開する。1 回の Undo で戻せる。</summary>
+        public void SetCollapsedForSelectionOrAll(bool collapsed)
+        {
+            if (_asset == null)
+            {
+                return;
+            }
+
+            var targets = selection.OfType<NodeView>().ToList();
+            if (targets.Count == 0)
+            {
+                targets = nodes.ToList().OfType<NodeView>().ToList();
+            }
+
+            Undo.RecordObject(_asset, collapsed ? "Collapse Nodes" : "Expand Nodes");
+            foreach (var view in targets)
+            {
+                view.SetCollapsed(collapsed);
+                if (_asset.FindNode(view.NodeId) is NodeData data)
+                {
+                    data.Collapsed = collapsed;
+                }
+            }
+
+            EditorUtility.SetDirty(_asset);
+        }
+
+        private void OnNodeCollapsedChanged(NodeView view)
+        {
+            if (_suppressSync || _asset == null || !(_asset.FindNode(view.NodeId) is NodeData data))
+            {
+                return;
+            }
+
+            Undo.RecordObject(_asset, view.IsCollapsed ? "Collapse Node" : "Expand Node");
+            data.Collapsed = view.IsCollapsed;
+            EditorUtility.SetDirty(_asset);
         }
 
         /// <summary><paramref name="position"/>（グラフ座標）に付箋を追加する。アセット未設定のときは何もせず null を返す。</summary>
@@ -336,6 +518,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 }
 
                 var view = NodeViewFactory.Create(node);
+                view.CollapsedChanged += OnNodeCollapsedChanged;
                 AddElement(view);
                 views[node.Id] = view;
             }
@@ -384,6 +567,11 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             if (RunningNodeId != null && views.TryGetValue(RunningNodeId, out var running))
             {
                 running.IsRunning = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_searchQuery))
+            {
+                ApplySearch(_searchQuery);
             }
         }
 
@@ -437,6 +625,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 Undo.RecordObject(_asset, "Move Graph Elements");
                 foreach (var element in change.movedElements)
                 {
+                    SnapIfEnabled(element);
                     SavePosition(element);
 
                     // グループを動かすと中のノードも動くので、念のため一緒に保存する
@@ -444,6 +633,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                     {
                         foreach (var member in groupView.containedElements)
                         {
+                            SnapIfEnabled(member);
                             SavePosition(member);
                         }
                     }

@@ -20,9 +20,11 @@
 
 ## データモデル
 
-- `NodeGraphAsset` : `List<NodeData>` を `[SerializeReference]` で、`List<EdgeData>` / `List<GroupData>` / `List<StickyNoteData>` を `[SerializeField]` で保持。
-- `NodeData` : `Id`(GUID 文字列), `Title`, `Position` を持つ抽象基底。ポート定義はサブクラスごとに Editor 側の `NodeView` が決める。
-  `Id` / `Position` は `[HideInInspector]`（インスペクタには出さない）。
+- `NodeGraphAsset` : `List<NodeData>` を `[SerializeReference]` で、`List<EdgeData>` / `List<GroupData>` / `List<StickyNoteData>` / `List<GraphParameter>` を `[SerializeField]` で保持。
+- `NodeData` : `Id`(GUID 文字列), `Title`, `Position`, `Collapsed` を持つ抽象基底。ポート定義はサブクラスごとに Editor 側の `NodeView` が決める。
+  `Id` / `Position` / `Collapsed` は `[HideInInspector]`（インスペクタには出さない。`Collapsed` は Position と同じくエディタ専用の表示状態）。
+- `GraphParameter` : グラフ単位のパラメータ（Blackboard）。`Id`, `Name`（グラフ内で一意）, `Type`（Bool / Int / Float / String）と型ごとの既定値。
+  ノードの処理を書くためのものではなく（非目的）、ゲームから参照・更新する設定値・状態の置き場
 - `EdgeData` : `(FromNodeId, FromPort, ToNodeId, ToPort)` の 4 つ組。ポートは文字列名で識別する。
 - `GroupData` : `Id`, `Title`, `Position` と、所属ノードの ID リスト。ノードは高々 1 つのグループに属する。ノード削除時は全グループから ID を外す。
 - `StickyNoteData` : 付箋（グラフ上のコメント）。`Id`, `Title`, `Contents`, `Rect`（位置とサイズ）, `Theme`, `FontSize`。
@@ -89,9 +91,43 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 
 ## 表示の操作
 
-- ミニマップ: GraphView の `MiniMap`。ツールバーのトグルで表示を切り替え、状態はウィンドウに保存する（ドメインリロード後も維持）。位置・大きさは USS
+- ツールバーの「View」メニュー（`ToolbarMenu`）にまとめた表示切り替え。状態はウィンドウに保存する（ドメインリロード後も維持）
+  - MiniMap: GraphView の `MiniMap`。位置・大きさは USS
+  - Blackboard: グラフのパラメータのパネル（後述）
+  - Snap to Grid: ノード・付箋を動かし終えたときにグリッドへ吸着する（後述）
 - ショートカット（グラフにフォーカスがあるとき）: `F` = 選択範囲に合わせる（何も選んでいなければ全体）、`A` = 全体を表示。
   ツールバーにも同じ操作のボタン（Frame Selection / Frame All）を置く
+
+### ノードの折りたたみ
+
+- GraphView の標準の折りたたみ（タイトルの ▼ ボタン。接続されていないポートを隠す）を使い、状態を `NodeData.Collapsed` に保存する（Undo 対応）
+- 折りたたんだノードはサマリー行も隠す（USS クラス `vne-node--collapsed`）
+- 右クリックメニュー「Collapse All」/「Expand All」: 選択中のノードがあればそれだけ、無ければ全ノードを対象にする
+
+### ノードの検索
+
+- ツールバーの検索欄（`ToolbarSearchField`）。入力すると、タイトルか型の表示名に含まれる（大文字小文字は区別しない）ノードを強調し、それ以外を薄くする
+- 件数を表示し、Enter で次の一致ノードを選択してフレームに収める（最後まで行ったら先頭へ戻る）。Esc で検索を消す
+- グラフを再構築しても（Undo など）検索結果の表示を保つ
+- 一致の判定は純粋な関数にし、EditMode テストの対象にする
+
+### Blackboard（グラフのパラメータ）
+
+- GraphView の `Blackboard` を使ったパネル。グラフの左上に重ねて表示する（位置・大きさは USS）
+- 「+」で型（Bool / Int / Float / String）を選んで追加。名前は型名から重複しないように付ける（`Bool`, `Bool1`, …）
+- 名前のダブルクリックで改名（空・重複する名前は受け付けない）。行の右クリック → Delete で削除。ドラッグで並べ替え
+- 既定値は行の中の入力欄で編集する。すべて Undo 対応で、変更後はパネルを作り直す
+- 検証: 空の名前・重複する名前を Error にする
+- ランタイム: `GraphRunner` が開始時に既定値をコピーし、`GetBool` / `SetBool` / `GetInt` / … で読み書きする（`ParameterChanged` で通知）。
+  名前が無い・型が違う場合は例外。値は Runner ごとで、アセットの既定値は変わらない
+
+### グリッドへの吸着・整列
+
+- Snap to Grid が有効なとき、ノード・付箋を動かし終えた時点でグリッドの間隔（`NodeGraphView.GridSpacing`、USS の `--spacing` と同じ 20px）に吸着させる
+- 右クリックメニュー（ノードを 2 つ以上選択しているとき）
+  - Align: Left / Right / Top / Bottom / Center Horizontally / Center Vertically
+  - Distribute（3 つ以上）: Horizontally / Vertically。両端のノードは動かさず、間隔を均等にする
+- 移動量の計算は純粋な関数にし、EditMode テストの対象にする。1 回の整列は 1 回の Undo で戻せる
 
 ## 検証（Validation）
 
@@ -108,6 +144,7 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
 | Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
+| Error | 名前が空のパラメータ / 名前が重複するパラメータ（Blackboard） |
 | Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード（参照先のシーンが削除されていれば、その旨の警告） |
 
 循環は許可する（State 間・Scene 遷移とも）。

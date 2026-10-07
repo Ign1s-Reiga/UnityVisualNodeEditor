@@ -14,6 +14,7 @@ namespace Reiga.VisualNodeEditor
         [SerializeField] private List<EdgeData> _edges = new();
         [SerializeField] private List<GroupData> _groups = new();
         [SerializeField] private List<StickyNoteData> _stickyNotes = new();
+        [SerializeField] private List<GraphParameter> _parameters = new();
 
         /// <summary>グラフに含まれる全ノード。型を読み込めなかった要素は null になりうる。</summary>
         public IReadOnlyList<NodeData> Nodes => _nodes;
@@ -26,6 +27,30 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>グラフに含まれる全付箋。</summary>
         public IReadOnlyList<StickyNoteData> StickyNotes => _stickyNotes;
+
+        /// <summary>グラフのパラメータ（Blackboard の並び順）。</summary>
+        public IReadOnlyList<GraphParameter> Parameters => _parameters;
+
+        public void AddParameter(GraphParameter parameter) => _parameters.Add(parameter);
+
+        public bool RemoveParameter(GraphParameter parameter) => _parameters.Remove(parameter);
+
+        public GraphParameter FindParameter(string id) => _parameters.Find(p => p != null && p.Id == id);
+
+        /// <summary>名前が一致する最初のパラメータ（大文字小文字を区別する）。無ければ null。</summary>
+        public GraphParameter FindParameterByName(string name) => _parameters.Find(p => p != null && p.Name == name);
+
+        /// <summary>パラメータを <paramref name="index"/> の位置へ移す（範囲外は端に寄せる）。含まれていなければ false。</summary>
+        public bool MoveParameter(GraphParameter parameter, int index)
+        {
+            if (!_parameters.Remove(parameter))
+            {
+                return false;
+            }
+
+            _parameters.Insert(Mathf.Clamp(index, 0, _parameters.Count), parameter);
+            return true;
+        }
 
         public void AddNode(NodeData node) => _nodes.Add(node);
 

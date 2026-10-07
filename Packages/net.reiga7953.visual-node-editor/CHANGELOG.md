@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0] - 2026-10-08
+- ノードの折りたたみ: タイトルの ▼ の状態を保存（Undo 対応）。折りたたむとサマリー行も隠す。右クリック → Collapse All / Expand All
+- ノードの検索: ツールバーの検索欄でタイトル・型名から検索（大文字小文字を区別しない）。一致を強調し、それ以外を薄く表示。Enter で次の一致へ、Esc で解除
+- Blackboard: グラフのパラメータ（Bool / Int / Float / String）を追加・改名・削除・並べ替え・既定値の編集（Undo 対応）。`GraphRunner.GetInt` / `SetInt` などで実行時に読み書き（Start のたびに既定値へ戻る、`ParameterChanged` で通知）。空・重複する名前は検証で Error
+- グリッドへの吸着（View メニューの Snap to Grid、動かし終えたときに 20px のグリッドへ）と、選択したノードの整列（Align）・等間隔配置（Distribute）
+- 変更: ツールバーの MiniMap ボタンを View メニュー（MiniMap / Blackboard / Snap to Grid）にまとめた
+
 ## [0.5.1] - 2026-10-07
 - 修正: `NodeExited` の通知の中（`Stop()` の途中）で `Raise` / `Advance` すると積まれたまま残り、次の `Start()` の後に勝手に実行されていた。停止状態にしてから通知するようにし、その呼び出しは false を返す
 - 修正: Event → Event と連鎖した先が出力の無い Event だと、その Event に入ったまま動けなくなっていた。連鎖全体を通知として扱い、直前の待機ノードに留まる
