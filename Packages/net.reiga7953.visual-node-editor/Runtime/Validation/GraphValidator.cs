@@ -40,6 +40,10 @@ namespace Reiga.VisualNodeEditor
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
                             $"'{node.Title}' has no scene assigned.", node.Id));
                         break;
+                    case EventNode eventNode when string.IsNullOrEmpty(eventNode.EventName):
+                        issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
+                            $"'{node.Title}' has no event name, so it cannot be raised.", node.Id));
+                        break;
                 }
             }
 

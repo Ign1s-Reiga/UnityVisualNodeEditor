@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Build;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
 using Reiga.VisualNodeEditor.Editor.Scenes;
@@ -39,6 +40,9 @@ namespace Reiga.VisualNodeEditor.Editor
         private readonly List<GraphIssue> _issues = new();
         private readonly HashSet<string> _knownErrorKeys = new();
         private bool _resetIssueBaseline = true;
+
+        // Play 中、開いているグラフを実行している Runner（強調表示用）
+        private GraphRunner _observedRunner;
 
         [MenuItem("Window/Visual Node Editor")]
         public static void Open() => Open(null);
@@ -148,6 +152,19 @@ namespace Reiga.VisualNodeEditor.Editor
                 });
             }
 
+            var buildSettingsButton = rootVisualElement.Q<ToolbarButton>("build-settings-button");
+            if (buildSettingsButton != null)
+            {
+                buildSettingsButton.clicked += AddScenesToBuildSettings;
+            }
+
+            // Build Settings がウィンドウの外で変わっても、警告をすぐ更新する
+            EditorBuildSettings.sceneListChanged += Revalidate;
+
+            GraphRunner.Started += OnRunnerStarted;
+            GraphRunner.Stopped += OnRunnerStopped;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+
             _assetNameLabel = rootVisualElement.Q<Label>("asset-name");
             _assetNameLabel?.RegisterCallback<ClickEvent>(_ => PingAsset());
 
@@ -159,6 +176,12 @@ namespace Reiga.VisualNodeEditor.Editor
 
         private void OnDisable()
         {
+            EditorBuildSettings.sceneListChanged -= Revalidate;
+            GraphRunner.Started -= OnRunnerStarted;
+            GraphRunner.Stopped -= OnRunnerStopped;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            StopObservingRunner();
+
             if (_searchWindow != null)
             {
                 DestroyImmediate(_searchWindow);
@@ -187,6 +210,65 @@ namespace Reiga.VisualNodeEditor.Editor
             _resetIssueBaseline = true;
             _inspector?.Show(null, null);
             _graphView?.Populate(_asset);
+            ObserveRunnerForAsset();
+        }
+
+        /// <summary>開いているグラフを実行中の Runner があれば、その現在のノードを強調し、遷移を追う。</summary>
+        private void ObserveRunnerForAsset()
+        {
+            StopObservingRunner();
+            if (_asset == null || _graphView == null)
+            {
+                return;
+            }
+
+            var runner = GraphRunner.Running.FirstOrDefault(r => r.Graph == _asset);
+            if (runner == null)
+            {
+                return;
+            }
+
+            _observedRunner = runner;
+            runner.NodeEntered += OnObservedNodeEntered;
+            _graphView.SetRunningNode(runner.Current?.Id);
+        }
+
+        private void StopObservingRunner()
+        {
+            if (_observedRunner != null)
+            {
+                _observedRunner.NodeEntered -= OnObservedNodeEntered;
+                _observedRunner = null;
+            }
+
+            _graphView?.SetRunningNode(null);
+        }
+
+        private void OnObservedNodeEntered(NodeData node) => _graphView?.SetRunningNode(node.Id);
+
+        private void OnRunnerStarted(GraphRunner runner)
+        {
+            if (_observedRunner == null && runner.Graph == _asset)
+            {
+                ObserveRunnerForAsset();
+            }
+        }
+
+        private void OnRunnerStopped(GraphRunner runner)
+        {
+            if (runner == _observedRunner)
+            {
+                // 同じグラフを動かす別の Runner があれば、そちらに切り替える
+                ObserveRunnerForAsset();
+            }
+        }
+
+        private void OnPlayModeStateChanged(PlayModeStateChange change)
+        {
+            if (change == PlayModeStateChange.ExitingPlayMode || change == PlayModeStateChange.EnteredEditMode)
+            {
+                StopObservingRunner();
+            }
         }
 
         private void UpdateAssetLabel()
@@ -207,6 +289,12 @@ namespace Reiga.VisualNodeEditor.Editor
             _assetNameLabel.tooltip = AssetDatabase.GetAssetPath(_asset);
         }
 
+        private void AddScenesToBuildSettings()
+        {
+            ShowNotification(new GUIContent(BuildSettingsSync.Apply(_asset)));
+            Revalidate();
+        }
+
         private void PingAsset()
         {
             if (_asset != null)
@@ -221,6 +309,8 @@ namespace Reiga.VisualNodeEditor.Editor
             if (_asset != null)
             {
                 _issues.AddRange(GraphValidator.Validate(_asset));
+                _issues.AddRange(BuildSettingsSync.GetIssues(
+                    _asset, BuildSettingsSync.GetEnabledSceneGuids(EditorBuildSettings.scenes)));
             }
 
             _graphView?.ShowIssues(_issues);

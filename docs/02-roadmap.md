@@ -25,7 +25,11 @@
 - [x] ミニマップと表示ショートカット（F / A）
 
 ## M3: ゲームから使う
-- [ ] `GraphQuery`（遷移先の列挙など）のランタイム API
+- [x] `GraphQuery`（遷移先の列挙など）のランタイム API
+- [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
+- [x] イベントのフック（C# イベント / UnityEvent）
+- [x] Build Settings との同期
+- [x] Play Mode 中の実行ノードの強調表示
 - [ ] サンプル: シーン遷移テーブルとしての利用
 - [ ] 骨組みコード生成（任意）
 

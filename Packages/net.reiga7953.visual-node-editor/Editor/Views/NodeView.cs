@@ -24,6 +24,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private const string HidePortLabelsClassName = "vne-node--hide-port-labels";
         private const string WarningClassName = "vne-node--warning";
         private const string ErrorClassName = "vne-node--error";
+        private const string RunningClassName = "vne-node--running";
 
         private static StyleSheet _styleSheet;
 
@@ -83,6 +84,13 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             EnableInClassList(ErrorClassName, hasError);
             EnableInClassList(WarningClassName, !hasError && issues.Count > 0);
             tooltip = string.Join("\n", issues.Select(i => i.Message));
+        }
+
+        /// <summary>Play 中に GraphRunner が今いるノードとして強調するか。</summary>
+        public bool IsRunning
+        {
+            get => ClassListContains(RunningClassName);
+            set => EnableInClassList(RunningClassName, value);
         }
 
         /// <summary>

@@ -14,7 +14,7 @@
 │  NodeGraphAsset (ScriptableObject)             │
 │  NodeData (abstract) / 各ノード型 / EdgeData  │
 │  NodeMenuAttribute                             │
-│  (将来) GraphRunner / GraphQuery               │
+│  GraphQuery / GraphRunner / GraphRunnerBehaviour │
 └──────────────────────────────┘
 ```
 
@@ -107,10 +107,67 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | 同じポート対を結ぶ重複エッジ |
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
+| Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
+| Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード |
 
 循環は許可する（State 間・Scene 遷移とも）。
 
+Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`BuildSettingsSync`）で行い、`GraphValidator` の結果に追加して表示する。
 エディタはグラフが変わるたびに再検証する。表示方法は「エディタ UI」の「問題の表示」を参照。
+
+## ランタイム実行（GraphRunner）
+
+ゲームからグラフを「シーン遷移表・ステートマシン」として動かす。すべて Runtime（UnityEngine のみ）に置く。
+
+| 型 | 役割 |
+|---|---|
+| `GraphQuery` | グラフの読み取り専用ビュー。Entry、ノードの出力エッジ・遷移先、参照しているシーンの一覧などを引く（生成時のスナップショット） |
+| `GraphRunner` | 純粋な C# の実行器。現在のノードを持ち、イベントで遷移する。シーンの読み込みは `ISceneLoader` に任せる |
+| `ISceneLoader` / `SceneManagerSceneLoader` | シーン読み込みの抽象と、`SceneManager.LoadSceneAsync`（Single）による実装。テストでは偽物に差し替える |
+| `GraphRunnerBehaviour` | シーンに置くコンポーネント。グラフを指定して開始し、UnityEvent でイベントに反応する |
+| `GraphEventBinding` | `GraphRunnerBehaviour` のインスペクタで「イベント名 → UnityEvent」を対応付ける項目 |
+
+### 実行の規則
+
+- ノードは 2 種類に分かれる
+  - 待機ノード: Scene・State（と、組み込み以外のノード型）。入ると止まり、次の操作を待つ。Scene に入るとそのシーンを読み込む
+  - 通過ノード: Entry・Event。入ったら止まらずに次へ進む
+- `Start()`: Entry に入る。Entry から Event 以外のノードへ繋がっていれば、そこへ進む（Event へしか繋がっていなければ Entry で待つ）
+- `Raise(eventName)`: 現在のノードから出ているエッジのうち、`EventName` が一致する Event ノードへ進み、その Event から出ている最初のエッジの先へ進む
+  - Event に出力エッジが無ければ、通知だけ行い現在のノードは変わらない（純粋な通知用のイベント）
+  - 一致する遷移が無ければ何もせず false を返す
+- `Advance()`: 現在のノードから Event 以外のノードへ出ている最初のエッジの先へ進む（イベントを介さない「次へ」）
+- 遷移先が複数ある場合は、アセット内のエッジの順で最初のものを使う
+- 通過ノードだけで輪になっている場合（Event → Event → …）は無限ループせず、警告を出して止める
+- シーンの読み込み: `SceneReference.Path`（無ければ `Name`）を `SceneManager` に渡す。すでにアクティブなシーンと同じなら読み込まない
+  （Play ボタンを押したシーンが最初の Scene ノードと同じ場合に、二重に読み込まないため）
+
+### イベント（C# / UnityEvent）
+
+- `GraphRunner` の C# イベント: `NodeEntered` / `NodeExited`（ノードの出入り）、`EventTriggered`（Event ノードを通過した、または通知用イベントが発生した）
+- `On(eventName, handler)` / `Off(...)`: 特定のイベント名だけを購読する
+- `GraphRunnerBehaviour` は上記を UnityEvent として公開する（`On Node Entered (string nodeTitle)` と、イベント名ごとの `GraphEventBinding`）。
+  `Raise(string)` / `Advance()` は public なので、UI の Button の OnClick などから直接呼べる
+- `GraphRunnerBehaviour` は既定で `DontDestroyOnLoad`。同じグラフを動かす永続インスタンスが既にあれば、後から来た方は自分を破棄する
+  （最初のシーンに置いた Runner が、そのシーンへ戻ったときに増えないように）
+
+### 実行中の Runner の一覧
+
+- `GraphRunner.Running`（静的）に実行中の Runner を持ち、`Started` / `Stopped` で通知する。エディタの強調表示が使う
+- 「Enter Play Mode Options」でドメインリロードを切っても前回の値が残らないよう、`RuntimeInitializeOnLoadMethod(SubsystemRegistration)` で初期化する
+
+## Build Settings 連携
+
+- `BuildSettingsSync`（Editor）: グラフが参照するシーンのうち、Build Settings に無い・無効なものを求め、追加・有効化する
+  - 既存の並び順は変えず、足りないシーンを末尾に追加する（ビルドでは index 0 のシーンから始まるため、Runner を置くシーンの位置はユーザーが決める）
+  - 判定と新しいシーン一覧の組み立ては純粋な関数にし、EditMode テストの対象にする
+- 実行方法: グラフウィンドウのツールバー「Add Scenes to Build」、または Project ビューでグラフを選んで `Assets > Visual Node Editor > Add Graph Scenes to Build Settings`
+
+## Play Mode 中の強調表示
+
+- Play 中、開いているグラフを実行している `GraphRunner` があれば、その現在のノードを強調する（USS クラス `vne-node--running`）
+- 遷移のたびに強調を移す。Runner が止まる・Play を終えると強調を消す
+- 同じグラフを複数の Runner が動かしている場合は、最初に見つかった Runner を表示する
 
 ## エディタ UI
 

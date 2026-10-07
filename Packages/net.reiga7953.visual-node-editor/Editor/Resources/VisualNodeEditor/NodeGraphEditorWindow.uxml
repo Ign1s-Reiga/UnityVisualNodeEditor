@@ -6,6 +6,8 @@
       <uie:ToolbarButton name="frame-all-button" text="Frame All" tooltip="Show the whole graph (A)" />
       <uie:ToolbarButton name="frame-selection-button" text="Frame Selection" tooltip="Show the selection, or the whole graph if nothing is selected (F)" />
       <uie:ToolbarToggle name="minimap-toggle" text="MiniMap" tooltip="Show or hide the minimap" />
+      <uie:ToolbarSpacer />
+      <uie:ToolbarButton name="build-settings-button" text="Add Scenes to Build" tooltip="Add the scenes used by this graph to Build Settings, or enable them there (existing order is kept)" />
       <ui:VisualElement class="vne-toolbar-spacer" />
       <uie:ToolbarToggle name="issue-toggle" class="vne-issue-toggle" tooltip="Show or hide the issue list" />
       <ui:Label name="asset-name" class="vne-asset-name" text="(no asset)" />

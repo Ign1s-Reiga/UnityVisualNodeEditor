@@ -5,5 +5,7 @@
   <ItemGroup>
     <Compile Include="$(PackageDir)Runtime/**/*.cs" />
     <Reference Include="$(UnityManagedDir)/UnityEngine*.dll" Private="false" />
+    <!-- Newer Unity versions move attributes such as PreserveAttribute (base of RuntimeInitializeOnLoadMethod) here. -->
+    <Reference Include="$(UnityManagedDir)/Unity.Scripting.dll" Private="false" Condition="Exists('$(UnityManagedDir)/Unity.Scripting.dll')" />
   </ItemGroup>
 </Project>

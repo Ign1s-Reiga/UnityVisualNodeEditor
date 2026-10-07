@@ -62,3 +62,14 @@
   border-color: #e04040;
   border-width: 2px;
 }
+
+/* Play Mode: the node the GraphRunner is currently on (after validation so it wins) */
+
+.vne-node--running #node-border {
+  border-color: #4ade80;
+  border-width: 3px;
+}
+
+.vne-node--running #title {
+  background-color: rgba(74, 222, 128, 0.25);
+}

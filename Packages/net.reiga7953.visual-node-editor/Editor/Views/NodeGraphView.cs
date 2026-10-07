@@ -75,6 +75,26 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// <summary>現在表示しているアセット。</summary>
         public NodeGraphAsset Asset => _asset;
 
+        /// <summary>Play 中に強調しているノードの ID。無ければ null。</summary>
+        public string RunningNodeId { get; private set; }
+
+        /// <summary>
+        /// GraphRunner が今いるノードを強調する。null で強調を消す。再構築（Undo など）の後も維持する。
+        /// </summary>
+        public void SetRunningNode(string nodeId)
+        {
+            if (RunningNodeId != null && FindNodeView(RunningNodeId) is NodeView previous)
+            {
+                previous.IsRunning = false;
+            }
+
+            RunningNodeId = nodeId;
+            if (nodeId != null && FindNodeView(nodeId) is NodeView current)
+            {
+                current.IsRunning = true;
+            }
+        }
+
         /// <summary>ミニマップを表示するか。</summary>
         public bool MiniMapVisible
         {
@@ -359,6 +379,11 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             foreach (var stickyNote in asset.StickyNotes)
             {
                 AddStickyNoteView(stickyNote);
+            }
+
+            if (RunningNodeId != null && views.TryGetValue(RunningNodeId, out var running))
+            {
+                running.IsRunning = true;
             }
         }
 
