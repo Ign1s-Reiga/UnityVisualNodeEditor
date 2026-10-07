@@ -27,6 +27,23 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Shortcuts_AreIgnoredInAnyTextInputField()
+        {
+            var floatField = new FloatField();
+            var integerField = new IntegerField();
+            var textField = new TextField();
+
+            // キー入力の対象になるのは、各フィールドの中の入力部分
+            Assert.That(NodeGraphView.IsEditingText(floatField.Q(className: TextInputBaseField<float>.inputUssClassName)), Is.True,
+                "Blackboard float defaults accept letters such as 'f'");
+            Assert.That(NodeGraphView.IsEditingText(integerField), Is.True);
+            Assert.That(NodeGraphView.IsEditingText(textField.Q(className: TextInputBaseField<string>.inputUssClassName)), Is.True);
+            Assert.That(NodeGraphView.IsEditingText(new Toggle()), Is.False);
+            Assert.That(NodeGraphView.IsEditingText(new NodeGraphView()), Is.False);
+            Assert.That(NodeGraphView.IsEditingText(null), Is.False);
+        }
+
+        [Test]
         public void CopyPasteCallbacks_AreConnected()
         {
             var view = new NodeGraphView();

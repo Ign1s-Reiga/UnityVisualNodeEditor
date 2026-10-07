@@ -541,6 +541,13 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 AddElement(output.ConnectTo(input));
             }
 
+            // 折りたたみ済みのノードは、生成時点（エッジがまだ無い）ですべてのポートが隠れている。
+            // エッジを繋いだ後に表示を更新し、接続済みのポートを見えるようにする
+            foreach (var view in views.Values.Where(v => v.IsCollapsed))
+            {
+                view.RefreshExpandedState();
+            }
+
             foreach (var groupData in asset.Groups)
             {
                 var groupView = new GroupView(groupData);
@@ -741,8 +748,23 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             evt.StopPropagation();
         }
 
-        private static bool IsEditingText(VisualElement target) =>
-            target is TextField || target?.GetFirstAncestorOfType<TextField>() != null;
+        /// <summary>
+        /// キー入力の対象がテキスト入力欄（またはその中）か。TextField だけでなく IntegerField / FloatField など
+        /// TextInputBaseField 系すべてを含む（数値欄でも "f" などを入力できるため）。
+        /// </summary>
+        internal static bool IsEditingText(VisualElement target)
+        {
+            for (var element = target; element != null; element = element.parent)
+            {
+                // TextInputBaseField<T> はどの値型でも同じ USS クラスを付ける
+                if (element.ClassListContains(TextInputBaseField<string>.ussClassName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private string SerializeElements(IEnumerable<GraphElement> elements)
         {

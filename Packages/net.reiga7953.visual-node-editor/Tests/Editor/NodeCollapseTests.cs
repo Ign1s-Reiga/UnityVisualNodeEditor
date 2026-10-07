@@ -1,6 +1,9 @@
+using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Views;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Reiga.VisualNodeEditor.Tests
 {
@@ -32,6 +35,22 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(_view.FindNodeView(_a.Id).IsCollapsed, Is.False);
             Assert.That(_view.FindNodeView(_b.Id).IsCollapsed, Is.True);
             Assert.That(_view.FindNodeView(_b.Id).ClassListContains("vne-node--collapsed"), Is.True);
+        }
+
+        [Test]
+        public void CollapsedNode_KeepsConnectedPortsVisibleWhenOpened()
+        {
+            // B は折りたたみ済みで、入力だけが A から繋がっている
+            _graph.AddEdge(new EdgeData(_a.Id, "out", _b.Id, "in"));
+
+            _view.Populate(_graph);
+
+            var bView = _view.FindNodeView(_b.Id);
+            var visiblePorts = bView.Query<Port>().ToList();
+            Assert.That(visiblePorts.Any(p => p.direction == Direction.Input && p.connected), Is.True,
+                "the connected input port must be shown, otherwise the edge has nowhere to attach");
+            Assert.That(visiblePorts.Any(p => p.direction == Direction.Output), Is.False,
+                "the unconnected output port stays hidden while collapsed");
         }
 
         [Test]
