@@ -149,6 +149,65 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(changes, Is.EqualTo(4));
         }
 
+        [TestCase(0, 2, 1)]
+        [TestCase(0, 1, 0)]
+        [TestCase(0, 3, 2)]
+        [TestCase(2, 0, 0)]
+        [TestCase(1, 1, 1)]
+        public void DropIndex_IsConvertedToFinalIndex(int current, int drop, int expected)
+        {
+            Assert.That(ParameterBlackboard.ToFinalIndex(current, drop), Is.EqualTo(expected));
+        }
+
+        [TestCase(0, 2, new[] { "B", "A", "C" })]
+        [TestCase(0, 1, new[] { "A", "B", "C" })]
+        [TestCase(0, 3, new[] { "B", "C", "A" })]
+        [TestCase(2, 0, new[] { "C", "A", "B" })]
+        [TestCase(2, 1, new[] { "A", "C", "B" })]
+        public void Blackboard_DragAndDropLandsWhereDropped(int from, int dropIndex, string[] expected)
+        {
+            // Blackboard のドロップ位置は、ドラッグ中の行がまだ一覧にある状態で数える
+            foreach (var name in new[] { "A", "B", "C" })
+            {
+                _graph.AddParameter(new GraphParameter(name, GraphParameterType.Int));
+            }
+
+            var view = new NodeGraphView();
+            view.Populate(_graph);
+            var moved = _graph.Parameters[from];
+
+            var result = view.Blackboard.MoveParameterToDropIndex(moved.Id, dropIndex);
+
+            Assert.That(_graph.Parameters.Select(p => p.Name), Is.EqualTo(expected));
+            Assert.That(FieldTexts(view.Blackboard), Is.EqualTo(expected));
+            Assert.That(result, Is.EqualTo(!expected.SequenceEqual(new[] { "A", "B", "C" })),
+                "dropping a row where it already is does nothing");
+        }
+
+        [Test]
+        public void Runner_NotifiesValuesResetOnStart()
+        {
+            _graph.AddParameter(new GraphParameter("Score", GraphParameterType.Int));
+            _graph.AddParameter(new GraphParameter("Hard", GraphParameterType.Bool));
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+            runner.SetInt("Score", 5);
+            var changed = new List<string>();
+            var scoreSeenInHandler = -1;
+            runner.ParameterChanged += name =>
+            {
+                changed.Add(name);
+                scoreSeenInHandler = runner.GetInt("Score");
+            };
+
+            runner.Stop();
+            runner.Start();
+
+            Assert.That(changed, Is.EqualTo(new[] { "Score" }), "only parameters whose value actually changed");
+            Assert.That(scoreSeenInHandler, Is.Zero, "handlers already see the reset value");
+            runner.Stop();
+        }
+
         private static List<string> FieldTexts(ParameterBlackboard blackboard) =>
             blackboard.Query<BlackboardField>().ToList().Select(f => f.text).ToList();
     }

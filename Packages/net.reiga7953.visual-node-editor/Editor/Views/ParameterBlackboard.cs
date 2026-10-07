@@ -26,7 +26,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             addItemRequested = _ => ShowAddMenu();
             editTextRequested = (_, element, newName) => RenameParameter(GetParameterId(element), newName);
-            moveItemRequested = (_, index, element) => MoveParameter(GetParameterId(element), index);
+            moveItemRequested = (_, dropIndex, element) => MoveParameterToDropIndex(GetParameterId(element), dropIndex);
         }
 
         /// <summary>パラメータが追加・変更・削除されたとき（検証や未保存表示の更新に使う）。</summary>
@@ -101,7 +101,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             return true;
         }
 
-        /// <summary>並び順を変える。</summary>
+        /// <summary>並び順を変える。<paramref name="index"/> は移動後の一覧での位置。</summary>
         internal bool MoveParameter(string id, int index)
         {
             var parameter = _asset != null ? _asset.FindParameter(id) : null;
@@ -114,6 +114,43 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             _asset.MoveParameter(parameter, index);
             CommitStructuralChange();
             return true;
+        }
+
+        /// <summary>
+        /// ドラッグ＆ドロップで並び順を変える。<paramref name="dropIndex"/> は Blackboard が渡す位置
+        /// （ドラッグ中の行を取り除く前の一覧で数えたもの）。位置が変わらなければ何もせず false を返す。
+        /// </summary>
+        internal bool MoveParameterToDropIndex(string id, int dropIndex)
+        {
+            var parameter = _asset != null ? _asset.FindParameter(id) : null;
+            if (parameter == null)
+            {
+                return false;
+            }
+
+            var currentIndex = IndexOf(parameter);
+            var finalIndex = ToFinalIndex(currentIndex, dropIndex);
+            return finalIndex != currentIndex && MoveParameter(id, finalIndex);
+        }
+
+        /// <summary>
+        /// ドロップ位置（取り除く前の一覧で数えた位置）を、取り除いた後の最終位置に直す。
+        /// 下へ動かすときは、自分が抜けた分だけ 1 つ前にずれる。
+        /// </summary>
+        internal static int ToFinalIndex(int currentIndex, int dropIndex) =>
+            dropIndex > currentIndex ? dropIndex - 1 : dropIndex;
+
+        private int IndexOf(GraphParameter parameter)
+        {
+            for (var i = 0; i < _asset.Parameters.Count; i++)
+            {
+                if (_asset.Parameters[i] == parameter)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private void ShowAddMenu()

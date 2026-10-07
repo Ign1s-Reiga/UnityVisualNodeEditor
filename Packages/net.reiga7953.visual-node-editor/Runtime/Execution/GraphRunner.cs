@@ -60,10 +60,12 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>
         /// パラメータの値をアセットの既定値に戻す（<see cref="Start"/> のたびにも行う）。
+        /// 値が変わったパラメータは <see cref="ParameterChanged"/> で通知する（表示などが古い値のまま残らないように）。
         /// 名前が空・重複するパラメータは、検証で Error になる状態なので最初のものだけを使う。
         /// </summary>
         public void ResetParameters()
         {
+            var previous = new Dictionary<string, object>(_parameterValues, StringComparer.Ordinal);
             _parameterTypes.Clear();
             _parameterValues.Clear();
             foreach (var parameter in Graph.Parameters)
@@ -73,6 +75,16 @@ namespace Reiga.VisualNodeEditor
                     _parameterTypes.Add(parameter.Name, parameter.Type);
                     _parameterValues.Add(parameter.Name, parameter.DefaultValue);
                 }
+            }
+
+            // 通知は値をすべて戻し終えてから行う（通知の中で他のパラメータを読んでも既定値が返るように）
+            var changed = _parameterValues
+                .Where(p => !previous.TryGetValue(p.Key, out var old) || !Equals(old, p.Value))
+                .Select(p => p.Key)
+                .ToList();
+            foreach (var name in changed)
+            {
+                ParameterChanged?.Invoke(name);
             }
         }
 
