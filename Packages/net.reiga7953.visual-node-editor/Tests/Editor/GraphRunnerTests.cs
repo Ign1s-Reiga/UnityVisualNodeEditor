@@ -214,6 +214,96 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void StopInNodeEntered_DoesNotLoadTheScene()
+        {
+            var entry = Add(new EntryNode());
+            var title = AddScene("Title");
+            Connect(entry, title);
+
+            _runner = new GraphRunner(_graph, _loader);
+            _runner.NodeEntered += node =>
+            {
+                if (node == title)
+                {
+                    _runner.Stop();
+                }
+            };
+            _runner.Start();
+
+            Assert.That(_runner.IsRunning, Is.False);
+            Assert.That(_runner.Current, Is.Null);
+            Assert.That(_loader.Loaded, Is.Empty);
+        }
+
+        [Test]
+        public void StopInNodeEntered_OnEvent_DoesNotTriggerItOrContinue()
+        {
+            var entry = Add(new EntryNode());
+            var play = Add(new StateNode());
+            var win = Add(new EventNode { EventName = "Win" });
+            var result = AddScene("Result");
+            Connect(entry, play);
+            Connect(play, win);
+            Connect(win, result);
+
+            _runner = new GraphRunner(_graph, _loader);
+            var triggered = new List<string>();
+            _runner.EventTriggered += triggered.Add;
+            _runner.NodeEntered += node =>
+            {
+                if (node == win)
+                {
+                    _runner.Stop();
+                }
+            };
+            _runner.Start();
+
+            _runner.Raise("Win");
+
+            Assert.That(triggered, Is.Empty);
+            Assert.That(_loader.Loaded, Is.Empty);
+            Assert.That(_runner.IsRunning, Is.False);
+        }
+
+        [Test]
+        public void RestartInHandler_AbandonsOldMoveAndStartsFresh()
+        {
+            var entry = Add(new EntryNode());
+            var a = Add(new StateNode { Title = "A" });
+            var go = Add(new EventNode { EventName = "Go" });
+            var b = AddScene("B");
+            Connect(entry, a);
+            Connect(a, go);
+            Connect(go, b);
+
+            _runner = new GraphRunner(_graph, _loader);
+            var entered = new List<string>();
+            var restarted = false;
+            _runner.NodeEntered += node =>
+            {
+                entered.Add(node.Title);
+                if (node == go && !restarted)
+                {
+                    restarted = true;
+                    _runner.Stop();
+                    _runner.Start();
+                }
+            };
+            _runner.Start();
+
+            _runner.Raise("Go");
+
+            // 再開後は Entry → A で止まり、古い遷移（Go → B）は続かない
+            Assert.That(entered, Is.EqualTo(new[] { "Entry", "A", "Event", "Entry", "A" }));
+            Assert.That(_runner.Current, Is.SameAs(a));
+            Assert.That(_loader.Loaded, Is.Empty);
+
+            // 遷移中の扱いが壊れていないこと: 次の Raise はすぐに実行される
+            Assert.That(_runner.Raise("Go"), Is.True);
+            Assert.That(_runner.Current, Is.SameAs(b));
+        }
+
+        [Test]
         public void Start_WithoutEntry_Throws()
         {
             Add(new StateNode());

@@ -310,7 +310,7 @@ namespace Reiga.VisualNodeEditor.Editor
             {
                 _issues.AddRange(GraphValidator.Validate(_asset));
                 _issues.AddRange(BuildSettingsSync.GetIssues(
-                    _asset, BuildSettingsSync.GetEnabledSceneGuids(EditorBuildSettings.scenes)));
+                    _asset, BuildSettingsSync.GetEnabledSceneGuids(EditorBuildSettings.scenes), AssetDatabase.GUIDToAssetPath));
             }
 
             _graphView?.ShowIssues(_issues);

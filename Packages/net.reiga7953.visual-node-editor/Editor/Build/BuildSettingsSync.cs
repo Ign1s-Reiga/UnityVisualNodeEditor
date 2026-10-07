@@ -15,8 +15,13 @@ namespace Reiga.VisualNodeEditor.Editor.Build
         public static HashSet<string> GetEnabledSceneGuids(IEnumerable<EditorBuildSettingsScene> buildScenes) =>
             new HashSet<string>(buildScenes.Where(s => s != null && s.enabled).Select(s => s.guid.ToString()));
 
-        /// <summary>Build Settings に有効な状態で入っていないシーンを参照する Scene ノードの警告。</summary>
-        public static List<GraphIssue> GetIssues(NodeGraphAsset graph, ICollection<string> enabledSceneGuids)
+        /// <summary>
+        /// Build Settings に有効な状態で入っていないシーンを参照する Scene ノードの警告。
+        /// 参照先のシーンが削除されている（<paramref name="guidToPath"/> が空を返す）ノードは、追加できないのでその旨を警告する。
+        /// </summary>
+        /// <param name="guidToPath">GUID からパスを返す関数。通常は <see cref="AssetDatabase.GUIDToAssetPath(string)"/>。</param>
+        public static List<GraphIssue> GetIssues(
+            NodeGraphAsset graph, ICollection<string> enabledSceneGuids, System.Func<string, string> guidToPath)
         {
             var issues = new List<GraphIssue>();
             if (graph == null)
@@ -27,14 +32,32 @@ namespace Reiga.VisualNodeEditor.Editor.Build
             foreach (var node in graph.Nodes.OfType<SceneNode>())
             {
                 var scene = node.Scene;
-                if (!string.IsNullOrEmpty(scene.Guid) && !enabledSceneGuids.Contains(scene.Guid))
+                if (string.IsNullOrEmpty(scene.Guid) || enabledSceneGuids.Contains(scene.Guid))
                 {
-                    issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
-                        $"'{node.Title}' uses scene '{scene.Name}', which is not enabled in Build Settings.", node.Id));
+                    continue;
                 }
+
+                var message = string.IsNullOrEmpty(guidToPath(scene.Guid))
+                    ? $"'{node.Title}' uses scene '{scene.Name}', which no longer exists."
+                    : $"'{node.Title}' uses scene '{scene.Name}', which is not enabled in Build Settings.";
+                issues.Add(new GraphIssue(GraphIssueSeverity.Warning, message, node.Id));
             }
 
             return issues;
+        }
+
+        /// <summary><see cref="Apply"/> の結果のメッセージ。追加・有効化した数と、削除済みで飛ばした数を伝える。</summary>
+        public static string GetResultMessage(string graphName, int addedCount, int enabledCount, int missingCount)
+        {
+            var missing = missingCount > 0 ? $" {missingCount} scene(s) no longer exist and were skipped." : string.Empty;
+            if (addedCount == 0 && enabledCount == 0)
+            {
+                return missingCount > 0
+                    ? $"Nothing to add for '{graphName}'.{missing}"
+                    : $"All scenes used by '{graphName}' are already in Build Settings.";
+            }
+
+            return $"Build Settings: added {addedCount} scene(s) and enabled {enabledCount} scene(s) used by '{graphName}'.{missing}";
         }
 
         /// <summary>
@@ -88,19 +111,21 @@ namespace Reiga.VisualNodeEditor.Editor.Build
                 return "No graph is open.";
             }
 
-            // 移動・改名に追従するよう、Path は GUID から引き直したものを使う
-            var scenes = new GraphQuery(graph).GetScenes()
+            // 移動・改名に追従するよう、Path は GUID から引き直したものを使う。引けないものは削除済みとして飛ばす
+            var resolved = new GraphQuery(graph).GetScenes()
                 .Select(s => new SceneReference(s.Guid, AssetDatabase.GUIDToAssetPath(s.Guid)))
-                .Where(s => !string.IsNullOrEmpty(s.Path));
+                .ToList();
+            var scenes = resolved.Where(s => !string.IsNullOrEmpty(s.Path)).ToList();
+            var missing = resolved.Count - scenes.Count;
 
             var updated = AddScenes(EditorBuildSettings.scenes, scenes, out var added, out var enabled);
+            var message = GetResultMessage(graph.name, added, enabled, missing);
             if (added == 0 && enabled == 0)
             {
-                return $"All scenes used by '{graph.name}' are already in Build Settings.";
+                return message;
             }
 
             EditorBuildSettings.scenes = updated;
-            var message = $"Build Settings: added {added} scene(s) and enabled {enabled} scene(s) used by '{graph.name}'.";
             Debug.Log("[VisualNodeEditor] " + message, graph);
             return message;
         }

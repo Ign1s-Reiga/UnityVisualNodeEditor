@@ -22,6 +22,9 @@ namespace Reiga.VisualNodeEditor
         private readonly Dictionary<string, Action> _eventHandlers = new(StringComparer.Ordinal);
         private bool _isMoving;
 
+        // Start / Stop のたびに進める。通知の中で止めたり再開したりされたら、古い遷移はこれを見て打ち切る
+        private int _generation;
+
         /// <param name="graph">実行するグラフ。</param>
         /// <param name="sceneLoader">Scene ノードに入ったときに使う。null ならシーンを読み込まない。</param>
         public GraphRunner(NodeGraphAsset graph, ISceneLoader sceneLoader = null)
@@ -108,9 +111,19 @@ namespace Reiga.VisualNodeEditor
             }
 
             IsRunning = true;
+            _generation++;
             _running.Add(this);
             Started?.Invoke(this);
-            Run(() => MoveTo(entry));
+
+            // 通知の中から呼ばれた（Stop → Start で再開された）場合は、いまの通知が終わってから始める
+            if (_isMoving)
+            {
+                _pending.Enqueue(() => MoveTo(entry));
+            }
+            else
+            {
+                Run(() => MoveTo(entry));
+            }
         }
 
         /// <summary>実行を止める。現在のノードから出たことを通知する。</summary>
@@ -122,6 +135,7 @@ namespace Reiga.VisualNodeEditor
             }
 
             _pending.Clear();
+            _generation++;
             var current = Current;
             Current = null;
             if (current != null)
@@ -212,6 +226,8 @@ namespace Reiga.VisualNodeEditor
         /// <summary>通知中に Raise / Advance が呼ばれても、いま進めている遷移を壊さないよう順番に実行する。</summary>
         private void Run(Action action)
         {
+            // 入れ子で呼ばれても、外側の Run が終わるまでは「遷移中」のままにする
+            var wasMoving = _isMoving;
             _isMoving = true;
             try
             {
@@ -223,15 +239,16 @@ namespace Reiga.VisualNodeEditor
             }
             finally
             {
-                _isMoving = false;
+                _isMoving = wasMoving;
             }
         }
 
         private void MoveTo(NodeData target)
         {
+            var generation = _generation;
             var visited = new HashSet<string>();
             var node = target;
-            while (node != null && IsRunning)
+            while (node != null && IsRunning && generation == _generation)
             {
                 if (!visited.Add(node.Id))
                 {
@@ -239,7 +256,11 @@ namespace Reiga.VisualNodeEditor
                     return;
                 }
 
-                Enter(node);
+                if (!Enter(node, generation))
+                {
+                    return;
+                }
+
                 node = node switch
                 {
                     EventNode eventNode => Query.GetNext(eventNode.Id).FirstOrDefault(),
@@ -249,16 +270,27 @@ namespace Reiga.VisualNodeEditor
             }
         }
 
-        private void Enter(NodeData node)
+        /// <summary>
+        /// ノードに入る。通知の中で止められた・再開された（世代が変わった）ら、残りの処理をせず false を返す。
+        /// </summary>
+        private bool Enter(NodeData node, int generation)
         {
             var previous = Current;
             if (previous != null)
             {
                 NodeExited?.Invoke(previous);
+                if (!IsCurrentGeneration(generation))
+                {
+                    return false;
+                }
             }
 
             Current = node;
             NodeEntered?.Invoke(node);
+            if (!IsCurrentGeneration(generation))
+            {
+                return false;
+            }
 
             switch (node)
             {
@@ -269,7 +301,11 @@ namespace Reiga.VisualNodeEditor
                     TriggerEvent(eventNode.EventName);
                     break;
             }
+
+            return IsCurrentGeneration(generation);
         }
+
+        private bool IsCurrentGeneration(int generation) => IsRunning && generation == _generation;
 
         private void TriggerEvent(string eventName)
         {

@@ -108,7 +108,7 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
 | Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
-| Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード |
+| Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード（参照先のシーンが削除されていれば、その旨の警告） |
 
 循環は許可する（State 間・Scene 遷移とも）。
 
@@ -139,6 +139,8 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
 - `Advance()`: 現在のノードから Event 以外のノードへ出ている最初のエッジの先へ進む（イベントを介さない「次へ」）
 - 遷移先が複数ある場合は、アセット内のエッジの順で最初のものを使う
 - 通過ノードだけで輪になっている場合（Event → Event → …）は無限ループせず、警告を出して止める
+- 通知（`NodeEntered` など）の中で `Stop()` したら、そのノードの残りの処理（シーンの読み込み・イベントの通知）は行わない
+- 通知の中で `Stop()` → `Start()` し直した場合は、進行中だった遷移を打ち切り、新しい実行を通知の後に始める（世代番号で古い遷移を止める）
 - シーンの読み込み: `SceneReference.Path`（無ければ `Name`）を `SceneManager` に渡す。すでにアクティブなシーンと同じなら読み込まない
   （Play ボタンを押したシーンが最初の Scene ノードと同じ場合に、二重に読み込まないため）
 
@@ -162,6 +164,7 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
   - 既存の並び順は変えず、足りないシーンを末尾に追加する（ビルドでは index 0 のシーンから始まるため、Runner を置くシーンの位置はユーザーが決める）
   - 判定と新しいシーン一覧の組み立ては純粋な関数にし、EditMode テストの対象にする
 - 実行方法: グラフウィンドウのツールバー「Add Scenes to Build」、または Project ビューでグラフを選んで `Assets > Visual Node Editor > Add Graph Scenes to Build Settings`
+- 削除されたシーンは追加できないので飛ばし、結果のメッセージでその数を知らせる
 
 ## Play Mode 中の強調表示
 
