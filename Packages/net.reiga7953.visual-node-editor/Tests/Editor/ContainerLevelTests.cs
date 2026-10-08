@@ -159,16 +159,57 @@ namespace Reiga.VisualNodeEditor.Tests
                 var container = (ContainerNode)view.CreateNode(typeof(StageTestContainer), Vector2.zero).Data;
 
                 var children = graph.GetChildren(container.Id).ToList();
-                Assert.That(children.OfType<ContainerEntryNode>().Count(), Is.EqualTo(1));
-                Assert.That(children.OfType<ContainerExitNode>().Select(e => e.ExitId),
+                var entry = children.OfType<ContainerEntryNode>().Single();
+                var exitNodes = children.OfType<ContainerExitNode>().ToList();
+                Assert.That(exitNodes.Select(e => e.ExitId),
                     Is.EqualTo(container.Exits.Select(e => e.Id)), "one Exit node per exit, in exit order");
-                Assert.That(VisibleIds(view), Has.No.Member(children[0].Id), "the contents stay inside the container");
+                Assert.That(graph.Edges.Where(e => e.FromNodeId == entry.Id).Select(e => e.ToNodeId),
+                    Is.EqualTo(new[] { exitNodes[0].Id }), "the Entry starts wired to the first exit");
+                Assert.That(VisibleIds(view), Has.No.Member(entry.Id), "the contents stay inside the container");
                 Assert.That(GraphValidator.Validate(graph).Where(i => i.Severity == GraphIssueSeverity.Error), Is.Empty);
             }
             finally
             {
                 Object.DestroyImmediate(graph);
             }
+        }
+
+        [Test]
+        public void NewContainer_PassesStraightThroughItsFirstExit()
+        {
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            try
+            {
+                var entry = new EntryNode();
+                var after = new StateNode { Title = "After" };
+                graph.AddNode(entry);
+                graph.AddNode(after);
+                var view = new NodeGraphView();
+                view.Populate(graph);
+                var container = (ContainerNode)view.CreateNode(typeof(ContainerNode), Vector2.zero).Data;
+                graph.AddEdge(new EdgeData(entry.Id, NodeView.OutputPortName, container.Id, ContainerNode.InputPortId));
+                graph.AddEdge(new EdgeData(container.Id, container.Exits[0].Id, after.Id, NodeView.InputPortName));
+
+                var runner = new GraphRunner(graph);
+                runner.Start();
+
+                Assert.That(runner.Current, Is.SameAs(after), "Entry → Exit(Next) inside, then out of the Next port");
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void NewContainerWithoutDefaultExits_HasAnUnwiredEntry()
+        {
+            _view.CreateNode(typeof(NoExitTestContainer), Vector2.zero);
+
+            var container = _g.Asset.Nodes.OfType<NoExitTestContainer>().Single();
+            var entry = _g.Asset.GetChildren(container.Id).OfType<ContainerEntryNode>().Single();
+            Assert.That(_g.Asset.GetChildren(container.Id).OfType<ContainerExitNode>(), Is.Empty);
+            Assert.That(_g.Asset.Edges.Any(e => e.FromNodeId == entry.Id), Is.False);
         }
 
         [Test]

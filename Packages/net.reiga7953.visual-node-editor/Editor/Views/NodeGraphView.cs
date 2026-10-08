@@ -347,18 +347,27 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             return view;
         }
 
-        /// <summary>新しいコンテナの中に、Entry と出口ごとの Exit ノードを作る（中の階層の左に Entry、右に Exit を縦に並べる）。</summary>
+        /// <summary>
+        /// 新しいコンテナの中に、Entry と出口ごとの Exit ノードを作る（中の階層の左に Entry、右に Exit を縦に並べる）。
+        /// Entry は最初の出口の Exit ノードに繋ぎ、作ったばかりのコンテナがそのまま通り抜けられるようにする。
+        /// </summary>
         private void AddContainerContents(ContainerNode container)
         {
-            _asset.AddNode(new ContainerEntryNode { ParentId = container.Id, Position = Vector2.zero });
+            var entry = new ContainerEntryNode { ParentId = container.Id, Position = Vector2.zero };
+            _asset.AddNode(entry);
             for (var i = 0; i < container.Exits.Count; i++)
             {
-                _asset.AddNode(new ContainerExitNode
+                var exitNode = new ContainerExitNode
                 {
                     ParentId = container.Id,
                     ExitId = container.Exits[i].Id,
                     Position = ContainerExitOrigin + ContainerExitSpacing * i,
-                });
+                };
+                _asset.AddNode(exitNode);
+                if (i == 0)
+                {
+                    _asset.AddEdge(new EdgeData(entry.Id, NodeView.OutputPortName, exitNode.Id, NodeView.InputPortName));
+                }
             }
         }
 
