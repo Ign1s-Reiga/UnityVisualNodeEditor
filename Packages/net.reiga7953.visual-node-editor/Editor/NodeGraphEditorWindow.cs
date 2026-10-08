@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Behaviours;
 using Reiga.VisualNodeEditor.Editor.Build;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
@@ -203,6 +204,9 @@ namespace Reiga.VisualNodeEditor.Editor
             GraphRunner.Stopped += OnRunnerStopped;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
+            // Create Script… で作ったスクリプトが、コンパイル後にノードへ追加されたとき
+            NodeBehaviourScriptCreator.BehaviourAdded += OnBehaviourScriptAdded;
+
             _assetNameLabel = rootVisualElement.Q<Label>("asset-name");
             _assetNameLabel?.RegisterCallback<ClickEvent>(_ => PingAsset());
 
@@ -218,6 +222,7 @@ namespace Reiga.VisualNodeEditor.Editor
             GraphRunner.Started -= OnRunnerStarted;
             GraphRunner.Stopped -= OnRunnerStopped;
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            NodeBehaviourScriptCreator.BehaviourAdded -= OnBehaviourScriptAdded;
             StopObservingRunner();
 
             if (_searchWindow != null)
@@ -541,6 +546,18 @@ namespace Reiga.VisualNodeEditor.Editor
                 _graphView.Populate(_asset);
                 _graphView.SelectNode(selected);
             });
+        }
+
+        /// <summary>新しいスクリプトの振る舞いがノードへ追加されたら、表示を作り直してそのノードを選び直す（インスペクタに出す）。</summary>
+        private void OnBehaviourScriptAdded(NodeGraphAsset asset, string nodeId)
+        {
+            if (asset != _asset || _graphView == null)
+            {
+                return;
+            }
+
+            _graphView.Populate(_asset);
+            _graphView.SelectNode(nodeId);
         }
 
         private void OnNodeCreationRequest(NodeCreationContext context)

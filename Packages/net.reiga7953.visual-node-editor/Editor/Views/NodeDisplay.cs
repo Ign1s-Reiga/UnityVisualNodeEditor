@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
 
@@ -68,5 +69,31 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// エディタの言語設定で displayName が一部だけ翻訳されるのを避けるため、displayName は使わない。
         /// </summary>
         public static string GetFieldLabel(string propertyName) => ObjectNames.NicifyVariableName(propertyName);
+
+        /// <summary>振る舞いの表示名（クラス名を単語に区切る。例: "PlayerMovement" → "Player Movement"）。</summary>
+        public static string GetBehaviourName(Type behaviourType) =>
+            behaviourType == null ? string.Empty : ObjectNames.NicifyVariableName(behaviourType.Name);
+
+        /// <summary>
+        /// ノードに出す振る舞いの一覧（例: "Player Movement, Timer"）。読めなかったものは "Missing"。振る舞いが無ければ空文字。
+        /// </summary>
+        public static string GetBehavioursText(IReadOnlyList<NodeBehaviour> behaviours)
+        {
+            if (behaviours == null || behaviours.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var names = new string[behaviours.Count];
+            for (var i = 0; i < behaviours.Count; i++)
+            {
+                names[i] = behaviours[i] == null ? MissingBehaviourName : GetBehaviourName(behaviours[i].GetType());
+            }
+
+            return string.Join(", ", names);
+        }
+
+        /// <summary>ノード上の一覧で、読めなかった振る舞いに出す名前。</summary>
+        public const string MissingBehaviourName = "Missing";
     }
 }

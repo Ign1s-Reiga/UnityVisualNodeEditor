@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-10-08
+- ノードの振る舞い（`NodeBehaviour`）: State・Scene ノードに C# のクラスを付け、Runner がそのノードにいる間の処理を書ける（Animator の StateMachineBehaviour に相当）。`OnEnter` / `OnUpdate(deltaTime)` / `OnFixedUpdate(fixedDeltaTime)` / `OnExit` を必要なものだけ上書きする。`Runner`・`Node`・`Host`（Graph Runner コンポーネント）を参照できる
+- ランタイム: `GraphRunner.Update` / `FixedUpdate` で現在のノードの振る舞いを動かす（Graph Runner コンポーネントが毎フレーム呼ぶ）。振る舞いは Runner ごと・`Start()` ごとにアセットの値から複製する。振る舞いの例外はログに出して次へ進む
+- インスペクタ: 振る舞いの一覧（フィールドの編集・並べ替え・削除・スクリプトを開く）、Add Behaviour（public な `NodeBehaviour` のサブクラスから選ぶ）、Create Script…（骨組みを書き出して開き、コンパイル後にノードへ自動で追加）。ノードには付いている振る舞いの名前を出す
+- 検証: 型の改名・削除で読めなくなった振る舞いを警告する（実行時は飛ばす）
+
 ## [0.8.0] - 2026-10-08
 - コンテナを作ると、中の Entry を最初の出口の Exit ノードに繋いだ状態で作る（作ったばかりのコンテナは、そのまま最初の出口へ通り抜ける）。既定の出口が無いコンテナでは繋がない
 

@@ -54,7 +54,7 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
-            Runner = new GraphRunner(_graph, _loadScenes ? new SceneManagerSceneLoader() : null);
+            Runner = new GraphRunner(_graph, _loadScenes ? new SceneManagerSceneLoader() : null) { Host = this };
 
             // 開始時の Entry / 最初のノードの通知にも間に合うよう、Start より前に購読する
             Runner.NodeEntered += node => _onNodeEntered.Invoke(node.Title);
@@ -96,6 +96,11 @@ namespace Reiga.VisualNodeEditor
                 StartGraph();
             }
         }
+
+        // 現在のノードの振る舞い（NodeBehaviour）の OnUpdate / OnFixedUpdate を呼ぶ
+        private void Update() => Runner?.Update(Time.deltaTime);
+
+        private void FixedUpdate() => Runner?.FixedUpdate(Time.fixedDeltaTime);
 
         private void OnDestroy()
         {

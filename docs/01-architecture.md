@@ -232,6 +232,7 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
 | Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
+| Warning | 読み込めなかった振る舞い（`NodeBehaviour` の型の改名・削除で null になったもの。実行時は飛ばす） |
 | Error | 名前が空のパラメータ / 名前が重複するパラメータ / ID が重複するパラメータ（Blackboard） |
 | Error | コンテナの条件 1〜7（階層をまたぐエッジ、Entry の数、Entry / Exit を置ける階層、親の参照と輪、出口の名前と ID、Exit が指す出口、出力ポートが指す出口）。「コンテナ」参照 |
 | Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード（参照先のシーンが削除されていれば、その旨の警告） |
@@ -250,7 +251,7 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
 | `GraphQuery` | グラフの読み取り専用ビュー。Entry、ノードの出力エッジ・遷移先、参照しているシーンの一覧などを引く（生成時のスナップショット） |
 | `GraphRunner` | 純粋な C# の実行器。現在のノードを持ち、イベントで遷移する。シーンの読み込みは `ISceneLoader` に任せる |
 | `ISceneLoader` / `SceneManagerSceneLoader` | シーン読み込みの抽象と、`SceneManager.LoadSceneAsync`（Single）による実装。テストでは偽物に差し替える |
-| `GraphRunnerBehaviour` | シーンに置くコンポーネント。グラフを指定して開始し、UnityEvent でイベントに反応する |
+| `GraphRunnerBehaviour` | シーンに置くコンポーネント。グラフを指定して開始し、UnityEvent でイベントに反応する。`Update` / `FixedUpdate` を Runner に渡す（「ノードの振る舞い」参照） |
 | `GraphEventBinding` | `GraphRunnerBehaviour` のインスペクタで「イベント名 → UnityEvent」を対応付ける項目 |
 
 ### 実行の規則
@@ -289,6 +290,47 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
 
 - `GraphRunner.Running`（静的）に実行中の Runner を持ち、`Started` / `Stopped` で通知する。エディタの強調表示が使う
 - 「Enter Play Mode Options」でドメインリロードを切っても前回の値が残らないよう、`RuntimeInitializeOnLoadMethod(SubsystemRegistration)` で初期化する
+
+## ノードの振る舞い（NodeBehaviour）
+
+Animator の `StateMachineBehaviour` と同じ考え方で、待機ノード（State・Scene）に C# のクラスを付け、
+Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当）を書けるようにする。
+処理は C# で書き、ノードには「どのクラスを、どの設定値で動かすか」だけを持たせる（ロジックをノードで組むビジュアルスクリプティングにはしない。非目的を守る）。
+
+### データ（Runtime）
+
+| 型 | 役割 |
+|---|---|
+| `NodeBehaviour` | 抽象基底。`[Serializable]` の純粋な C#（MonoBehaviour でも ScriptableObject でもない）。`OnEnter()` / `OnUpdate(float deltaTime)` / `OnFixedUpdate(float fixedDeltaTime)` / `OnExit()` を必要なものだけ上書きする。`Runner`・`Node`・`Host`（Runner を動かしている `GraphRunnerBehaviour`。コンポーネントを使っていなければ null）を参照できる |
+| `IBehaviourHost` | 振る舞いを持てるノード。`StateNode`・`SceneNode` が実装し、`_behaviours` を `[SerializeReference]` のリストで持つ。独自の待機ノードも実装できる |
+
+- `_behaviours` はノードのインスペクタが名前で除外し、専用の UI で出す。`[HideInInspector]` は付けない
+  （付けると、その中の振る舞いのフィールドまで `SerializedProperty` 上で非表示扱いになり、編集欄を作れない）
+
+- サブクラスにも `[Serializable]` が要る（属性は継承されない）。public / `[SerializeField]` のフィールドはノードのインスペクタで編集でき、グラフアセットに保存される
+- グラフはアセットなので、シーン上のオブジェクトをフィールドで参照することはできない。シーンのものは `Host`（の `gameObject` など）や `FindFirstObjectByType` から実行時に引く
+- 型が削除・改名されて読めなくなった振る舞い（リストの null）は実行時に飛ばし、検証で Warning にする
+
+### 実行（GraphRunner）
+
+- `GraphRunner.Update(deltaTime)` / `FixedUpdate(fixedDeltaTime)`: 現在のノードの振る舞いの `OnUpdate` / `OnFixedUpdate` を順に呼ぶ。
+  `GraphRunnerBehaviour` が自分の `Update` / `FixedUpdate` から `Time.deltaTime` / `Time.fixedDeltaTime` を渡して呼ぶ（Runner を直接使う場合は自分で呼ぶ）
+- 振る舞いを持つノードに入ったら `NodeEntered` の前に `OnEnter`、出るときは `NodeExited` の前に `OnExit` を呼ぶ（`Stop()` でも `OnExit`）。通過ノードは振る舞いを持たない。
+  Scene ノードの `OnEnter` はシーンの読み込みを始める前に呼ばれる（読み込みは非同期）ので、そのシーンのオブジェクトは `OnUpdate` から引く
+- 振る舞いのインスタンスは Runner ごとに、`Start()` のたびにアセットの値から複製して作る（`JsonUtility` の往復）。
+  パラメータと同じく毎回まっさらから始まり、同じグラフを複数の Runner で動かしても状態が混ざらず、実行中の変更はアセットに書き戻されない
+- 振る舞いの中から `Runner.Raise` / `Advance` / `Stop` を呼んでよい。`OnUpdate` / `OnFixedUpdate` の中で遷移・停止したら、そのノードの残りの振る舞いは呼ばない。
+  `OnEnter` / `OnExit` の中からの `Raise` / `Advance` は、いま進めている遷移の後に行う（`NodeEntered` などの通知と同じ）
+- 振る舞いで例外が出たら、ログに出して次の振る舞いへ進む（1 つの不具合で Runner 全体が止まらないように）
+
+### エディタ
+
+- State・Scene ノードのインスペクタに「Behaviours」の一覧を出す。各振る舞いのフィールドを `PropertyField` で編集し（Undo 対応）、
+  Edit Script でスクリプトを開き、Remove で外し、上下のボタンで並べ替える。読めなくなった振る舞いは「Missing behaviour」と出し、Remove だけできる
+- Add Behaviour: `NodeBehaviour` のサブクラス（抽象・ジェネリック・引数なしのコンストラクタが無いものを除く）から選んで追加する
+- Create Script…: 保存先を選ぶと、ファイル名からクラス名を作り、`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit` の空の骨組みを書き出して IDE で開く。
+  コンパイル（ドメインリロード）後に、そのクラスを元のノードへ自動で追加する（追加待ちは `SessionState` に覚えておく）
+- ノードには、付いている振る舞いのクラス名を 1 行で出す（USS クラス `vne-node__behaviours`）
 
 ## Build Settings 連携
 

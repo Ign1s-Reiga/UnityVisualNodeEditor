@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Reiga.VisualNodeEditor
 {
@@ -87,6 +88,13 @@ namespace Reiga.VisualNodeEditor
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
                             $"'{node.Title}' has no event name, so it cannot be raised.", node.Id));
                         break;
+                }
+
+                // 型が削除・改名されて読めなくなった振る舞い。実行時は飛ばす
+                if (node is IBehaviourHost host && host.Behaviours.Any(b => b == null))
+                {
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
+                        $"'{node.Title}' has a behaviour that could not be loaded. Its script may have been renamed or deleted.", node.Id));
                 }
             }
 

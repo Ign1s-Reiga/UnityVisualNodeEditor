@@ -34,6 +34,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         private readonly Label _summaryLabel = new Label();
 
+        // 付いている振る舞い（NodeBehaviour）の一覧。ポートの下（extensionContainer）に出し、折りたたむと GraphView が隠す
+        private readonly Label _behavioursLabel = new Label();
+
         /// <summary>この View が表示しているノードデータ。</summary>
         public NodeData Data { get; private set; }
 
@@ -74,6 +77,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             _summaryLabel.AddToClassList("vne-node__summary");
+            _behavioursLabel.AddToClassList("vne-node__behaviours");
             SetPosition(new Rect(data.Position, Vector2.zero));
             Rebind(data);
 
@@ -113,6 +117,29 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             Data = data;
             title = GetDisplayTitle();
             UpdateSummary(GetSummary());
+            UpdateBehaviours();
+        }
+
+        /// <summary>ノードに出している振る舞いの一覧。振る舞いが無ければ空文字。</summary>
+        public string BehavioursText => _behavioursLabel.parent != null ? _behavioursLabel.text : string.Empty;
+
+        private void UpdateBehaviours()
+        {
+            var text = NodeDisplay.GetBehavioursText((Data as IBehaviourHost)?.Behaviours);
+            _behavioursLabel.text = text;
+            _behavioursLabel.tooltip = text.Length > 0 ? "Behaviours: " + text : string.Empty;
+
+            var shown = _behavioursLabel.parent != null;
+            if (text.Length == 0 && shown)
+            {
+                _behavioursLabel.RemoveFromHierarchy();
+                RefreshExpandedState();
+            }
+            else if (text.Length > 0 && !shown)
+            {
+                extensionContainer.Add(_behavioursLabel);
+                RefreshExpandedState();
+            }
         }
 
         /// <summary>

@@ -37,6 +37,10 @@
 - [x] エディタ: 出口の編集（コンテナのインスペクタの一覧、Exit ノードのドロップダウン、削除時の確認）
 - [ ] ゲームのテンプレート（ADV / アクション）とテンプレート専用のコンテナのサブクラス（今回は対象外）
 
+## ノードの振る舞い（Update / FixedUpdate）
+- [x] ランタイム: `NodeBehaviour`（`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit`）、State・Scene への付与、`GraphRunner.Update` / `FixedUpdate` と `GraphRunnerBehaviour` からの呼び出し、Runner ごとの複製、読めない振る舞いの検証
+- [x] エディタ: インスペクタの一覧（追加・削除・並べ替え・フィールド編集）、Create Script…（骨組みの生成と、コンパイル後の自動追加）、ノード上の表示
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
@@ -54,3 +58,5 @@
 - コンテナ: Exit に対応する出力ポートが繋がっていないときのランタイムの扱い（止める / エラー / 警告）。**当面は**、直前の待機ノードに留まって警告を出す
 - コンテナ: 「選択範囲をコンテナにまとめる」コマンド（範囲の境界をまたぐエッジを Entry / Exit に置き換える）
 - コンテナ: コンテナの中身を、外の階層でもプレビュー表示するか
+- ノードの振る舞い: `OnLateUpdate` や物理・入力のコールバック（`OnTriggerEnter` 相当）まで持たせるか（当面は Enter / Update / FixedUpdate / Exit のみ）
+- ノードの振る舞い: コンテナにも付けるか（コンテナの中にいる間ずっと動く、サブステートマシン相当。当面は State・Scene のみ）

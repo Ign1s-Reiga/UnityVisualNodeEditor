@@ -70,8 +70,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             var hasChild = child.NextVisible(true);
             while (hasChild && !SerializedProperty.EqualContents(child, end))
             {
-                // タイトルはヘッダーで編集する
-                if (child.name != TitlePropertyName)
+                // タイトルはヘッダーで、振る舞いのリストは NodeBehaviourListView で編集する
+                if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName)
                 {
                     var field = new PropertyField(child.Copy(), NodeDisplay.GetFieldLabel(child.name));
                     field.AddToClassList("vne-inspector-view__field");
@@ -93,6 +93,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     var exitPicker = new ContainerExitPicker(asset, exitNode);
                     exitPicker.Changed += OnStructureChanged;
                     content.Add(exitPicker);
+                    break;
+
+                // 振る舞い（NodeBehaviour）は SerializeReference のリストなので、追加・削除は専用の UI で行う
+                case IBehaviourHost _:
+                    var behaviourList = new NodeBehaviourListView(asset, asset.Nodes[_index],
+                        nodeProperty.FindPropertyRelative(NodeBehaviourListView.BehavioursPropertyName));
+                    behaviourList.Changed += OnStructureChanged;
+                    content.Add(behaviourList);
                     break;
             }
 

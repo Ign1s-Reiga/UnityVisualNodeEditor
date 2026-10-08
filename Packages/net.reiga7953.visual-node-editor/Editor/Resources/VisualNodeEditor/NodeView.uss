@@ -50,6 +50,22 @@
   -unity-text-align: middle-left;
 }
 
+/* NodeBehaviours attached to the node, below the ports (GraphView hides the extension area when collapsed) */
+
+.vne-node__behaviours {
+  max-width: 220px;
+  padding: 3px 8px 4px 8px;
+  font-size: 10px;
+  color: #9ec7ff;
+  background-color: #2b2b2b;
+  border-top-width: 1px;
+  border-top-color: #232323;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -unity-text-align: middle-left;
+}
+
 /* Collapsed nodes (title ▼ button) also hide the summary line */
 
 .vne-node--collapsed .vne-node__summary {

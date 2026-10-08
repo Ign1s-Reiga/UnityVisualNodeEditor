@@ -29,6 +29,31 @@ runner.Raise("StartGame");
 
 詳しい規則はリポジトリの `docs/01-architecture.md`「ランタイム実行（GraphRunner）」を参照。
 
+## ノードの振る舞い（Update / FixedUpdate）
+
+State・Scene ノードにいる間の処理は、C# の `NodeBehaviour` に書いてノードに付ける（Animator の StateMachineBehaviour と同じ考え方）。
+
+1. ノードを選び、インスペクタの「Create Script…」で骨組みを作る（コンパイル後にそのノードへ自動で追加される）。既存のクラスは「Add Behaviour」から付ける
+2. 必要なメソッドだけ書く
+
+```csharp
+[System.Serializable]
+public class PlayerMovement : NodeBehaviour
+{
+    [SerializeField] private float _speed = 5f; // ノードのインスペクタで編集できる
+
+    public override void OnEnter() { }
+    public override void OnUpdate(float deltaTime) { /* 毎フレーム */ }
+    public override void OnFixedUpdate(float fixedDeltaTime) { /* 物理の更新ごと */ }
+    public override void OnExit() { }
+}
+```
+
+- `Graph Runner` コンポーネントが毎フレーム `Update` / `FixedUpdate` を呼ぶ（`GraphRunner` を直接使うなら `runner.Update(Time.deltaTime)` を自分で呼ぶ）
+- 振る舞いからは `Runner`（`Runner.Raise("Win")` など）、`Node`、`Host`（Graph Runner コンポーネント）を使える
+- グラフはアセットなので、シーンのオブジェクトはフィールドで参照できない。`Host` や `FindFirstObjectByType` から実行時に引く
+- 値は `Start()` のたびにアセットから複製されるので、実行中に書き換えてもアセットには残らない
+
 ## コンテナ（入れ子）
 
 - `Flow/Container` ノードの中にノードを入れられる。ダブルクリックで中を開き、ツールバー下のパンくずで戻る

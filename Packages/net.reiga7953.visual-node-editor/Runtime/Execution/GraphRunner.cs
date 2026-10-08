@@ -8,7 +8,8 @@ namespace Reiga.VisualNodeEditor
     /// <summary>
     /// グラフをシーン遷移表・ステートマシンとして実行する。MonoBehaviour に依存しない純粋な C# なので、テストから直接動かせる。
     /// <list type="bullet">
-    /// <item>待機ノード（Scene・State など）: 入ると止まる。Scene に入るとシーンを読み込む</item>
+    /// <item>待機ノード（Scene・State など）: 入ると止まる。Scene に入るとシーンを読み込む。
+    /// 付いている <see cref="NodeBehaviour"/> は、入ると OnEnter、<see cref="Update"/> / <see cref="FixedUpdate"/> のたびに OnUpdate / OnFixedUpdate、出ると OnExit が呼ばれる</item>
     /// <item>通過ノード（Entry・Event・コンテナとその Entry / Exit）: 入ったら止まらずに次へ進む。コンテナに入ると中の Entry から、Exit で出ると親の階層の対応する出力ポートから続く</item>
     /// </list>
     /// 遷移先が複数あるときは、アセット内のエッジの順で最初のものを使う。
@@ -26,6 +27,17 @@ namespace Reiga.VisualNodeEditor
 
         // Start / Stop のたびに進める。通知の中で止めたり再開したりされたら、古い遷移はこれを見て打ち切る
         private int _generation;
+
+        // ノード ID → この Runner 用に複製した振る舞い。Start() のたびに作り直す
+        private readonly Dictionary<string, List<NodeBehaviour>> _behaviours = new(StringComparer.Ordinal);
+
+        // OnEnter を呼んだ（まだ OnExit を呼んでいない）振る舞い。OnExit はこれにだけ、1 回ずつ呼ぶ
+        private readonly List<NodeBehaviour> _activeBehaviours = new();
+
+        /// <summary>
+        /// 振る舞いで出た例外の扱い。既定はログに出すだけ（次の振る舞いへ進む）。テストで差し替える。
+        /// </summary>
+        internal static Action<Exception> BehaviourExceptionHandler = Debug.LogException;
 
         /// <param name="graph">実行するグラフ。</param>
         /// <param name="sceneLoader">Scene ノードに入ったときに使う。null ならシーンを読み込まない。</param>
@@ -181,6 +193,119 @@ namespace Reiga.VisualNodeEditor
         /// <summary>実行中か。</summary>
         public bool IsRunning { get; private set; }
 
+        /// <summary>この Runner を動かしているコンポーネント。<see cref="GraphRunner"/> を直接使っている場合は null。</summary>
+        public GraphRunnerBehaviour Host { get; internal set; }
+
+        /// <summary>
+        /// 現在のノードの振る舞いの <see cref="NodeBehaviour.OnUpdate"/> を順に呼ぶ。<see cref="GraphRunnerBehaviour"/> が毎フレーム呼ぶ
+        /// （Runner を直接使う場合は自分で呼ぶ）。途中の振る舞いが遷移・停止したら、残りは呼ばない。
+        /// </summary>
+        public void Update(float deltaTime) => TickBehaviours(b => b.OnUpdate(deltaTime));
+
+        /// <summary>
+        /// 現在のノードの振る舞いの <see cref="NodeBehaviour.OnFixedUpdate"/> を順に呼ぶ。<see cref="GraphRunnerBehaviour"/> が物理の更新ごとに呼ぶ。
+        /// </summary>
+        public void FixedUpdate(float fixedDeltaTime) => TickBehaviours(b => b.OnFixedUpdate(fixedDeltaTime));
+
+        /// <summary>
+        /// この Runner がノードで動かす振る舞い（アセットの値から複製したもの。<see cref="Start"/> のたびに作り直す）。
+        /// 振る舞いを持たないノードなら空。読めなかった振る舞い（null）は含まない。
+        /// </summary>
+        public IReadOnlyList<NodeBehaviour> GetBehaviours(NodeData node)
+        {
+            if (!(node is IBehaviourHost host) || host.Behaviours.Count == 0)
+            {
+                return Array.Empty<NodeBehaviour>();
+            }
+
+            if (!_behaviours.TryGetValue(node.Id, out var instances))
+            {
+                instances = new List<NodeBehaviour>();
+                foreach (var template in host.Behaviours)
+                {
+                    // 型が削除・改名されて読めなかったものは飛ばす（検証で Warning になる）
+                    if (template == null)
+                    {
+                        continue;
+                    }
+
+                    var instance = (NodeBehaviour)JsonUtility.FromJson(JsonUtility.ToJson(template), template.GetType());
+                    instance.Bind(this, node);
+                    instances.Add(instance);
+                }
+
+                _behaviours[node.Id] = instances;
+            }
+
+            return instances;
+        }
+
+        private void TickBehaviours(Action<NodeBehaviour> call)
+        {
+            if (!IsRunning || _activeBehaviours.Count == 0)
+            {
+                return;
+            }
+
+            var node = Current;
+            var generation = _generation;
+            foreach (var behaviour in _activeBehaviours.ToArray())
+            {
+                InvokeBehaviour(behaviour, call);
+
+                // 振る舞いの中で遷移・停止したら、もうそのノードにはいない
+                if (!IsCurrentGeneration(generation) || Current != node)
+                {
+                    return;
+                }
+            }
+        }
+
+        /// <summary>ノードの振る舞いの OnEnter を順に呼ぶ。途中で止められた・再開されたら false。</summary>
+        private bool EnterBehaviours(NodeData node, int generation)
+        {
+            foreach (var behaviour in GetBehaviours(node))
+            {
+                _activeBehaviours.Add(behaviour);
+                InvokeBehaviour(behaviour, b => b.OnEnter());
+                if (!IsCurrentGeneration(generation))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>OnEnter を呼んだ振る舞いの OnExit を、1 回ずつ呼ぶ（中で Stop() されても二重には呼ばない）。</summary>
+        private void ExitBehaviours()
+        {
+            if (_activeBehaviours.Count == 0)
+            {
+                return;
+            }
+
+            var active = _activeBehaviours.ToArray();
+            _activeBehaviours.Clear();
+            foreach (var behaviour in active)
+            {
+                InvokeBehaviour(behaviour, b => b.OnExit());
+            }
+        }
+
+        private static void InvokeBehaviour(NodeBehaviour behaviour, Action<NodeBehaviour> call)
+        {
+            // 1 つの振る舞いの不具合で Runner 全体が止まらないよう、ログに出して次へ進む
+            try
+            {
+                call(behaviour);
+            }
+            catch (Exception exception)
+            {
+                BehaviourExceptionHandler?.Invoke(exception);
+            }
+        }
+
         /// <summary>
         /// 現在のノードを囲むコンテナ（外側から順）。ルート階層にいれば空。
         /// コンテナに入るたびに積み、Exit で出るたびに下ろすスタックと同じ内容を、現在のノードの親の連なりから求める。
@@ -202,8 +327,10 @@ namespace Reiga.VisualNodeEditor
                 throw new InvalidOperationException($"Graph '{Graph.name}' has no Entry node.");
             }
 
-            // 毎回の実行をアセットの既定値から始める
+            // 毎回の実行をアセットの既定値から始める（振る舞いも、入るときにアセットの値から複製し直す）
             ResetParameters();
+            _behaviours.Clear();
+            _activeBehaviours.Clear();
             IsRunning = true;
             _generation++;
             _running.Add(this);
@@ -239,6 +366,7 @@ namespace Reiga.VisualNodeEditor
             Current = null;
             if (current != null)
             {
+                ExitBehaviours();
                 NodeExited?.Invoke(current);
             }
 
@@ -475,6 +603,13 @@ namespace Reiga.VisualNodeEditor
             var previous = Current;
             if (previous != null)
             {
+                // 振る舞いの OnExit → NodeExited の順。どちらの中で止められても、それ以上は進めない
+                ExitBehaviours();
+                if (!IsCurrentGeneration(generation))
+                {
+                    return false;
+                }
+
                 NodeExited?.Invoke(previous);
                 if (!IsCurrentGeneration(generation))
                 {
@@ -483,6 +618,11 @@ namespace Reiga.VisualNodeEditor
             }
 
             Current = node;
+            if (!EnterBehaviours(node, generation))
+            {
+                return false;
+            }
+
             NodeEntered?.Invoke(node);
             if (!IsCurrentGeneration(generation))
             {
