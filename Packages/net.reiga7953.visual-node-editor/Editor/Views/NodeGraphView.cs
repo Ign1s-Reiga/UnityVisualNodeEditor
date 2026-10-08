@@ -954,8 +954,10 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             _pasteCount = data == _lastPastedData ? _pasteCount + 1 : 1;
             _lastPastedData = data;
 
-            // 表示中の階層に貼る（コンテナを貼ると、その中身は貼ったコンテナの中に入る）
-            var content = GraphClipboard.Deserialize(data, PasteOffset * _pasteCount, CurrentContainerId);
+            // 表示中の階層に貼る（コンテナを貼ると、その中身は貼ったコンテナの中に入る）。
+            // この階層に置けないノードは貼らず、Exit ノードはこのコンテナの出口を指させる
+            var targetExits = (_asset.FindNode(CurrentContainerId) as ContainerNode)?.Exits;
+            var content = GraphClipboard.Deserialize(data, PasteOffset * _pasteCount, CurrentContainerId, targetExits);
             if (content == null || content.IsEmpty)
             {
                 return;

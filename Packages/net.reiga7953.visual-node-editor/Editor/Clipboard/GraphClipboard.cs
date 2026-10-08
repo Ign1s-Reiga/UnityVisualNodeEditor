@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Search;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -91,8 +92,11 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
         /// クリップボード文字列から、新しい ID を振り直した要素一式を作る。このツールの文字列でなければ null を返す。
         /// 一緒にコピーしたコンテナの中にあったものは、新しいコンテナの中に入れる。
         /// それ以外は <paramref name="targetParentId"/> の階層（空文字ならルート）に置き、位置を <paramref name="offset"/> だけずらす。
+        /// その階層に置けないノード（<see cref="NodeMenuCatalog.IsAvailableAt"/>）は、エッジ・グループの所属ごと除く。
+        /// 貼り付け先に置く Exit ノードの出口が <paramref name="targetExits"/>（貼り付け先のコンテナの出口）に無ければ、最初の出口を指させる。
         /// </summary>
-        public static GraphClipboardContent Deserialize(string data, Vector2 offset, string targetParentId = "")
+        public static GraphClipboardContent Deserialize(
+            string data, Vector2 offset, string targetParentId = "", IReadOnlyList<ContainerExit> targetExits = null)
         {
             if (!CanPaste(data))
             {
@@ -111,7 +115,7 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
                     return null;
                 }
 
-                return Remap(container, offset, targetParentId ?? string.Empty);
+                return Remap(container, offset, targetParentId ?? string.Empty, targetExits);
             }
             finally
             {
@@ -119,10 +123,17 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
             }
         }
 
-        private static GraphClipboardContent Remap(NodeGraphAsset copied, Vector2 offset, string targetParentId)
+        private static GraphClipboardContent Remap(
+            NodeGraphAsset copied, Vector2 offset, string targetParentId, IReadOnlyList<ContainerExit> targetExits)
         {
-            // 型が削除・改名されて読めなかったノードは貼り付けない
-            var copiedNodes = copied.Nodes.Where(n => n != null).ToList();
+            // 型が削除・改名されて読めなかったノードと、貼り付け先の階層に置けないノード（Create Node メニューと同じ規則）は貼り付けない。
+            // 一緒にコピーしたコンテナの中にあるノードは、そのコンテナの中に入るので規則を満たす
+            var copiedIds = new HashSet<string>(copied.Nodes.Where(n => n != null).Select(n => n.Id));
+            var insideContainer = targetParentId.Length > 0;
+            var copiedNodes = copied.Nodes
+                .Where(n => n != null
+                    && (copiedIds.Contains(n.ParentId) || NodeMenuCatalog.IsAvailableAt(n.GetType(), insideContainer)))
+                .ToList();
             var newIds = new Dictionary<string, string>();
             foreach (var node in copiedNodes)
             {
@@ -144,6 +155,14 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
                 {
                     node.ParentId = targetParentId;
                     node.Position += offset;
+
+                    // 別のコンテナから持ってきた Exit ノードは、貼り付け先の出口を指させる（CreateNode と同じく最初の出口）
+                    var firstExit = targetExits?.FirstOrDefault(e => e != null);
+                    if (node is ContainerExitNode exitNode && firstExit != null
+                        && !targetExits.Any(e => e != null && e.Id == exitNode.ExitId))
+                    {
+                        exitNode.ExitId = firstExit.Id;
+                    }
                 }
 
                 nodes.Add(node);

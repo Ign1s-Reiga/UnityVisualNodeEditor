@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Clipboard;
@@ -129,11 +130,68 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(content.StickyNotes.Single().ParentId, Is.Empty);
         }
 
-        private GraphClipboardContent Paste(string[] nodeIds, string targetParentId, string[] groupIds = null, string[] stickyNoteIds = null)
+        // ---- 貼り付け先の階層の規則 ----
+
+        [Test]
+        public void Paste_SkipsNodesThatCannotBePlacedOnTheTargetLevel()
+        {
+            var atRoot = Paste(new[] { _g.ClearExit.Id, _g.Play.Id }, string.Empty);
+            Assert.That(atRoot.Nodes.Select(n => n.Title), Is.EqualTo(new[] { "Play" }), "a container Exit cannot go to the root");
+            Assert.That(atRoot.Edges, Is.Empty, "the edge to the skipped Exit goes too");
+
+            var intoContainer = Paste(new[] { _g.Entry.Id, _g.Result.Id }, _g.Stage.Id);
+            Assert.That(intoContainer.Nodes.Select(n => n.Title), Is.EqualTo(new[] { "Result" }), "the root Entry cannot go into a container");
+        }
+
+        [Test]
+        public void Paste_DropsSkippedNodesFromGroups()
+        {
+            _g.StageGroup.AddNode(_g.ClearExit.Id);
+
+            var content = Paste(null, string.Empty, new[] { _g.StageGroup.Id });
+
+            Assert.That(content.Nodes.OfType<ContainerExitNode>(), Is.Empty);
+            Assert.That(content.Groups.Single().NodeIds, Is.EqualTo(new[] { content.Nodes.Single().Id }), "only Play");
+        }
+
+        [Test]
+        public void PastedExitNode_InAnotherContainer_PointsAtThatContainersFirstExit()
+        {
+            var content = Paste(new[] { _g.InnerExit.Id }, _g.Stage.Id, targetExits: _g.Stage.Exits);
+
+            Assert.That(((ContainerExitNode)content.Nodes.Single()).ExitId, Is.EqualTo(_g.Stage.Exits[0].Id));
+        }
+
+        [Test]
+        public void PastedExitNode_InItsOwnContainer_KeepsItsExit()
+        {
+            var gameOver = ContainerTestGraph.ExitId(_g.Stage, "GameOver");
+            _g.ClearExit.ExitId = gameOver;
+
+            var content = Paste(new[] { _g.ClearExit.Id }, _g.Stage.Id, targetExits: _g.Stage.Exits);
+
+            Assert.That(((ContainerExitNode)content.Nodes.Single()).ExitId, Is.EqualTo(gameOver));
+        }
+
+        [Test]
+        public void PastedContainer_KeepsTheExitsOfItsOwnExitNodes()
+        {
+            // Stage を Inner の中に貼っても、Stage の中の Exit ノードは Stage（のコピー）の出口を指したまま
+            var content = Paste(new[] { _g.Stage.Id }, _g.Inner.Id, targetExits: _g.Inner.Exits);
+
+            var stage = content.Nodes.OfType<StageTestContainer>().Single();
+            var exitNode = content.Nodes.OfType<ContainerExitNode>().Single(n => n.ParentId == stage.Id);
+            Assert.That(exitNode.ExitId, Is.EqualTo(ContainerTestGraph.ExitId(_g.Stage, "Clear")));
+            Assert.That(content.Nodes.OfType<ContainerEntryNode>().Count(), Is.EqualTo(2), "entries inside copied containers are kept");
+        }
+
+        private GraphClipboardContent Paste(
+            string[] nodeIds, string targetParentId, string[] groupIds = null, string[] stickyNoteIds = null,
+            IReadOnlyList<ContainerExit> targetExits = null)
         {
             var data = GraphClipboard.Serialize(_g.Asset, nodeIds, groupIds, stickyNoteIds);
             Assert.That(data, Is.Not.Empty);
-            return GraphClipboard.Deserialize(data, Offset, targetParentId);
+            return GraphClipboard.Deserialize(data, Offset, targetParentId, targetExits);
         }
     }
 }

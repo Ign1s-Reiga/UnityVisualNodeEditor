@@ -350,7 +350,7 @@ namespace Reiga.VisualNodeEditor
             var generation = _generation;
             var path = ResolvePath(target, out var endsInDeadEnd);
 
-            // 通過ノードの連鎖が行き止まり（出力の無い Event、Entry の無いコンテナ、繋がっていない出口）で終わるなら、
+            // 通過ノードの連鎖が行き止まり（出力の無い Event、Entry の無い・Entry からエッジの出ていないコンテナ、繋がっていない出口）で終わるなら、
             // どこにも入らず途中の Event の通知だけ行い、いまの待機ノードに留まる
             // （入ってしまうと出口が無く、以後どの Raise / Advance でも動けなくなる）
             if (endsInDeadEnd)
@@ -386,7 +386,7 @@ namespace Reiga.VisualNodeEditor
         /// <summary>
         /// <paramref name="target"/> から通過ノード（Entry・Event）をたどり、入るノードを順に返す。
         /// 待機ノードに着くか、Entry の先に Event 以外が無ければそこで終わる。
-        /// 行き止まり（出力の無い Event、Entry の無いコンテナ、繋がっていない出口）に行き着いたら <paramref name="endsInDeadEnd"/> を true にする
+        /// 行き止まり（出力の無い Event、Entry の無い・Entry からエッジの出ていないコンテナ、繋がっていない出口）に行き着いたら <paramref name="endsInDeadEnd"/> を true にする
         /// （そこまでのノードも返し、途中の Event の通知に使う）。コンテナ・Entry・Exit も通過ノードとしてたどる。
         /// 通過ノードが輪になっていたら、警告を出して輪に入る手前までで止める。
         /// </summary>
@@ -443,6 +443,14 @@ namespace Reiga.VisualNodeEditor
                             endsInDeadEnd = true;
                         }
 
+                        break;
+
+                    // 1 本もエッジが出ていないコンテナの Entry は、Entry の無いコンテナと同じく行き止まり。
+                    // 入ると通過ノードの Entry で止まり、以後どの Raise / Advance でも動けなくなる
+                    case ContainerEntryNode containerEntry when Query.GetNext(containerEntry.Id).Count == 0:
+                        Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': the Entry of container '{Query.GetParentContainer(containerEntry)?.Title}' is not connected. Stayed before it.");
+                        endsInDeadEnd = true;
+                        node = null;
                         break;
 
                     case EntryNode _:

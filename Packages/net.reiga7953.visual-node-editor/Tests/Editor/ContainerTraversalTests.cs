@@ -161,6 +161,53 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ContainerWhoseEntryLeadsNowhere_MidRun_StaysOnTheWaitNode()
+        {
+            // Inner の Clear の先を、Entry はあるが Entry から何も出ていないコンテナに繋ぎ替える
+            var broken = AddChild(_outer, new ContainerNode { Title = "Broken" });
+            AddChild(broken, new ContainerEntryNode());
+            _graph.RemoveEdge(_graph.Edges.Single(e => e.FromNodeId == _inner.Id && e.FromPort == Exit(_inner, "Clear")));
+            Connect(_inner, Exit(_inner, "Clear"), broken);
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+
+            Assert.That(runner.Raise("Win"), Is.True);
+
+            Assert.That(runner.Current, Is.SameAs(_play), "must not get stuck on the Entry inside");
+            Assert.That(runner.Raise("Lose"), Is.True, "still able to move on");
+            Assert.That(runner.Current, Is.SameAs(_retry));
+        }
+
+        [Test]
+        public void ContainerWhoseEntryLeadsNowhere_AtStart_StaysOnTheRootEntry()
+        {
+            _graph.RemoveEdge(_graph.Edges.Single(e => e.FromNodeId == _innerEntry.Id));
+            var runner = new GraphRunner(_graph);
+            var entered = new List<string>();
+            runner.NodeEntered += n => entered.Add(n.Title);
+
+            runner.Start();
+
+            Assert.That(runner.Current, Is.SameAs(_rootEntry));
+            Assert.That(entered, Is.EqualTo(new[] { "Entry" }));
+        }
+
+        [Test]
+        public void ContainerEntryWithOnlyEventEdges_WaitsOnTheEntryLikeTheRootEntry()
+        {
+            _graph.RemoveEdge(_graph.Edges.Single(e => e.FromNodeId == _innerEntry.Id));
+            var go = AddChild(_inner, new EventNode { EventName = "Go" });
+            Connect(_innerEntry, "out", go);
+            Connect(go, "out", _play);
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+
+            Assert.That(runner.Current, Is.SameAs(_innerEntry));
+            Assert.That(runner.Raise("Go"), Is.True);
+            Assert.That(runner.Current, Is.SameAs(_play));
+        }
+
+        [Test]
         public void DataApi_ResolvesPortsEntriesAndExits()
         {
             var query = new GraphQuery(_graph);

@@ -261,6 +261,30 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void PasteAtTheRoot_LeavesOutContainerExitNodes()
+        {
+            var data = GraphClipboard.Serialize(_g.Asset, new[] { _g.ClearExit.Id }, null, null);
+            var count = _g.Asset.Nodes.Count;
+
+            _view.unserializeAndPaste("Paste", data);
+
+            Assert.That(_g.Asset.Nodes, Has.Count.EqualTo(count));
+        }
+
+        [Test]
+        public void PasteExitNodeIntoAnotherContainer_PointsAtThatContainersExit()
+        {
+            var data = GraphClipboard.Serialize(_g.Asset, new[] { _g.ClearExit.Id }, null, null);
+            _view.EnterLevel(_g.Inner.Id);
+
+            _view.unserializeAndPaste("Paste", data);
+
+            var pasted = _g.Asset.GetChildren(_g.Inner.Id).OfType<ContainerExitNode>().Single(n => n != _g.InnerExit);
+            Assert.That(pasted.ExitId, Is.EqualTo(_g.Inner.Exits[0].Id));
+            Assert.That(GraphValidator.Validate(_g.Asset).Where(i => i.NodeId == pasted.Id), Is.Empty);
+        }
+
+        [Test]
         public void ContainerEntry_IsNotDeletedWithTheSelection()
         {
             _view.EnterLevel(_g.Stage.Id);
