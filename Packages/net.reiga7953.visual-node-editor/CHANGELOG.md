@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.1] - 2026-10-08
+- 修正: 振る舞いの `OnUpdate` の中で同じノードへ戻る遷移をすると、入り直したばかりの残りの振る舞いの `OnUpdate` が同じフレームで呼ばれていた。どんな遷移でも、そのフレームの残りは呼ばないようにした
+- 修正: Create Script… で、`NodeBehaviour` 以外の既存のクラス（名前空間の無い `Player` など）と同じ名前を付けるとスクリプトが書き出され、コンパイルエラーになっていた。読み込まれているすべての型と名前を比べて、重なれば作らないようにした
+
 ## [0.9.0] - 2026-10-08
 - ノードの振る舞い（`NodeBehaviour`）: State・Scene ノードに C# のクラスを付け、Runner がそのノードにいる間の処理を書ける（Animator の StateMachineBehaviour に相当）。`OnEnter` / `OnUpdate(deltaTime)` / `OnFixedUpdate(fixedDeltaTime)` / `OnExit` を必要なものだけ上書きする。`Runner`・`Node`・`Host`（Graph Runner コンポーネント）を参照できる
 - ランタイム: `GraphRunner.Update` / `FixedUpdate` で現在のノードの振る舞いを動かす（Graph Runner コンポーネントが毎フレーム呼ぶ）。振る舞いは Runner ごと・`Start()` ごとにアセットの値から複製する。振る舞いの例外はログに出して次へ進む

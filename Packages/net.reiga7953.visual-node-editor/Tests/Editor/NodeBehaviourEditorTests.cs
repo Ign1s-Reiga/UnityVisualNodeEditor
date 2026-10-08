@@ -150,6 +150,15 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ClassNameCheck_FindsAnyLoadedClassNotJustBehaviours()
+        {
+            Assert.That(NodeBehaviourScriptCreator.IsClassNameTaken(typeof(RecordingBehaviour).FullName), Is.True);
+            Assert.That(NodeBehaviourScriptCreator.IsClassNameTaken(typeof(NodeGraphAsset).FullName), Is.True,
+                "a class that is not a NodeBehaviour still collides");
+            Assert.That(NodeBehaviourScriptCreator.IsClassNameTaken("NoSuchClassAnywhere_8f3a"), Is.False);
+        }
+
+        [Test]
         public void PendingScript_IsClearedEvenWhenItCannotBeAdded()
         {
             NodeBehaviourScriptCreator.SetPending(new PendingBehaviourScript(string.Empty, _state.Id, "NoSuchBehaviour"));

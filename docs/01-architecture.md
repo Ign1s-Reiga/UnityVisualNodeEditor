@@ -319,7 +319,7 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
   Scene ノードの `OnEnter` はシーンの読み込みを始める前に呼ばれる（読み込みは非同期）ので、そのシーンのオブジェクトは `OnUpdate` から引く
 - 振る舞いのインスタンスは Runner ごとに、`Start()` のたびにアセットの値から複製して作る（`JsonUtility` の往復）。
   パラメータと同じく毎回まっさらから始まり、同じグラフを複数の Runner で動かしても状態が混ざらず、実行中の変更はアセットに書き戻されない
-- 振る舞いの中から `Runner.Raise` / `Advance` / `Stop` を呼んでよい。`OnUpdate` / `OnFixedUpdate` の中で遷移・停止したら、そのノードの残りの振る舞いは呼ばない。
+- 振る舞いの中から `Runner.Raise` / `Advance` / `Stop` を呼んでよい。`OnUpdate` / `OnFixedUpdate` の中で遷移・停止したら、そのノードの残りの振る舞いは呼ばない（同じノードへ戻る遷移でも同じ。入り直した振る舞いの更新は次の `Update` から）。
   `OnEnter` / `OnExit` の中からの `Raise` / `Advance` は、いま進めている遷移の後に行う（`NodeEntered` などの通知と同じ）
 - 振る舞いで例外が出たら、ログに出して次の振る舞いへ進む（1 つの不具合で Runner 全体が止まらないように）
 
@@ -328,7 +328,7 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 - State・Scene ノードのインスペクタに「Behaviours」の一覧を出す。各振る舞いのフィールドを `PropertyField` で編集し（Undo 対応）、
   Edit Script でスクリプトを開き、Remove で外し、上下のボタンで並べ替える。読めなくなった振る舞いは「Missing behaviour」と出し、Remove だけできる
 - Add Behaviour: `NodeBehaviour` のサブクラス（抽象・ジェネリック・引数なしのコンストラクタが無いものを除く）から選んで追加する
-- Create Script…: 保存先を選ぶと、ファイル名からクラス名を作り、`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit` の空の骨組みを書き出して IDE で開く。
+- Create Script…: 保存先を選ぶと、ファイル名からクラス名を作り、`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit` の空の骨組みを書き出して IDE で開く。同じ名前のファイルや、同じ名前のクラス（`NodeBehaviour` 以外も含む。骨組みは名前空間の無いクラスなので衝突する）が既にあれば作らない。
   コンパイル（ドメインリロード）後に、そのクラスを元のノードへ自動で追加する（追加待ちは `SessionState` に覚えておく）
 - ノードには、付いている振る舞いのクラス名を 1 行で出す（USS クラス `vne-node__behaviours`）
 

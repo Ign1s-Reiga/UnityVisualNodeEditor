@@ -34,6 +34,9 @@ namespace Reiga.VisualNodeEditor
         // OnEnter を呼んだ（まだ OnExit を呼んでいない）振る舞い。OnExit はこれにだけ、1 回ずつ呼ぶ
         private readonly List<NodeBehaviour> _activeBehaviours = new();
 
+        // ノードに入るたびに進める。同じノードへ戻る遷移でも変わるので、振る舞いの更新の打ち切りに使う
+        private int _entryCount;
+
         /// <summary>
         /// 振る舞いで出た例外の扱い。既定はログに出すだけ（次の振る舞いへ進む）。テストで差し替える。
         /// </summary>
@@ -247,14 +250,15 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
-            var node = Current;
+            var entry = _entryCount;
             var generation = _generation;
             foreach (var behaviour in _activeBehaviours.ToArray())
             {
                 InvokeBehaviour(behaviour, call);
 
-                // 振る舞いの中で遷移・停止したら、もうそのノードにはいない
-                if (!IsCurrentGeneration(generation) || Current != node)
+                // 振る舞いの中で遷移・停止したら、残りは呼ばない。同じノードへ戻った場合も、
+                // 入り直した振る舞いは OnEnter を済ませたばかりなので、更新は次の Update から
+                if (!IsCurrentGeneration(generation) || _entryCount != entry)
                 {
                     return;
                 }
@@ -618,6 +622,7 @@ namespace Reiga.VisualNodeEditor
             }
 
             Current = node;
+            _entryCount++;
             if (!EnterBehaviours(node, generation))
             {
                 return false;

@@ -44,7 +44,7 @@ namespace Reiga.VisualNodeEditor.Editor.Behaviours
             // Unity はファイル名とクラス名が同じでないとスクリプトとクラスを結び付けられない
             var className = NodeBehaviourScriptTemplate.ToClassName(Path.GetFileNameWithoutExtension(path));
             path = (Path.GetDirectoryName(path) ?? string.Empty).Replace('\\', '/') + "/" + className + ".cs";
-            if (File.Exists(path) || FindType(className) != null)
+            if (File.Exists(path) || IsClassNameTaken(className))
             {
                 EditorUtility.DisplayDialog("Create Script", $"A script or class named '{className}' already exists.", "OK");
                 return;
@@ -86,6 +86,30 @@ namespace Reiga.VisualNodeEditor.Editor.Behaviours
 
             BehaviourAdded?.Invoke(asset, pending.NodeId);
             return true;
+        }
+
+        /// <summary>
+        /// 読み込まれているどこかのアセンブリに、完全名が <paramref name="className"/> の型があるか。
+        /// 骨組みは名前空間の無い public クラスなので、<see cref="NodeBehaviour"/> 以外の同名クラスとも衝突してコンパイルが通らなくなる。
+        /// </summary>
+        internal static bool IsClassNameTaken(string className)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    if (assembly.GetType(className, false) != null)
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception)
+                {
+                    // 読めないアセンブリ（動的に作られたものなど）は飛ばす
+                }
+            }
+
+            return false;
         }
 
         /// <summary>クラス名（名前空間を含む完全名）から振る舞いの型を探す。無ければ null。</summary>

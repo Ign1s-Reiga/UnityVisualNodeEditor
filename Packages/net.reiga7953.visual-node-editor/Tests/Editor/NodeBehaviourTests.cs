@@ -225,6 +225,26 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void RaiseBackToTheSameNodeInsideOnUpdate_AlsoStopsTheTick()
+        {
+            // Title ─Retry→ Title（自分へ戻る遷移）
+            var retry = Add(new EventNode { EventName = "Retry" });
+            Connect(_title, retry);
+            Connect(retry, _title);
+            _title.AddBehaviour(new ControlBehaviour { RaiseOnUpdate = "Retry" });
+            _title.AddBehaviour(new RecordingBehaviour { Tag = "Title" });
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+            RecordingBehaviour.Log.Clear();
+
+            runner.Update(1f);
+
+            Assert.That(runner.Current, Is.SameAs(_title));
+            Assert.That(RecordingBehaviour.Log, Is.EqualTo(new[] { "Title.Exit", "Title.Enter" }),
+                "the re-entered behaviours are updated from the next Update, not right after their OnEnter");
+        }
+
+        [Test]
         public void StopInsideOnExit_ExitsEachBehaviourOnceAndDoesNotEnterTheNextNode()
         {
             _title.AddBehaviour(new ControlBehaviour { StopOnExit = true });
