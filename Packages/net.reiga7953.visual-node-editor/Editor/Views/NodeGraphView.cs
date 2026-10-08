@@ -27,6 +27,14 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private static readonly Vector2 ContainerExitOrigin = new Vector2(400f, 0f);
         private static readonly Vector2 ContainerExitSpacing = new Vector2(0f, 100f);
 
+        // 案内の Add First Scene で、Entry から右へずらして Scene ノードを置く量
+        private static readonly Vector2 FirstSceneOffset = new Vector2(300f, 0f);
+
+        private const string EmptyHintPath = "VisualNodeEditor/EmptyCanvasHint";
+
+        // 表示中の階層が空のときに中央に出す案内（EmptyCanvasHint.uxml）。どれを見せるかは USS クラスで切り替える
+        private readonly VisualElement _emptyHint;
+
         private string _lastPastedData;
         private int _pasteCount;
         private string _searchQuery;
@@ -80,6 +88,213 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             RegisterCallback<KeyDownEvent>(OnKeyDown);
             RegisterCallback<AttachToPanelEvent>(_ => Undo.undoRedoPerformed += OnUndoRedo);
             RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
+
+            _emptyHint = CreateEmptyHint();
+            GraphChanged += UpdateEmptyHint;
+
+            // Project ビューからシーンアセットをドロップすると Scene ノードを作る
+            RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
+            RegisterCallback<DragPerformEvent>(OnDragPerform);
+        }
+
+        /// <summary>
+        /// <paramref name="scenes"/> の Scene ノードを、表示中の階層の <paramref name="position"/>（グラフ座標）から右へ並べて作り、選択する。
+        /// 1 回の Undo で戻せる。アセット未設定・シーンが無ければ何もしない。
+        /// </summary>
+        public List<NodeView> CreateSceneNodes(IReadOnlyList<SceneReference> scenes, Vector2 position)
+        {
+            var views = new List<NodeView>();
+            if (_asset == null || scenes == null || scenes.Count == 0)
+            {
+                return views;
+            }
+
+            Undo.RecordObject(_asset, scenes.Count == 1 ? "Add Scene Node" : "Add Scene Nodes");
+            var ids = new List<string>();
+            for (var i = 0; i < scenes.Count; i++)
+            {
+                var node = new SceneNode
+                {
+                    Scene = scenes[i],
+                    Position = SceneDrop.GetPosition(position, i),
+                    ParentId = CurrentContainerId,
+                };
+                _asset.AddNode(node);
+                ids.Add(node.Id);
+            }
+
+            EditorUtility.SetDirty(_asset);
+            Populate(_asset);
+
+            ClearSelection();
+            foreach (var id in ids)
+            {
+                if (FindNodeView(id) is NodeView view)
+                {
+                    AddToSelection(view);
+                    views.Add(view);
+                }
+            }
+
+            return views;
+        }
+
+        private static List<SceneReference> GetDraggedScenes() =>
+            SceneDrop.FromPaths(
+                DragAndDrop.objectReferences.OfType<SceneAsset>().Select(AssetDatabase.GetAssetPath),
+                AssetDatabase.AssetPathToGUID);
+
+        private void OnDragUpdated(DragUpdatedEvent evt)
+        {
+            if (_asset == null || GetDraggedScenes().Count == 0)
+            {
+                return;
+            }
+
+            DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+            evt.StopPropagation();
+        }
+
+        private void OnDragPerform(DragPerformEvent evt)
+        {
+            var scenes = GetDraggedScenes();
+            if (_asset == null || scenes.Count == 0)
+            {
+                return;
+            }
+
+            DragAndDrop.AcceptDrag();
+            CreateSceneNodes(scenes, contentViewContainer.WorldToLocal(evt.mousePosition));
+            evt.StopPropagation();
+        }
+
+        /// <summary>表示中の階層に出している案内の種類（空でなければ <see cref="EmptyStateKind.None"/>）。</summary>
+        public EmptyStateKind EmptyState { get; private set; }
+
+        private VisualElement CreateEmptyHint()
+        {
+            var tree = Resources.Load<VisualTreeAsset>(EmptyHintPath);
+            var hint = tree != null ? tree.Instantiate().Q("vne-empty-hint") : null;
+            if (hint == null)
+            {
+                return null;
+            }
+
+            // コンテンツ（拡大縮小・スクロールする）ではなく GraphView 自身に置き、表示中の範囲の中央に固定する
+            Add(hint);
+            hint.Q<Button>("vne-empty-hint-add-entry").clicked += () => AddEntry();
+            hint.Q<Button>("vne-empty-hint-add-first-scene").clicked += () => AddFirstScene();
+            hint.Q<Button>("vne-empty-hint-add-first-scene-after-entry").clicked += () => AddFirstScene();
+            hint.Q<Button>("vne-empty-hint-add-scene-inside").clicked += () => AddInsideContainer(typeof(SceneNode));
+            hint.Q<Button>("vne-empty-hint-add-state-inside").clicked += () => AddInsideContainer(typeof(StateNode));
+            return hint;
+        }
+
+        private void UpdateEmptyHint()
+        {
+            var level = CurrentContainerId;
+            EmptyState = _asset == null
+                ? EmptyStateKind.None
+                : EmptyStateHint.For(_asset.GetChildren(level), level.Length > 0);
+            if (_emptyHint == null)
+            {
+                return;
+            }
+
+            foreach (EmptyStateKind kind in Enum.GetValues(typeof(EmptyStateKind)))
+            {
+                var className = EmptyStateHint.GetClassName(kind);
+                if (className.Length > 0)
+                {
+                    _emptyHint.EnableInClassList(className, kind == EmptyState);
+                }
+            }
+        }
+
+        /// <summary>案内の Add Entry: ルートに Entry を作る。</summary>
+        public NodeView AddEntry() => CreateNode(typeof(EntryNode), GetViewCenter());
+
+        /// <summary>
+        /// 案内の Add First Scene: ルートの Entry の右に Scene ノードを作って Entry と繋ぎ、選択する（インスペクタでシーンを選べる）。
+        /// Entry が無ければ一緒に作る。1 回の Undo で戻せる。
+        /// </summary>
+        public NodeView AddFirstScene()
+        {
+            if (_asset == null)
+            {
+                return null;
+            }
+
+            Undo.RecordObject(_asset, "Add First Scene");
+            var entry = _asset.Nodes.OfType<EntryNode>().FirstOrDefault(e => e.IsAtRoot);
+            if (entry == null)
+            {
+                entry = new EntryNode { Position = GetViewCenter() - FirstSceneOffset * 0.5f };
+                _asset.AddNode(entry);
+            }
+
+            var scene = new SceneNode { Position = entry.Position + FirstSceneOffset };
+            _asset.AddNode(scene);
+            _asset.AddEdge(new EdgeData(entry.Id, NodeView.OutputPortName, scene.Id, NodeView.InputPortName));
+            EditorUtility.SetDirty(_asset);
+
+            Populate(_asset);
+            SelectNode(scene.Id);
+            return FindNodeView(scene.Id);
+        }
+
+        /// <summary>
+        /// 案内の Add Scene / Add State（コンテナの中）: Entry と最初の出口の Exit ノードの間に <paramref name="nodeType"/> のノードを作り、
+        /// Entry → 新しいノード → Exit に繋ぎ直して選択する。コンテナの中でなければ何もせず null。1 回の Undo で戻せる。
+        /// </summary>
+        public NodeView AddInsideContainer(Type nodeType)
+        {
+            if (_asset == null || !(_asset.FindNode(CurrentContainerId) is ContainerNode container))
+            {
+                return null;
+            }
+
+            var children = _asset.GetChildren(container.Id).ToList();
+            var entry = children.OfType<ContainerEntryNode>().FirstOrDefault();
+            var exitNodes = children.OfType<ContainerExitNode>().ToList();
+            var exitNode = container.Exits
+                .Select(exit => exitNodes.FirstOrDefault(n => n.ExitId == exit?.Id))
+                .FirstOrDefault(n => n != null) ?? exitNodes.FirstOrDefault();
+
+            var node = (NodeData)Activator.CreateInstance(nodeType);
+            node.ParentId = container.Id;
+            node.Position = entry != null && exitNode != null
+                ? (entry.Position + exitNode.Position) * 0.5f
+                : entry != null ? entry.Position + FirstSceneOffset : GetViewCenter();
+
+            Undo.RecordObject(_asset, "Add Node");
+            _asset.AddNode(node);
+            if (entry != null)
+            {
+                if (exitNode != null)
+                {
+                    _asset.RemoveEdge(_asset.FindEdge(entry.Id, NodeView.OutputPortName, exitNode.Id, NodeView.InputPortName));
+                }
+
+                _asset.AddEdge(new EdgeData(entry.Id, NodeView.OutputPortName, node.Id, NodeView.InputPortName));
+            }
+
+            if (exitNode != null)
+            {
+                _asset.AddEdge(new EdgeData(node.Id, NodeView.OutputPortName, exitNode.Id, NodeView.InputPortName));
+            }
+
+            EditorUtility.SetDirty(_asset);
+            Populate(_asset);
+            SelectNode(node.Id);
+            return FindNodeView(node.Id);
+        }
+
+        /// <summary>表示している範囲の中央（グラフ座標）。まだレイアウトされていなければ原点。</summary>
+        private Vector2 GetViewCenter()
+        {
+            var center = contentViewContainer.WorldToLocal(worldBound.center);
+            return float.IsNaN(center.x) || float.IsNaN(center.y) ? Vector2.zero : center;
         }
 
         /// <summary>グラフの内容（ノード・エッジ・グループ）が変わった後に呼ばれる。</summary>

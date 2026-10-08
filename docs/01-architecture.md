@@ -236,6 +236,7 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Error | 名前が空のパラメータ / 名前が重複するパラメータ / ID が重複するパラメータ（Blackboard） |
 | Error | コンテナの条件 1〜7（階層をまたぐエッジ、Entry の数、Entry / Exit を置ける階層、親の参照と輪、出口の名前と ID、Exit が指す出口、出力ポートが指す出口）。「コンテナ」参照 |
 | Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード（参照先のシーンが削除されていれば、その旨の警告） |
+| Warning | （エディタのみ）Scene ノードがあるのに、有効な Build Settings のシーンのどれにもこのグラフの Graph Runner が無い（「ワンクリック Play」参照） |
 
 循環は許可する（State 間・Scene 遷移とも）。
 
@@ -285,6 +286,18 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
   `Raise(string)` / `Advance()` は public なので、UI の Button の OnClick などから直接呼べる
 - `GraphRunnerBehaviour` は既定で `DontDestroyOnLoad`。同じグラフを動かす永続インスタンスが既にあれば、後から来た方は自分を破棄する
   （最初のシーンに置いた Runner が、そのシーンへ戻ったときに増えないように）
+
+### ボタンから送る（`GraphEventButton`）
+
+Runner は最初のシーンに `DontDestroyOnLoad` で残るので、後のシーンのボタンの OnClick からは参照できない（シーンをまたぐ参照はできず、
+そのシーンに 2 つ目の Graph Runner を置いても重複として破棄される）。コードを書かずにボタンからイベントを送れるよう、専用のコンポーネントを用意する。
+
+- `GraphEventButton`（`Add Component > Visual Node Editor > Graph Event Button`）: 送り先のグラフ（空なら実行中のどれか）、操作（Raise / Advance）、イベント名
+- Runner は `GraphRunner.Running` から、そのグラフを実行中のものを探す。参照は持たない
+- 同じ GameObject にある、public な `onClick`（`UnityEvent`）を持つコンポーネント（uGUI の Button など）に、有効になったとき自動で繋ぐ。
+  パッケージを uGUI に依存させない（CI のコンパイル確認にも uGUI は無い）ため、型ではなく名前で探す。それ以外からは任意の UnityEvent で `Send()` を呼ぶ
+- 送れなかったとき（Runner が無い・今のノードからその名前の遷移が無い）は、開発ビルドだけ警告を出す
+- グラフにあるイベント名は `GraphEventNames.Collect`（Runtime。空を除き、グラフ内の順で重複なし）で取る。インスペクタのドロップダウンが使う
 
 ### 実行中の Runner の一覧
 
@@ -340,6 +353,23 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 - 実行方法: グラフウィンドウのツールバー「Add Scenes to Build」、または Project ビューでグラフを選んで `Assets > Visual Node Editor > Add Graph Scenes to Build Settings`
 - 削除されたシーンは追加できないので飛ばし、結果のメッセージでその数を知らせる
 
+### ワンクリック Play（ツールバーの「Play」）
+
+「組んだ流れを動かす」までを 1 操作にする（`PlaySetup`）。シーンや Build Settings の並びを変える前には必ず確認する。
+
+1. グラフのシーンを Build Settings に入れる（上と同じ `BuildSettingsSync.Apply`）
+2. グラフが始まるシーン（`PlayStart.FindStartScene`: Runner と同じように Entry から最初の待機ノードまでたどり、それが Scene ノードならそのシーン。
+   そうでなければ Entry から辿れる最初の Scene ノード）が Build Settings の先頭でなければ、先頭へ移すか尋ねる
+   （エディタの Play はどちらでも動くので「並びはそのまま」も選べる。選んだらそのセッションの間は尋ねない）
+3. そのシーンを開く（未保存のシーンがあれば Unity の保存確認を出す）。グラフにシーンが無ければ今開いているシーンを使う
+4. そのシーンにこのグラフの Graph Runner が無ければ、「Graph Runner (グラフ名)」という GameObject を追加してシーンを保存してよいか尋ねる
+5. Play に入る。Play 中はボタンが「Stop」になり、押すと Play を終える
+
+あわせて、Scene ノードを持つグラフなのに有効な Build Settings のシーンのどれにもこのグラフの Graph Runner が無ければ、検証の Warning を出す
+（Play しても何も起きないことを先に知らせる）。判定はシーンファイル（テキストの YAML）の Graph Runner のコンポーネントが指すグラフの GUID で行い
+（`RunnerUsage`）、結果はファイルの更新日時ごとに覚えて、編集のたびの再検証でシーンを読み直さない。バイナリのシーンなど読めないものがあれば、
+誤った警告を出さないよう「使われている」とみなす。コードから Runner を作るだけのグラフでは警告が出るが、文言で「その場合は無視してよい」と伝える
+
 ## Play Mode 中の強調表示
 
 - Play 中、開いているグラフを実行している `GraphRunner` があれば、その現在のノードを強調する（USS クラス `vne-node--running`）
@@ -385,6 +415,29 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
   - アセット表示は名前のみ（パスはツールチップ）。未保存の変更があれば末尾に ` *`。クリックで Project ビューの該当アセットを Ping する。長い名前は先頭側を省略する
   - 未保存状態はアセット側の変更（Ctrl+S など）でも変わるため、定期的に確認して表示を更新する
 
+### 最初の一歩（新しいグラフと空のキャンバス）
+
+- `Assets > Create > Visual Node Editor > Node Graph` は Editor の `NodeGraphFactory` が作る（`ProjectWindowUtil.CreateAsset` で名前を入力して保存）。
+  作ったグラフには最初から Entry がある（Unity の State Graph の Start と同じく、最初の Error で止まらないように）。Runtime の `[CreateAssetMenu]` は使わない
+- 表示中の階層にノードがほとんど無いとき、キャンバスの中央に案内を出す。どの案内かは純粋関数 `EmptyStateHint.For`（EditMode テストの対象）で決める
+  - ルートにノードが無い: 「Add Entry」と「Add First Scene」
+  - ルートに Entry しか無い: 「Add First Scene」
+  - コンテナの中に Entry / Exit しか無い: 「Add Scene」と「Add State」
+  - ノードの追加方法（Space / 右クリック）も一緒に出す。付箋・グループはノードに数えない
+- ボタンの動き（どれも 1 回の Undo で戻せる）
+  - Add Entry: ルートの Entry を作る
+  - Add First Scene: Entry の右に Scene ノードを作って Entry と繋ぎ、選択する（インスペクタでシーンを選べる）。Entry が無ければ一緒に作る
+  - Add Scene / Add State（コンテナの中）: Entry と最初の出口の Exit ノードの間に作り、Entry → 新しいノード → Exit に繋ぎ直す
+- 案内の文言とボタンは UXML（`EmptyCanvasHint.uxml`）に置き、どれを見せるかは USS クラス（`vne-empty-hint--<kind>`）で切り替える。
+  ボタン以外はクリックを通す（`picking-mode="Ignore"`）ので、案内が出ていても右クリックや範囲選択はそのまま使える
+
+### シーンアセットのドロップ
+
+- Project ビューのシーンアセット（複数可）をキャンバスへドロップすると、落とした位置から右へ並べて Scene ノードを作り、作ったノードを選択する
+  （表示中の階層に作る。1 回の Undo で戻せる）。シーン以外のアセットを含むドラッグでは、シーンだけを使う。シーンが 1 つも無ければ受け付けない
+- ドラッグ中のシーンの取り出し（`.unity` だけ・重複を除く・選んだ順）と並べ方は純粋関数 `SceneDrop` にし、EditMode テストの対象にする
+- 空のキャンバスの案内にも「Project ビューからシーンをドロップできる」ことを書く
+
 ### ノードの表示
 
 - カテゴリ = `[NodeMenu]` パスの先頭セグメント（小文字化）。`vne-node--<category>` クラスを付ける
@@ -392,8 +445,10 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
   - 組み込みノードのパス: Entry・Scene = `Flow/…`、State = `State/State`、Event = `Event/Event`、Note = `Misc/Note`
 - タイトル領域の上端にカテゴリ色の帯（3px）
 - タイトル = ユーザーが入力したタイトル。空（空白のみを含む）なら型の表示名（`[NodeMenu]` パスの末尾、無ければ型名から `Node` を除いたもの）
+- Scene ノードは、ユーザーがタイトルを付けていなければシーン名をタイトルにする（シーンも未設定なら「Scene」）。
+  同じ「Scene」が並んで見分けが付かない、を無くすため
 - タイトルの直下にサマリー 1 行。内容は `NodeView.GetSummary()`（virtual）で型ごとに決める。空なら行ごと出さない
-  - Event = イベント名、Scene = シーン名、State = 説明の 1 行目、Note = 本文の 1 行目
+  - Event = イベント名、Scene = シーン名（タイトルがシーン名のときは出さない）、State = 説明の 1 行目、Note = 本文の 1 行目
 - 入力・出力がそれぞれ 1 つ以下のノードはポートラベル（`in` / `out`）を隠す（`vne-node--hide-port-labels`）。ポート名自体はエッジの識別子なので変えない
 - インスペクタでの編集は、タイトル・サマリーへ即座に反映する
 
@@ -414,6 +469,14 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - 問題が無いときは、トグルの状態に関わらず一覧を表示しない（空の一覧の "List is empty" も出さない）
 - 一覧の項目をクリックすると該当ノードを選択してフレームに収める
 - 問題の集め方（`GraphValidator` + Build Settings の確認）は `GraphIssues.Collect` にまとめ、ウィンドウとアセットのインスペクタで共有する
+
+### Graph Event Button のインスペクタ（`GraphEventButtonEditor`）
+
+- 送り先のグラフが決まっていれば、イベント名をそのグラフの Event ノードの名前からドロップダウンで選ぶ（同じ文字列を打たせない）。
+  グラフが無い・Event ノードが無いときは名前を直接入力する。今の値がグラフに無ければ、選択肢に残したまま注意を出す
+- 設定の問題は、直し方を添えて HelpBox で出す（グラフ未設定、イベント未選択、グラフに無いイベント名、同じ GameObject にボタンが無い）。
+  どれを出すかは純粋関数 `GraphEventButtonHints.Get` にし、EditMode テストの対象にする
+- 欄はグラフと操作が変わったときだけ作り直す（名前の入力中に作り直すとフォーカスが外れるため）
 
 ### アセットのインスペクタ（`NodeGraphAssetEditor`）
 

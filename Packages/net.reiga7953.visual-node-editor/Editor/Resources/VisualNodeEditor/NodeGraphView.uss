@@ -42,3 +42,83 @@ GridBackground {
   min-width: 50px;
   width: 50px;
 }
+
+/* Empty-canvas hint (EmptyCanvasHint.uxml): centered over the graph, only the buttons take clicks */
+
+.vne-empty-hint {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  align-items: center;
+  justify-content: center;
+  display: none;
+}
+
+.vne-empty-hint--empty-graph,
+.vne-empty-hint--only-entry,
+.vne-empty-hint--empty-container {
+  display: flex;
+}
+
+.vne-empty-hint__panel {
+  max-width: 360px;
+  padding: 14px 18px;
+  border-width: 1px;
+  border-color: #3a3a3a;
+  border-radius: 6px;
+  background-color: rgba(32, 32, 32, 0.92);
+}
+
+.vne-empty-hint__block {
+  display: none;
+}
+
+.vne-empty-hint--empty-graph .vne-empty-hint__block--empty-graph,
+.vne-empty-hint--only-entry .vne-empty-hint__block--only-entry,
+.vne-empty-hint--empty-container .vne-empty-hint__block--empty-container {
+  display: flex;
+}
+
+.vne-empty-hint__title {
+  font-size: 15px;
+  -unity-font-style: bold;
+  color: #e6e6e6;
+  margin-bottom: 4px;
+}
+
+.vne-empty-hint__text {
+  white-space: normal;
+  color: #b4b4b4;
+  margin-bottom: 10px;
+}
+
+.vne-empty-hint__actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.vne-empty-hint__action {
+  height: 24px;
+  padding-left: 10px;
+  padding-right: 10px;
+  margin-left: 0;
+  margin-right: 6px;
+}
+
+.vne-empty-hint__action--primary {
+  background-color: #2f6db5;
+  border-color: #2a5f9c;
+  color: #ffffff;
+}
+
+.vne-empty-hint__action--primary:hover {
+  background-color: #3a7cc8;
+}
+
+.vne-empty-hint__footer {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #888888;
+}

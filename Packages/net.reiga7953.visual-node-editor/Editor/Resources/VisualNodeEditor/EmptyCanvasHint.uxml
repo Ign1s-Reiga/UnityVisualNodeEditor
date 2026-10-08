@@ -1,0 +1,37 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <!-- Shown in the middle of the graph while the current level is (almost) empty. NodeGraphView adds one
+       modifier class per kind (see EmptyStateHint.GetClassName) to pick which block is visible.
+       Only the buttons take clicks. -->
+  <ui:VisualElement name="vne-empty-hint" class="vne-empty-hint" picking-mode="Ignore">
+    <ui:VisualElement class="vne-empty-hint__panel" picking-mode="Ignore">
+
+      <ui:VisualElement class="vne-empty-hint__block vne-empty-hint__block--empty-graph" picking-mode="Ignore">
+        <ui:Label class="vne-empty-hint__title" text="Start your game flow" picking-mode="Ignore" />
+        <ui:Label class="vne-empty-hint__text" text="Every graph starts at an Entry node. Add it, add the first scene right away, or drag scene assets from the Project window onto the canvas." picking-mode="Ignore" />
+        <ui:VisualElement class="vne-empty-hint__actions" picking-mode="Ignore">
+          <ui:Button name="vne-empty-hint-add-entry" class="vne-empty-hint__action" text="Add Entry" />
+          <ui:Button name="vne-empty-hint-add-first-scene" class="vne-empty-hint__action vne-empty-hint__action--primary" text="Add First Scene" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+
+      <ui:VisualElement class="vne-empty-hint__block vne-empty-hint__block--only-entry" picking-mode="Ignore">
+        <ui:Label class="vne-empty-hint__title" text="Add the first scene" picking-mode="Ignore" />
+        <ui:Label class="vne-empty-hint__text" text="The flow starts at Entry. Add the scene your game opens with, or drag scene assets from the Project window onto the canvas, then connect the next steps." picking-mode="Ignore" />
+        <ui:VisualElement class="vne-empty-hint__actions" picking-mode="Ignore">
+          <ui:Button name="vne-empty-hint-add-first-scene-after-entry" class="vne-empty-hint__action vne-empty-hint__action--primary" text="Add First Scene" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+
+      <ui:VisualElement class="vne-empty-hint__block vne-empty-hint__block--empty-container" picking-mode="Ignore">
+        <ui:Label class="vne-empty-hint__title" text="This container is empty" picking-mode="Ignore" />
+        <ui:Label class="vne-empty-hint__text" text="Entry runs first. An Exit node leaves through the container's output with the same name. Add what happens in between." picking-mode="Ignore" />
+        <ui:VisualElement class="vne-empty-hint__actions" picking-mode="Ignore">
+          <ui:Button name="vne-empty-hint-add-scene-inside" class="vne-empty-hint__action" text="Add Scene" />
+          <ui:Button name="vne-empty-hint-add-state-inside" class="vne-empty-hint__action vne-empty-hint__action--primary" text="Add State" />
+        </ui:VisualElement>
+      </ui:VisualElement>
+
+      <ui:Label class="vne-empty-hint__footer" text="Press Space or right-click to add any node." picking-mode="Ignore" />
+    </ui:VisualElement>
+  </ui:VisualElement>
+</ui:UXML>

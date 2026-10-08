@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.0] - 2026-10-09
+UX 改善のフェーズ 1: 初めての人が、シーンを 3 つ繋いだ流れをコードを書かずにボタンで動かせるようにする（調査は `docs/04-ux-audit.md`）。
+- 新しいグラフは最初から Entry がある。空のキャンバス・空のコンテナには次の一手の案内（Add Entry / Add First Scene / Add Scene / Add State）を出す
+- Project ビューのシーンアセットをキャンバスへドロップすると Scene ノードを作る。タイトルを付けていない Scene ノードはシーン名をタイトルに出す
+- `Graph Event Button` コンポーネント: UI Button に付けると、クリックでそのグラフを実行中の Runner にイベントを送る（別のシーンからでも届く。参照もコードも不要）。
+  イベント名はグラフの Event ノードの名前から選ぶ
+- ツールバーの「Play」: シーンを Build Settings に入れ、グラフが始まるシーンを開き、Graph Runner が無ければ（確認して）追加・保存して Play に入る
+- 検証: Scene ノードがあるのに、Build Settings のシーンにこのグラフの Graph Runner が無ければ警告する
+- 変更: Node Graph の作成メニューは Runtime の `[CreateAssetMenu]` から Editor のメニューに移った（場所は同じ `Assets > Create > Visual Node Editor > Node Graph`）
+
 ## [0.9.1] - 2026-10-08
 - 修正: 振る舞いの `OnUpdate` の中で同じノードへ戻る遷移をすると、入り直したばかりの残りの振る舞いの `OnUpdate` が同じフレームで呼ばれていた。どんな遷移でも、そのフレームの残りは呼ばないようにした
 - 修正: Create Script… で、`NodeBehaviour` 以外の既存のクラス（名前空間の無い `Player` など）と同じ名前を付けるとスクリプトが書き出され、コンパイルエラーになっていた。読み込まれているすべての型と名前を比べて、重なれば作らないようにした

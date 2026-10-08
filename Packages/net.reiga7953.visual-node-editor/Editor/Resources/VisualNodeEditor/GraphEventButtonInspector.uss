@@ -1,0 +1,9 @@
+/* Inspector of the Graph Event Button component (GraphEventButtonEditor) */
+
+.vne-event-button-inspector__hints {
+  margin-top: 6px;
+}
+
+.vne-event-button-inspector__hints > .unity-help-box {
+  margin-bottom: 2px;
+}

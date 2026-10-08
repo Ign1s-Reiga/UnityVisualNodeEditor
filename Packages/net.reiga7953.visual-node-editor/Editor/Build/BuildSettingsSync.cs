@@ -101,6 +101,35 @@ namespace Reiga.VisualNodeEditor.Editor.Build
             return result.ToArray();
         }
 
+        /// <summary>Build Settings の最初のシーン（ビルドが始まるシーン）が <paramref name="sceneGuid"/> か。</summary>
+        public static bool IsFirst(IReadOnlyList<EditorBuildSettingsScene> current, string sceneGuid) =>
+            current != null && current.Count > 0 && current[0] != null && GUID.TryParse(sceneGuid, out var guid) && current[0].guid == guid;
+
+        /// <summary>
+        /// <paramref name="sceneGuid"/> のシーンを先頭へ移した新しい一覧を返す（有効にする。無ければ先頭に追加する）。
+        /// ほかのシーンの並びは変えない。<paramref name="current"/> 自体は変更しない。
+        /// </summary>
+        public static EditorBuildSettingsScene[] MoveToFront(IReadOnlyList<EditorBuildSettingsScene> current, string sceneGuid, string scenePath)
+        {
+            var result = current.Where(s => s != null)
+                .Select(s => new EditorBuildSettingsScene(s.path, s.enabled) { guid = s.guid })
+                .ToList();
+            if (!GUID.TryParse(sceneGuid, out var guid))
+            {
+                return result.ToArray();
+            }
+
+            var existing = result.FirstOrDefault(s => s.guid == guid);
+            if (existing != null)
+            {
+                result.Remove(existing);
+                existing.enabled = true;
+            }
+
+            result.Insert(0, existing ?? new EditorBuildSettingsScene(scenePath, true) { guid = guid });
+            return result.ToArray();
+        }
+
         /// <summary>
         /// グラフのシーンを Build Settings に追加・有効化し、結果のメッセージを返す。削除済みのシーンは追加しない。
         /// </summary>

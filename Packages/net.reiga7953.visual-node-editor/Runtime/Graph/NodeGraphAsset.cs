@@ -6,8 +6,8 @@ namespace Reiga.VisualNodeEditor
     /// <summary>
     /// ノードグラフ 1 枚分を保持する ScriptableObject。
     /// ノード・エッジは <see cref="SerializeReference"/> により多態シリアライズされる。
+    /// 新しいグラフはエディタのメニュー（Assets > Create > Visual Node Editor > Node Graph）で Entry 付きで作る。
     /// </summary>
-    [CreateAssetMenu(menuName = "Visual Node Editor/Node Graph", fileName = "NewNodeGraph")]
     public sealed class NodeGraphAsset : ScriptableObject
     {
         [SerializeReference] private List<NodeData> _nodes = new();

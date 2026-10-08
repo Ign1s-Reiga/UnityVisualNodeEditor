@@ -7,6 +7,7 @@
       <uie:ToolbarButton name="frame-selection-button" text="Frame Selection" tooltip="Show the selection, or the whole graph if nothing is selected (F)" />
       <uie:ToolbarMenu name="view-menu" text="View" tooltip="MiniMap, Blackboard and Snap to Grid" />
       <uie:ToolbarSpacer />
+      <uie:ToolbarButton name="play-button" class="vne-play-button" text="Play" tooltip="Add this graph's scenes to Build Settings, open the scene it starts in, add a Graph Runner there if it has none (asks first), and enter Play mode" />
       <uie:ToolbarButton name="build-settings-button" text="Add Scenes to Build" tooltip="Add the scenes used by this graph to Build Settings, or enable them there (existing order is kept)" />
       <ui:VisualElement class="vne-toolbar-spacer" />
       <uie:ToolbarSearchField name="node-search" class="vne-node-search" tooltip="Find nodes by title or type. Enter: next match, Esc: clear" />

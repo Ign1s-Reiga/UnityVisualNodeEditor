@@ -5,6 +5,7 @@ using Reiga.VisualNodeEditor.Editor.Behaviours;
 using Reiga.VisualNodeEditor.Editor.Build;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
+using Reiga.VisualNodeEditor.Editor.Play;
 using Reiga.VisualNodeEditor.Editor.Scenes;
 using Reiga.VisualNodeEditor.Editor.Search;
 using Reiga.VisualNodeEditor.Editor.Views;
@@ -50,6 +51,7 @@ namespace Reiga.VisualNodeEditor.Editor
         private List<string> _searchMatches = new();
         private int _searchIndex = -1;
         private Label _assetNameLabel;
+        private ToolbarButton _playButton;
         private VisualElement _levelBar;
         private ToolbarBreadcrumbs _levelBreadcrumbs;
         private readonly List<GraphIssue> _issues = new();
@@ -189,6 +191,13 @@ namespace Reiga.VisualNodeEditor.Editor
                     _snapToGrid = value;
                     _graphView.SnapToGrid = value;
                 });
+            }
+
+            _playButton = rootVisualElement.Q<ToolbarButton>("play-button");
+            if (_playButton != null)
+            {
+                _playButton.clicked += PlayGraph;
+                UpdatePlayButton();
             }
 
             var buildSettingsButton = rootVisualElement.Q<ToolbarButton>("build-settings-button");
@@ -345,6 +354,25 @@ namespace Reiga.VisualNodeEditor.Editor
             if (change == PlayModeStateChange.ExitingPlayMode || change == PlayModeStateChange.EnteredEditMode)
             {
                 StopObservingRunner();
+            }
+
+            UpdatePlayButton();
+        }
+
+        /// <summary>ツールバーの Play: シーンと Graph Runner を用意して Play に入る（Play 中なら止める）。</summary>
+        private void PlayGraph()
+        {
+            PlaySetup.Run(_asset, message => ShowNotification(new GUIContent(message)));
+
+            // Runner を追加したら「Runner が無い」警告を消す
+            Revalidate();
+        }
+
+        private void UpdatePlayButton()
+        {
+            if (_playButton != null)
+            {
+                _playButton.text = EditorApplication.isPlayingOrWillChangePlaymode ? "Stop" : "Play";
             }
         }
 

@@ -41,6 +41,12 @@
   flex-grow: 1;
 }
 
+/* One-click Play (PlaySetup): the shortest path from "I built a flow" to "it runs" */
+.vne-play-button {
+  -unity-font-style: bold;
+  color: #7fd18b;
+}
+
 /* Long names are cut from the start so the distinctive end and the " *" mark stay visible */
 .vne-asset-name {
   flex-shrink: 1;

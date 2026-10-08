@@ -7,13 +7,20 @@
 
 ## ゲームから使う（シーン遷移）
 
-1. グラフを `Entry → Scene → Event（イベント名） → Scene …` のように繋ぐ（Event は待機中のノードから出す）
-2. ウィンドウのツールバー「Add Scenes to Build」で、グラフのシーンを Build Settings に追加する
-3. 最初に読み込まれるシーン（Build Settings の index 0）のルート GameObject に `Graph Runner` コンポーネントを付け、グラフを指定する
-4. ゲーム側からイベントを発生させる
+1. グラフを `Entry → Scene → Event（イベント名） → Scene …` のように繋ぐ（Event は待機中のノードから出す）。
+   シーンは Project ビューからキャンバスへドロップすると Scene ノードになる
+2. ボタンからイベントを送る: UI Button に `Add Component > Visual Node Editor > Graph Event Button` を付け、グラフとイベント名（グラフにある名前から選ぶ）を指定する。
+   別のシーンのボタンからでも届く（Graph Runner への参照もコードも要らない）
+3. ウィンドウのツールバー「Play」を押す。グラフのシーンを Build Settings に入れ、グラフが始まるシーンを開き、そこに Graph Runner が無ければ
+   （確認してから）追加して保存し、Play に入る
+
+手で用意する場合は、ツールバー「Add Scenes to Build」でシーンを Build Settings に入れ、最初に読み込まれるシーン（Build Settings の index 0）の
+ルート GameObject に `Graph Runner` コンポーネントを付けてグラフを指定する。
+
+コードから送る場合:
 
 ```csharp
-// コンポーネント経由（UI Button の OnClick に Raise("StartGame") を設定してもよい）
+// コンポーネント経由
 FindFirstObjectByType<GraphRunnerBehaviour>().Raise("StartGame");
 
 // 実行器を直接使う
