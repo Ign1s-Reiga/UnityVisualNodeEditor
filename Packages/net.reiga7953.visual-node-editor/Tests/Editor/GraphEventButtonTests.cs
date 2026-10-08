@@ -178,6 +178,20 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ClickWithSendSwitchedOff_IsStillHooked()
+        {
+            var button = CreateButton(GraphEventButtonAction.Advance, string.Empty);
+            var switchedOff = new UnityEvent();
+            UnityEventTools.AddVoidPersistentListener(switchedOff, button.Send);
+            switchedOff.SetPersistentListenerState(0, UnityEventCallState.Off);
+
+            Assert.That(GraphEventButton.CallsSend(switchedOff, button), Is.False, "an Off entry never fires");
+
+            button.HookClick(switchedOff);
+            Assert.That(button.IsClickHooked, Is.True, "otherwise the click would send nothing");
+        }
+
+        [Test]
         public void FindClickEvent_NeedsAPublicOnClickEvent()
         {
             var source = new ClickSourceTestComponent();

@@ -156,13 +156,25 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void PrefabInstances_AreNoticed()
+        public void PrefabReferences_ComeFromPrefabInstancesOnly()
         {
-            // プレハブの中の Graph Runner はシーンファイルに書き出されないので、プレハブがあるかを別に見る
-            Assert.That(RunnerUsage.HasPrefabInstances("%YAML 1.1\n--- !u!1001 &5\nPrefabInstance:\n  m_SourcePrefab: {fileID: 100100000, guid: p, type: 3}\n"),
-                Is.True);
-            Assert.That(RunnerUsage.HasPrefabInstances("%YAML 1.1\n--- !u!1 &1\nGameObject:\n"), Is.False);
-            Assert.That(RunnerUsage.HasPrefabInstances(null), Is.False);
+            // プレハブの中の Graph Runner はシーンファイルに書き出されないので、元のプレハブとインスタンスの上書きを拾う。
+            // シーンに直接置いたコンポーネント（Graph Event Button など）の参照は拾わない
+            var yaml = "%YAML 1.1\n" +
+                       "--- !u!1001 &5\nPrefabInstance:\n  m_Modification:\n    m_Modifications:\n" +
+                       "    - target: {fileID: 1, guid: rootPrefab, type: 3}\n      propertyPath: _graph\n      value: \n" +
+                       "      objectReference: {fileID: 11400000, guid: graphOverride, type: 2}\n" +
+                       "    - target: {fileID: 2, guid: rootPrefab, type: 3}\n      propertyPath: m_Name\n      value: Root\n" +
+                       "      objectReference: {fileID: 0}\n" +
+                       "  m_SourcePrefab: {fileID: 100100000, guid: rootPrefab, type: 3}\n" +
+                       "--- !u!114 &7\nMonoBehaviour:\n  m_Script: {fileID: 11500000, guid: buttonScript, type: 3}\n" +
+                       "  _graph: {fileID: 11400000, guid: graphOnSceneButton, type: 2}\n";
+
+            var references = RunnerUsage.GetPrefabReferences(yaml);
+
+            Assert.That(references.SourcePrefabGuids, Is.EquivalentTo(new[] { "rootPrefab" }));
+            Assert.That(references.OverriddenGuids, Is.EquivalentTo(new[] { "graphOverride" }));
+            Assert.That(RunnerUsage.GetPrefabReferences(null).SourcePrefabGuids, Is.Empty);
         }
 
         [Test]

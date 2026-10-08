@@ -16,11 +16,13 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         private const string ComponentSeparator = "--- !u!";
         private const string GraphFieldPrefix = "_graph: {fileID: 11400000, guid: ";
 
-        // シーンのパス → (更新日時, そのシーンの Graph Runner が指すグラフの GUID。バイナリなどで読めなければ null)
-        // プレハブのインスタンスがあるか（プレハブの中の Runner はシーンファイルに書き出されないので、別に調べる）
-        private static readonly Dictionary<string, (DateTime Stamp, HashSet<string> GraphGuids, bool HasPrefabs)> _cache = new();
+        // シーンのパス → (更新日時, そのシーンの Graph Runner が指すグラフの GUID（バイナリなどで読めなければ null）, プレハブのインスタンスの情報)。
+        // プレハブの中の Runner はシーンファイルに書き出されないので、インスタンスの元のプレハブと、インスタンスで上書きした参照を別に持つ
+        private static readonly Dictionary<string, (DateTime Stamp, HashSet<string> GraphGuids, PrefabReferences Prefabs)> _cache = new();
 
-        private const string PrefabInstanceHeader = "--- !u!1001 ";
+        private const string PrefabInstanceType = "1001 ";
+        private const string SourcePrefabPrefix = "m_SourcePrefab: {fileID: 100100000, guid: ";
+        private const string ObjectReferencePrefix = "objectReference: {fileID: 11400000, guid: ";
 
         private static string _runnerScriptGuid;
 
@@ -82,15 +84,17 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             var graphPath = AssetDatabase.GUIDToAssetPath(graphGuid);
             foreach (var scene in EditorBuildSettings.scenes.Where(s => s != null && s.enabled))
             {
-                var (guids, hasPrefabs) = GetCachedSceneInfo(scene.path);
+                var (guids, prefabs) = GetCachedSceneInfo(scene.path);
                 if (guids == null || guids.Contains(graphGuid))
                 {
                     return true;
                 }
 
-                // プレハブの中の Runner は見えないので、プレハブ経由でシーンがこのグラフを参照していれば使われているとみなす
-                // （誤った警告を出さない側に倒す）
-                if (hasPrefabs && AssetDatabase.GetDependencies(scene.path, true).Contains(graphPath))
+                // プレハブの中の Runner はシーンファイルに書き出されない。インスタンスでグラフを上書きしているか、
+                // 元のプレハブがグラフを参照していれば、使われているとみなす（誤った警告を出さない側に倒す）。
+                // シーンに直接置いた Graph Event Button の参照は数えない（Runner が無いことを見逃さないように）
+                if (prefabs.OverriddenGuids.Contains(graphGuid)
+                    || prefabs.SourcePrefabGuids.Any(prefab => PrefabUsesGraph(prefab, graphPath)))
                 {
                     return true;
                 }
@@ -99,29 +103,81 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             return false;
         }
 
-        /// <summary>シーンの YAML にプレハブのインスタンスがあるか（中の Graph Runner はシーンファイルに書き出されない）。</summary>
-        public static bool HasPrefabInstances(string sceneText) =>
-            sceneText != null && sceneText.Contains(PrefabInstanceHeader);
+        /// <summary>
+        /// シーンの YAML の、プレハブのインスタンスの情報: 元のプレハブの GUID と、インスタンスで上書きしたアセット参照の GUID。
+        /// プレハブの中のコンポーネントはシーンファイルに書き出されないので、Graph Runner を探すにはこれを見る。
+        /// </summary>
+        public static PrefabReferences GetPrefabReferences(string sceneText)
+        {
+            var references = new PrefabReferences();
+            if (sceneText == null)
+            {
+                return references;
+            }
 
-        private static (HashSet<string> GraphGuids, bool HasPrefabs) GetCachedSceneInfo(string scenePath)
+            foreach (var block in sceneText.Split(new[] { ComponentSeparator }, StringSplitOptions.None))
+            {
+                if (!block.StartsWith(PrefabInstanceType, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                foreach (var guid in FindGuids(block, SourcePrefabPrefix))
+                {
+                    references.SourcePrefabGuids.Add(guid);
+                }
+
+                foreach (var guid in FindGuids(block, ObjectReferencePrefix))
+                {
+                    references.OverriddenGuids.Add(guid);
+                }
+            }
+
+            return references;
+        }
+
+        // prefix の直後から ',' までを GUID として拾う
+        private static IEnumerable<string> FindGuids(string text, string prefix)
+        {
+            for (var start = text.IndexOf(prefix, StringComparison.Ordinal); start >= 0; start = text.IndexOf(prefix, start, StringComparison.Ordinal))
+            {
+                start += prefix.Length;
+                var end = text.IndexOf(',', start);
+                if (end <= start)
+                {
+                    yield break;
+                }
+
+                yield return text.Substring(start, end - start).Trim();
+            }
+        }
+
+        // 元のプレハブ（入れ子のプレハブも含む）がグラフを参照しているか
+        private static bool PrefabUsesGraph(string prefabGuid, string graphPath)
+        {
+            var prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
+            return !string.IsNullOrEmpty(prefabPath) && AssetDatabase.GetDependencies(prefabPath, true).Contains(graphPath);
+        }
+
+        private static (HashSet<string> GraphGuids, PrefabReferences Prefabs) GetCachedSceneInfo(string scenePath)
         {
             if (string.IsNullOrEmpty(scenePath) || !File.Exists(scenePath))
             {
                 // 削除されたシーンは Build Settings の警告で知らせるので、ここでは「Runner は無い」とだけ扱う
-                return (new HashSet<string>(), false);
+                return (new HashSet<string>(), new PrefabReferences());
             }
 
             var stamp = File.GetLastWriteTimeUtc(scenePath);
             if (_cache.TryGetValue(scenePath, out var cached) && cached.Stamp == stamp)
             {
-                return (cached.GraphGuids, cached.HasPrefabs);
+                return (cached.GraphGuids, cached.Prefabs);
             }
 
             var text = File.ReadAllText(scenePath);
             var guids = GetRunnerGraphGuids(text, RunnerScriptGuid);
-            var hasPrefabs = HasPrefabInstances(text);
-            _cache[scenePath] = (stamp, guids, hasPrefabs);
-            return (guids, hasPrefabs);
+            var prefabs = GetPrefabReferences(text);
+            _cache[scenePath] = (stamp, guids, prefabs);
+            return (guids, prefabs);
         }
 
         /// <summary>Graph Runner（<see cref="GraphRunnerBehaviour"/>）のスクリプトの GUID。</summary>
