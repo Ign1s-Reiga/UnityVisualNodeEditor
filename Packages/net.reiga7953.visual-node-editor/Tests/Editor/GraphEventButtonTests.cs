@@ -2,7 +2,9 @@ using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using UnityEditor;
+using UnityEditor.Events;
 using UnityEngine;
+using UnityEngine.Events;
 using Object = UnityEngine.Object;
 
 namespace Reiga.VisualNodeEditor.Tests
@@ -158,6 +160,24 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ClickThatAlreadyCallsSend_IsNotHookedAgain()
+        {
+            var button = CreateButton(GraphEventButtonAction.Advance, string.Empty);
+            var wiredByHand = new UnityEvent();
+            UnityEventTools.AddVoidPersistentListener(wiredByHand, button.Send);
+            var plain = new UnityEvent();
+
+            Assert.That(GraphEventButton.CallsSend(wiredByHand, button), Is.True);
+            Assert.That(GraphEventButton.CallsSend(plain, button), Is.False);
+
+            button.HookClick(wiredByHand);
+            Assert.That(button.IsClickHooked, Is.False, "OnClick already sends; hooking again would send twice per click");
+
+            button.HookClick(plain);
+            Assert.That(button.IsClickHooked, Is.True);
+        }
+
+        [Test]
         public void FindClickEvent_NeedsAPublicOnClickEvent()
         {
             var source = new ClickSourceTestComponent();
@@ -188,6 +208,8 @@ namespace Reiga.VisualNodeEditor.Tests
                 Does.Contain("No button on this GameObject"));
             Assert.That(GraphEventButtonHints.Get(null, "", GraphEventButtonAction.Advance, false, false), Is.Empty,
                 "Advance needs no event name");
+            Assert.That(GraphEventButtonHints.Get(events, "StartGame", GraphEventButtonAction.Raise, true, true, true).Single(),
+                Does.Contain("already calls Send()"));
         }
 
         [Test]

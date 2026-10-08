@@ -107,13 +107,15 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
 
             serializedObject.Update();
             var button = (GraphEventButton)target;
+            var clickEvent = GraphEventButton.FindClickEvent(button.gameObject);
             var graph = serializedObject.FindProperty(GraphPropertyName).objectReferenceValue as NodeGraphAsset;
             var hints = GraphEventButtonHints.Get(
                 graph != null ? GraphEventNames.Collect(graph) : null,
                 serializedObject.FindProperty(EventNamePropertyName).stringValue,
                 (GraphEventButtonAction)serializedObject.FindProperty(ActionPropertyName).enumValueIndex,
                 serializedObject.FindProperty(SendOnClickPropertyName).boolValue,
-                GraphEventButton.FindClickEvent(button.gameObject) != null);
+                clickEvent != null,
+                GraphEventButton.CallsSend(clickEvent, button));
 
             _hints.Clear();
             foreach (var hint in hints)

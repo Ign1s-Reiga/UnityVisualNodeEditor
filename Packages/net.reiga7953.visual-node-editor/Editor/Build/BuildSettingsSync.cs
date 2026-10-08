@@ -101,9 +101,14 @@ namespace Reiga.VisualNodeEditor.Editor.Build
             return result.ToArray();
         }
 
-        /// <summary>Build Settings の最初のシーン（ビルドが始まるシーン）が <paramref name="sceneGuid"/> か。</summary>
-        public static bool IsFirst(IReadOnlyList<EditorBuildSettingsScene> current, string sceneGuid) =>
-            current != null && current.Count > 0 && current[0] != null && GUID.TryParse(sceneGuid, out var guid) && current[0].guid == guid;
+        /// <summary>
+        /// ビルドが始まるシーン（Build Settings の、有効な最初のシーン）が <paramref name="sceneGuid"/> か。無効なシーンは飛ばす。
+        /// </summary>
+        public static bool IsFirst(IReadOnlyList<EditorBuildSettingsScene> current, string sceneGuid)
+        {
+            var first = current?.FirstOrDefault(s => s != null && s.enabled);
+            return first != null && GUID.TryParse(sceneGuid, out var guid) && first.guid == guid;
+        }
 
         /// <summary>
         /// <paramref name="sceneGuid"/> のシーンを先頭へ移した新しい一覧を返す（有効にする。無ければ先頭に追加する）。

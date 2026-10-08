@@ -102,6 +102,21 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void IsFirst_SkipsDisabledScenes()
+        {
+            var disabled = GUID.Generate();
+            var start = GUID.Generate();
+            var current = new[]
+            {
+                new EditorBuildSettingsScene("Assets/SampleScene.unity", false) { guid = disabled },
+                new EditorBuildSettingsScene("Assets/Title.unity", true) { guid = start },
+            };
+
+            Assert.That(BuildSettingsSync.IsFirst(current, start.ToString()), Is.True, "builds start from the first enabled scene");
+            Assert.That(BuildSettingsSync.IsFirst(current, disabled.ToString()), Is.False);
+        }
+
+        [Test]
         public void MoveToFront_AddsAMissingScene()
         {
             var a = GUID.Generate();
@@ -138,6 +153,16 @@ namespace Reiga.VisualNodeEditor.Tests
         {
             Assert.That(RunnerUsage.GetRunnerGraphGuids("\u0000binary", "aaaa1111"), Is.Null);
             Assert.That(RunnerUsage.GetRunnerGraphGuids(null, "aaaa1111"), Is.Null);
+        }
+
+        [Test]
+        public void PrefabInstances_AreNoticed()
+        {
+            // プレハブの中の Graph Runner はシーンファイルに書き出されないので、プレハブがあるかを別に見る
+            Assert.That(RunnerUsage.HasPrefabInstances("%YAML 1.1\n--- !u!1001 &5\nPrefabInstance:\n  m_SourcePrefab: {fileID: 100100000, guid: p, type: 3}\n"),
+                Is.True);
+            Assert.That(RunnerUsage.HasPrefabInstances("%YAML 1.1\n--- !u!1 &1\nGameObject:\n"), Is.False);
+            Assert.That(RunnerUsage.HasPrefabInstances(null), Is.False);
         }
 
         [Test]

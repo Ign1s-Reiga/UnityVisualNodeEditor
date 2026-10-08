@@ -150,15 +150,41 @@ namespace Reiga.VisualNodeEditor
 
         private void OnDisable() => UnhookClick();
 
-        /// <summary><paramref name="clickEvent"/>（ボタンのクリック）に <see cref="Send"/> を繋ぐ。<see cref="SendOnClick"/> でなければ繋がない。</summary>
+        /// <summary>
+        /// <paramref name="clickEvent"/>（ボタンのクリック）に <see cref="Send"/> を繋ぐ。<see cref="SendOnClick"/> でなければ繋がない。
+        /// インスペクタの OnClick で既にこのコンポーネントの Send を呼んでいれば繋がない（1 回のクリックで 2 回送らないように）。
+        /// </summary>
         internal void HookClick(UnityEvent clickEvent)
         {
             UnhookClick();
-            if (_sendOnClick && clickEvent != null)
+            if (_sendOnClick && clickEvent != null && !CallsSend(clickEvent, this))
             {
                 _clickEvent = clickEvent;
                 _clickEvent.AddListener(Send);
             }
+        }
+
+        /// <summary>クリックに自動で繋いでいるか。</summary>
+        internal bool IsClickHooked => _clickEvent != null;
+
+        /// <summary><paramref name="clickEvent"/> の永続的な呼び出し（インスペクタの OnClick）に、<paramref name="button"/> の送信があるか。</summary>
+        internal static bool CallsSend(UnityEventBase clickEvent, GraphEventButton button)
+        {
+            if (clickEvent == null || button == null)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < clickEvent.GetPersistentEventCount(); i++)
+            {
+                var method = clickEvent.GetPersistentMethodName(i);
+                if (clickEvent.GetPersistentTarget(i) == button && (method == nameof(Send) || method == nameof(TrySend)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal void UnhookClick()

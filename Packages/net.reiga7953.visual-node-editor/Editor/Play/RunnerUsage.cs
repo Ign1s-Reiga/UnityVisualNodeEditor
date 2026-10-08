@@ -17,7 +17,10 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         private const string GraphFieldPrefix = "_graph: {fileID: 11400000, guid: ";
 
         // シーンのパス → (更新日時, そのシーンの Graph Runner が指すグラフの GUID。バイナリなどで読めなければ null)
-        private static readonly Dictionary<string, (DateTime Stamp, HashSet<string> GraphGuids)> _cache = new();
+        // プレハブのインスタンスがあるか（プレハブの中の Runner はシーンファイルに書き出されないので、別に調べる）
+        private static readonly Dictionary<string, (DateTime Stamp, HashSet<string> GraphGuids, bool HasPrefabs)> _cache = new();
+
+        private const string PrefabInstanceHeader = "--- !u!1001 ";
 
         private static string _runnerScriptGuid;
 
@@ -76,10 +79,18 @@ namespace Reiga.VisualNodeEditor.Editor.Play
                 return true;
             }
 
+            var graphPath = AssetDatabase.GUIDToAssetPath(graphGuid);
             foreach (var scene in EditorBuildSettings.scenes.Where(s => s != null && s.enabled))
             {
-                var guids = GetCachedRunnerGraphGuids(scene.path);
+                var (guids, hasPrefabs) = GetCachedSceneInfo(scene.path);
                 if (guids == null || guids.Contains(graphGuid))
+                {
+                    return true;
+                }
+
+                // プレハブの中の Runner は見えないので、プレハブ経由でシーンがこのグラフを参照していれば使われているとみなす
+                // （誤った警告を出さない側に倒す）
+                if (hasPrefabs && AssetDatabase.GetDependencies(scene.path, true).Contains(graphPath))
                 {
                     return true;
                 }
@@ -88,23 +99,29 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             return false;
         }
 
-        private static HashSet<string> GetCachedRunnerGraphGuids(string scenePath)
+        /// <summary>シーンの YAML にプレハブのインスタンスがあるか（中の Graph Runner はシーンファイルに書き出されない）。</summary>
+        public static bool HasPrefabInstances(string sceneText) =>
+            sceneText != null && sceneText.Contains(PrefabInstanceHeader);
+
+        private static (HashSet<string> GraphGuids, bool HasPrefabs) GetCachedSceneInfo(string scenePath)
         {
             if (string.IsNullOrEmpty(scenePath) || !File.Exists(scenePath))
             {
                 // 削除されたシーンは Build Settings の警告で知らせるので、ここでは「Runner は無い」とだけ扱う
-                return new HashSet<string>();
+                return (new HashSet<string>(), false);
             }
 
             var stamp = File.GetLastWriteTimeUtc(scenePath);
             if (_cache.TryGetValue(scenePath, out var cached) && cached.Stamp == stamp)
             {
-                return cached.GraphGuids;
+                return (cached.GraphGuids, cached.HasPrefabs);
             }
 
-            var guids = GetRunnerGraphGuids(File.ReadAllText(scenePath), RunnerScriptGuid);
-            _cache[scenePath] = (stamp, guids);
-            return guids;
+            var text = File.ReadAllText(scenePath);
+            var guids = GetRunnerGraphGuids(text, RunnerScriptGuid);
+            var hasPrefabs = HasPrefabInstances(text);
+            _cache[scenePath] = (stamp, guids, hasPrefabs);
+            return (guids, hasPrefabs);
         }
 
         /// <summary>Graph Runner（<see cref="GraphRunnerBehaviour"/>）のスクリプトの GUID。</summary>
