@@ -23,9 +23,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         // 貼り付けた要素を元の位置から少しずらす量。同じ内容を続けて貼るたびに、さらにこの分ずらす
         private static readonly Vector2 PasteOffset = new Vector2(30f, 30f);
 
+        // 新しいコンテナの中に自動で作る Exit ノードの位置（Entry は原点）
+        private static readonly Vector2 ContainerExitOrigin = new Vector2(400f, 0f);
+        private static readonly Vector2 ContainerExitSpacing = new Vector2(0f, 100f);
+
         private string _lastPastedData;
         private int _pasteCount;
         private string _searchQuery;
+
+        // 表示中の階層（ルートから外側順のコンテナ ID）。空ならルート階層
+        private readonly List<string> _levelPath = new();
 
         // 位置・大きさは NodeGraphView.uss（#vne-minimap）で決める
         private readonly MiniMap _miniMap = new MiniMap { anchored = true, name = "vne-minimap" };
@@ -126,19 +133,45 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         /// <summary>
         /// GraphRunner が今いるノードを強調する。null で強調を消す。再構築（Undo など）の後も維持する。
+        /// ノードが表示中の階層より深い所にあれば、それを含むコンテナを強調する。
         /// </summary>
         public void SetRunningNode(string nodeId)
         {
-            if (RunningNodeId != null && FindNodeView(RunningNodeId) is NodeView previous)
+            RunningNodeId = nodeId;
+            ShowRunningNode();
+        }
+
+        private void ShowRunningNode()
+        {
+            var visibleId = FindVisibleNodeId(RunningNodeId);
+            foreach (var view in nodes.ToList().OfType<NodeView>())
             {
-                previous.IsRunning = false;
+                view.IsRunning = visibleId != null && view.NodeId == visibleId;
+            }
+        }
+
+        /// <summary>
+        /// ノードが表示中の階層にあればその ID を、より深い階層にあれば、それを含む表示中の階層のコンテナの ID を返す。
+        /// 表示中の階層の外（上の階層や、別のコンテナの中）にあれば null。
+        /// </summary>
+        public string FindVisibleNodeId(string nodeId)
+        {
+            if (_asset == null || nodeId == null)
+            {
+                return null;
             }
 
-            RunningNodeId = nodeId;
-            if (nodeId != null && FindNodeView(nodeId) is NodeView current)
+            var level = CurrentContainerId;
+            var visited = new HashSet<string>();
+            for (var node = _asset.FindNode(nodeId); node != null && visited.Add(node.Id); node = _asset.FindNode(node.ParentId))
             {
-                current.IsRunning = true;
+                if (NodeGraphAsset.IsSameLevel(node.ParentId, level))
+                {
+                    return node.Id;
+                }
             }
+
+            return null;
         }
 
         /// <summary>ミニマップを表示するか。</summary>
@@ -194,10 +227,65 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
-        /// <summary>アセットの内容でビューを再構築する。再構築中の変更はアセットへ書き戻さない。</summary>
+        /// <summary>表示中の階層（コンテナの ID）。空文字ならルート階層。</summary>
+        public string CurrentContainerId => _levelPath.Count == 0 ? string.Empty : _levelPath[_levelPath.Count - 1];
+
+        /// <summary>ルートから表示中の階層までのコンテナの ID（外側から順。ルートなら空）。パンくずの表示に使う。</summary>
+        public IReadOnlyList<string> LevelPath => _levelPath;
+
+        /// <summary>表示する階層が変わったとき（コンテナに入った・戻った・表示中のコンテナが消えた）。</summary>
+        public event Action LevelChanged;
+
+        /// <summary>
+        /// 表示中のアセットの、<paramref name="containerId"/> の階層を表示する（空文字ならルート）。
+        /// コンテナが見つからなければルートを表示する。
+        /// </summary>
+        public void EnterLevel(string containerId) => Populate(_asset, containerId);
+
+        /// <summary>1 つ上の階層を表示する。ルートにいれば何もしない。</summary>
+        public void ExitLevel()
+        {
+            if (_levelPath.Count > 0)
+            {
+                EnterLevel(_levelPath.Count >= 2 ? _levelPath[_levelPath.Count - 2] : string.Empty);
+            }
+        }
+
+        /// <summary>
+        /// <paramref name="asset"/> の <paramref name="containerId"/> の階層を表示する（空文字ならルート）。
+        /// コンテナが見つからなければルートを表示する。
+        /// </summary>
+        public void Populate(NodeGraphAsset asset, string containerId)
+        {
+            _levelPath.Clear();
+            if (asset != null && asset.FindNode(containerId) is ContainerNode container)
+            {
+                // 親をたどってルートからの道筋を作る（親の参照が輪になっていても止まる）
+                var visited = new HashSet<string>();
+                for (NodeData node = container; node is ContainerNode && visited.Add(node.Id); node = asset.FindNode(node.ParentId))
+                {
+                    _levelPath.Insert(0, node.Id);
+                }
+            }
+
+            Populate(asset);
+            LevelChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// アセットの内容で、表示中の階層のビューを再構築する。再構築中の変更はアセットへ書き戻さない。
+        /// Undo などで表示中のコンテナが消えていたら、存在する一番近い親の階層へ戻る。
+        /// </summary>
         public void Populate(NodeGraphAsset asset)
         {
             _asset = asset;
+
+            var missing = _levelPath.FindIndex(id => !(asset != null && asset.FindNode(id) is ContainerNode));
+            var levelChanged = missing >= 0;
+            if (levelChanged)
+            {
+                _levelPath.RemoveRange(missing, _levelPath.Count - missing);
+            }
 
             _suppressSync = true;
             try
@@ -217,10 +305,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             NotifySelectionChanged();
             GraphChanged?.Invoke();
+            if (levelChanged)
+            {
+                LevelChanged?.Invoke();
+            }
         }
 
         /// <summary>
-        /// <paramref name="nodeType"/> のノードを <paramref name="position"/>（グラフ座標）に追加する。
+        /// <paramref name="nodeType"/> のノードを、表示中の階層の <paramref name="position"/>（グラフ座標）に追加する。
+        /// コンテナなら中に Entry と、出口ごとの Exit ノードも作る。コンテナの中の Exit ノードは親の最初の出口を指す。
         /// アセット未設定のときは何もせず null を返す。
         /// </summary>
         public NodeView CreateNode(Type nodeType, Vector2 position)
@@ -232,15 +325,47 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             var data = (NodeData)Activator.CreateInstance(nodeType);
             data.Position = position;
+            data.ParentId = CurrentContainerId;
+            if (data is ContainerExitNode exitNode && _asset.FindNode(CurrentContainerId) is ContainerNode parent
+                && parent.Exits.Count > 0)
+            {
+                exitNode.ExitId = parent.Exits[0].Id;
+            }
 
             Undo.RecordObject(_asset, "Add Node");
             _asset.AddNode(data);
+            if (data is ContainerNode container)
+            {
+                AddContainerContents(container);
+            }
+
             EditorUtility.SetDirty(_asset);
 
-            var view = NodeViewFactory.Create(data);
-            view.CollapsedChanged += OnNodeCollapsedChanged;
+            var view = CreateNodeView(data);
             AddElement(view);
             GraphChanged?.Invoke();
+            return view;
+        }
+
+        /// <summary>新しいコンテナの中に、Entry と出口ごとの Exit ノードを作る（中の階層の左に Entry、右に Exit を縦に並べる）。</summary>
+        private void AddContainerContents(ContainerNode container)
+        {
+            _asset.AddNode(new ContainerEntryNode { ParentId = container.Id, Position = Vector2.zero });
+            for (var i = 0; i < container.Exits.Count; i++)
+            {
+                _asset.AddNode(new ContainerExitNode
+                {
+                    ParentId = container.Id,
+                    ExitId = container.Exits[i].Id,
+                    Position = ContainerExitOrigin + ContainerExitSpacing * i,
+                });
+            }
+        }
+
+        private NodeView CreateNodeView(NodeData data)
+        {
+            var view = NodeViewFactory.Create(data, _asset);
+            view.CollapsedChanged += OnNodeCollapsedChanged;
             return view;
         }
 
@@ -255,7 +380,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             var members = selection.OfType<NodeView>().ToList();
-            var data = new GroupData { Position = position };
+            var data = new GroupData { Position = position, ParentId = CurrentContainerId };
 
             Undo.RecordObject(_asset, "Create Group");
             foreach (var member in members)
@@ -291,6 +416,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             return view;
         }
 
+        /// <summary>表示中の階層のノードだけを選択する（表示位置は変えない）。見つからなければ選択を外すだけ。</summary>
+        public void SelectNode(string nodeId)
+        {
+            ClearSelection();
+            if (FindNodeView(nodeId) is NodeView view)
+            {
+                AddToSelection(view);
+            }
+        }
+
         /// <summary>ID に対応するノードの View を返す。無ければ null。</summary>
         public NodeView FindNodeView(string nodeId) => GetNodeByGuid(nodeId) as NodeView;
 
@@ -305,19 +440,32 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
-        /// <summary>検証結果を各ノードの表示に反映する。</summary>
+        /// <summary>
+        /// 検証結果を各ノードの表示に反映する。コンテナには、その中（入れ子を含む）のノードの問題もまとめて出す。
+        /// </summary>
         public void ShowIssues(IReadOnlyList<GraphIssue> issues)
         {
-            var issuesByNode = issues.Where(i => i.NodeId != null).ToLookup(i => i.NodeId);
+            var issuesByNode = issues
+                .Select(i => (Issue: i, VisibleId: FindVisibleNodeId(i.NodeId)))
+                .Where(x => x.VisibleId != null)
+                .ToLookup(x => x.VisibleId, x => x.Issue);
             foreach (var view in nodes.ToList().OfType<NodeView>())
             {
                 view.ShowIssues(issuesByNode[view.NodeId].ToList());
             }
         }
 
-        /// <summary>ノードを選択し、画面の中央に表示する。</summary>
+        /// <summary>
+        /// ノードを選択し、画面の中央に表示する。別の階層のノードなら、その階層に移ってから選択する。
+        /// </summary>
         public void FocusNode(string nodeId)
         {
+            if (_asset != null && _asset.FindNode(nodeId) is NodeData node
+                && !NodeGraphAsset.IsSameLevel(node.ParentId, CurrentContainerId))
+            {
+                EnterLevel(node.ParentId);
+            }
+
             var view = FindNodeView(nodeId);
             if (view == null)
             {
@@ -329,12 +477,18 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             FrameSelection();
         }
 
-        /// <summary>向きが逆・別ノード・まだ接続されていないポートだけを接続候補にする。</summary>
+        /// <summary>
+        /// 向きが逆・別ノード・まだ接続されていない・同じ階層にあるポートだけを接続候補にする。
+        /// 表示しているのは 1 つの階層だけだが、階層をまたぐエッジは検証で Error になるので、データでも確かめる。
+        /// </summary>
         public override List<Port> GetCompatiblePorts(Port startPort, NodeAdapter nodeAdapter)
         {
+            var startParent = (startPort.node as NodeView)?.Data?.ParentId;
             return ports.ToList()
                 .Where(p => p.direction != startPort.direction
                     && p.node != startPort.node
+                    && p.node is NodeView view && view.Data != null
+                    && NodeGraphAsset.IsSameLevel(view.Data.ParentId, startParent)
                     && !p.connections.Any(e => e.input == startPort || e.output == startPort))
                 .ToList();
         }
@@ -348,6 +502,17 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             var position = contentViewContainer.WorldToLocal(evt.mousePosition);
+            if (evt.target is ContainerNodeView containerView)
+            {
+                evt.menu.AppendSeparator();
+                evt.menu.AppendAction("Open Container", _ => EnterLevel(containerView.NodeId));
+            }
+            else if (evt.target is GraphView && _levelPath.Count > 0)
+            {
+                evt.menu.AppendSeparator();
+                evt.menu.AppendAction("Open Parent Level", _ => ExitLevel());
+            }
+
             evt.menu.AppendSeparator();
             evt.menu.AppendAction("Create Group", _ => CreateGroup(position));
             evt.menu.AppendAction("Create Sticky Note", _ => CreateStickyNote(position));
@@ -471,7 +636,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 return null;
             }
 
-            var data = new StickyNoteData { Rect = new Rect(position, StickyNoteData.DefaultSize) };
+            var data = new StickyNoteData { Rect = new Rect(position, StickyNoteData.DefaultSize), ParentId = CurrentContainerId };
 
             Undo.RecordObject(_asset, "Create Sticky Note");
             _asset.AddStickyNote(data);
@@ -506,31 +671,37 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             SelectedNodeChanged?.Invoke(selectedNodes.Count == 1 ? selectedNodes[0] : null);
         }
 
+        /// <summary>表示中の階層のノード・エッジ・グループ・付箋だけを作る。</summary>
         private void BuildElements(NodeGraphAsset asset)
         {
+            var level = CurrentContainerId;
             var views = new Dictionary<string, NodeView>();
             foreach (var node in asset.Nodes)
             {
                 // 型が削除・改名されると SerializeReference は null を返すことがある
-                if (node == null)
+                if (node == null || !NodeGraphAsset.IsSameLevel(node.ParentId, level))
                 {
                     continue;
                 }
 
-                var view = NodeViewFactory.Create(node);
-                view.CollapsedChanged += OnNodeCollapsedChanged;
+                var view = CreateNodeView(node);
                 AddElement(view);
                 views[node.Id] = view;
             }
 
             foreach (var edgeData in asset.Edges)
             {
-                var output = views.TryGetValue(edgeData.FromNodeId, out var from)
-                    ? from.FindPort(edgeData.FromPort, Direction.Output)
-                    : null;
-                var input = views.TryGetValue(edgeData.ToNodeId, out var to)
-                    ? to.FindPort(edgeData.ToPort, Direction.Input)
-                    : null;
+                var hasFrom = views.TryGetValue(edgeData.FromNodeId, out var from);
+                var hasTo = views.TryGetValue(edgeData.ToNodeId, out var to);
+
+                // 別の階層のエッジ。階層をまたぐもの・ノードが無いものは検証が Error として出す
+                if (!hasFrom || !hasTo)
+                {
+                    continue;
+                }
+
+                var output = from.FindPort(edgeData.FromPort, Direction.Output);
+                var input = to.FindPort(edgeData.ToPort, Direction.Input);
                 if (output == null || input == null)
                 {
                     Debug.LogWarning($"[VisualNodeEditor] Skipped edge {edgeData.FromNodeId}.{edgeData.FromPort} -> "
@@ -548,7 +719,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 view.RefreshExpandedState();
             }
 
-            foreach (var groupData in asset.Groups)
+            foreach (var groupData in asset.Groups.Where(g => NodeGraphAsset.IsSameLevel(g.ParentId, level)))
             {
                 var groupView = new GroupView(groupData);
                 AddElement(groupView);
@@ -566,15 +737,12 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 groupView.AddElements(members);
             }
 
-            foreach (var stickyNote in asset.StickyNotes)
+            foreach (var stickyNote in asset.StickyNotes.Where(s => NodeGraphAsset.IsSameLevel(s.ParentId, level)))
             {
                 AddStickyNoteView(stickyNote);
             }
 
-            if (RunningNodeId != null && views.TryGetValue(RunningNodeId, out var running))
-            {
-                running.IsRunning = true;
-            }
+            ShowRunningNode();
 
             if (!string.IsNullOrWhiteSpace(_searchQuery))
             {
@@ -786,7 +954,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             _pasteCount = data == _lastPastedData ? _pasteCount + 1 : 1;
             _lastPastedData = data;
 
-            var content = GraphClipboard.Deserialize(data, PasteOffset * _pasteCount);
+            // 表示中の階層に貼る（コンテナを貼ると、その中身は貼ったコンテナの中に入る）
+            var content = GraphClipboard.Deserialize(data, PasteOffset * _pasteCount, CurrentContainerId);
             if (content == null || content.IsEmpty)
             {
                 return;
@@ -896,9 +1065,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 return;
             }
 
-            if (_asset.FindEdge(fromId, edge.output.portName, toId, edge.input.portName) == null)
+            if (_asset.FindEdge(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)) == null)
             {
-                _asset.AddEdge(new EdgeData(fromId, edge.output.portName, toId, edge.input.portName));
+                _asset.AddEdge(new EdgeData(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)));
             }
         }
 
@@ -906,7 +1075,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         {
             if (TryGetEdgeKey(edge, out var fromId, out var toId))
             {
-                _asset.RemoveEdge(_asset.FindEdge(fromId, edge.output.portName, toId, edge.input.portName));
+                _asset.RemoveEdge(_asset.FindEdge(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)));
             }
         }
 

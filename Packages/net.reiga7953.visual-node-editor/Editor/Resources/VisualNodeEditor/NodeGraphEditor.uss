@@ -8,6 +8,7 @@
   --vne-category-event: #b36ad9;
   --vne-category-entity: #2bb3a3;
   --vne-category-system: #d19a52;
+  --vne-category-container: #d9668a;
 }
 
 .vne-inspector-view__icon.vne-category--flow {
@@ -28,6 +29,10 @@
 
 .vne-inspector-view__icon.vne-category--system {
   background-color: var(--vne-category-system);
+}
+
+.vne-inspector-view__icon.vne-category--container {
+  background-color: var(--vne-category-container);
 }
 
 /* Toolbar */
@@ -52,6 +57,17 @@
 
 .vne-asset-name:hover {
   color: #ffffff;
+}
+
+/* Container levels: breadcrumbs (Root > Stage > ...), shown only inside a container */
+
+.vne-level-bar--hidden {
+  display: none;
+}
+
+.vne-level-breadcrumbs {
+  flex-shrink: 1;
+  overflow: hidden;
 }
 
 /* Layout: TwoPaneSplitView (graph | inspector) */
@@ -140,6 +156,63 @@
 
 .vne-inspector-view .unity-text-field__input--multiline {
   white-space: normal;
+}
+
+/* Container exits: the list in a container's inspector, the picker in an Exit node's inspector */
+
+.vne-exit-list {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top-width: 1px;
+  border-top-color: #191919;
+}
+
+.vne-exit-list__header {
+  margin-left: 3px;
+  margin-bottom: 4px;
+  -unity-font-style: bold;
+}
+
+.vne-exit-list__list {
+  max-height: 240px;
+}
+
+.vne-exit-list__row {
+  flex-direction: row;
+  align-items: center;
+  padding-right: 2px;
+}
+
+.vne-exit-list__name {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.vne-exit-list__remove {
+  width: 20px;
+  margin-left: 2px;
+  margin-right: 0;
+  flex-shrink: 0;
+}
+
+.vne-exit-list__add {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.vne-exit-list__message,
+.vne-exit-picker__message {
+  display: none;
+  margin-left: 3px;
+  margin-top: 2px;
+  color: #e0a030;
+  white-space: normal;
+}
+
+.vne-exit-list__message--visible,
+.vne-exit-picker__message--visible {
+  display: flex;
 }
 
 /* Node search */

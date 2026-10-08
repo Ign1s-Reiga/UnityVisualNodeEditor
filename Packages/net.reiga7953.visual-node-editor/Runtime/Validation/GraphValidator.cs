@@ -19,11 +19,21 @@ namespace Reiga.VisualNodeEditor
             var issues = new List<GraphIssue>();
             var names = new HashSet<string>();
             var reportedDuplicates = new HashSet<string>();
+            var ids = new HashSet<string>();
+            var reportedDuplicateIds = new HashSet<string>();
             foreach (var parameter in parameters)
             {
                 if (parameter == null)
                 {
                     continue;
+                }
+
+                // Blackboard は ID でパラメータを引くので、ID が重複すると別のパラメータを編集してしまう
+                // （Inspector の Debug モードなどで生のリストを複製すると起きる）
+                if (!ids.Add(parameter.Id) && reportedDuplicateIds.Add(parameter.Id))
+                {
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Error,
+                        $"Parameter '{parameter.Name}' has the same ID as another parameter. Delete it and add it again."));
                 }
 
                 if (string.IsNullOrWhiteSpace(parameter.Name))
@@ -65,7 +75,8 @@ namespace Reiga.VisualNodeEditor
 
                 switch (node)
                 {
-                    case EntryNode _:
+                    // ルートの開始点。コンテナの中の EntryNode は ContainerValidator が Error にする
+                    case EntryNode _ when node.IsAtRoot:
                         entries.Add(node);
                         break;
                     case SceneNode scene when scene.Scene.IsEmpty:
@@ -123,6 +134,7 @@ namespace Reiga.VisualNodeEditor
                 }
             }
 
+            issues.AddRange(ContainerValidator.Validate(nodes, edges, nodesById));
             return issues;
         }
     }

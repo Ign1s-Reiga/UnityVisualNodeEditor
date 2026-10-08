@@ -37,14 +37,27 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// <summary>この View が表示しているノードデータ。</summary>
         public NodeData Data { get; private set; }
 
+        /// <summary>
+        /// ノードが属するグラフ。コンテナの子の数や親コンテナの出口など、ほかのノードを見て表示を決める View が使う。
+        /// グラフ無しで作られた View では null。
+        /// </summary>
+        protected NodeGraphAsset Graph { get; private set; }
+
         /// <summary>表示しているノードの ID。</summary>
         public string NodeId => viewDataKey;
 
         /// <summary>入力・出力ポートの数から、ポートラベル（in / out）を隠すかどうかを決める。</summary>
         public static bool ShouldHidePortLabels(int inputCount, int outputCount) => inputCount <= 1 && outputCount <= 1;
 
-        internal void Initialize(NodeData data)
+        /// <summary>
+        /// ポートの ID（<see cref="EdgeData"/> に保存される値）。表示名（<see cref="Port.portName"/>）とは別に持つ。
+        /// </summary>
+        public static string GetPortId(Port port) => port?.userData as string ?? port?.portName;
+
+        internal void Initialize(NodeData data, NodeGraphAsset graph = null)
         {
+            Graph = graph;
+
             // GraphView の既定 USS はノード自身に付いているため、確実に上書きできるよう同じ要素に付ける
             _styleSheet ??= Resources.Load<StyleSheet>(StyleSheetPath);
             if (_styleSheet != null)
@@ -65,8 +78,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             Rebind(data);
 
             CreatePorts();
-            EnableInClassList(HidePortLabelsClassName,
-                ShouldHidePortLabels(inputContainer.Query<Port>().ToList().Count, outputContainer.Query<Port>().ToList().Count));
+            EnableInClassList(HidePortLabelsClassName, !AlwaysShowPortLabels
+                && ShouldHidePortLabels(inputContainer.Query<Port>().ToList().Count, outputContainer.Query<Port>().ToList().Count));
             SetCollapsed(data.Collapsed);
             RefreshPorts();
         }
@@ -98,9 +111,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         internal void Rebind(NodeData data)
         {
             Data = data;
-            title = NodeDisplay.ResolveTitle(data.Title, NodeDisplay.GetTypeDisplayName(data.GetType()));
+            title = GetDisplayTitle();
             UpdateSummary(GetSummary());
         }
+
+        /// <summary>
+        /// タイトルに出す文字列。既定はユーザーのタイトル（空なら型の表示名）。
+        /// 別のデータから決めるノード（コンテナの Exit など）は上書きする。
+        /// </summary>
+        protected virtual string GetDisplayTitle() =>
+            NodeDisplay.ResolveTitle(Data.Title, NodeDisplay.GetTypeDisplayName(Data.GetType()));
 
         /// <summary>このノードに関する検証結果を枠の色とツールチップに反映する。空なら表示を消す。</summary>
         public void ShowIssues(IReadOnlyList<GraphIssue> issues)
@@ -128,12 +148,12 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         }
 
         /// <summary>
-        /// 指定した向き・名前のポートを返す。存在しなければ null。
+        /// 指定した向き・ID のポートを返す。存在しなければ null。
         /// </summary>
-        public Port FindPort(string portName, Direction direction)
+        public Port FindPort(string portId, Direction direction)
         {
             var container = direction == Direction.Input ? inputContainer : outputContainer;
-            return container.Query<Port>().Where(p => p.portName == portName).First();
+            return container.Query<Port>().Where(p => GetPortId(p) == portId).First();
         }
 
         /// <summary>現在表示しているサマリー。行を出していなければ空文字。</summary>
@@ -145,26 +165,40 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// </summary>
         protected virtual string GetSummary() => string.Empty;
 
+        /// <summary>
+        /// ポートが入力・出力 1 つずつ以下でも、ポートラベルを出すか。ラベルが意味を持つノード（コンテナの出口など）で true にする。
+        /// </summary>
+        protected virtual bool AlwaysShowPortLabels => false;
+
+        /// <summary>ポートラベル（in / out や出口の名前）を隠しているか。</summary>
+        public bool PortLabelsHidden => ClassListContains(HidePortLabelsClassName);
+
         /// <summary>ポートを定義する。既定ではポートを持たない。</summary>
         protected virtual void CreatePorts()
         {
         }
 
-        /// <summary>入力ポートを追加する。<paramref name="portName"/> がそのままエッジのポート名になる。</summary>
-        protected Port AddInputPort(string portName, Port.Capacity capacity = Port.Capacity.Multi)
-        {
-            var port = InstantiatePort(Orientation.Horizontal, Direction.Input, capacity, typeof(bool));
-            port.portName = portName;
-            inputContainer.Add(port);
-            return port;
-        }
+        /// <summary>入力ポートを追加する。<paramref name="portId"/> がエッジに保存される ID で、表示名も兼ねる。</summary>
+        protected Port AddInputPort(string portId, Port.Capacity capacity = Port.Capacity.Multi) =>
+            AddPort(Direction.Input, portId, portId, capacity);
 
-        /// <summary>出力ポートを追加する。<paramref name="portName"/> がそのままエッジのポート名になる。</summary>
-        protected Port AddOutputPort(string portName, Port.Capacity capacity = Port.Capacity.Multi)
+        /// <summary>出力ポートを追加する。<paramref name="portId"/> がエッジに保存される ID で、表示名も兼ねる。</summary>
+        protected Port AddOutputPort(string portId, Port.Capacity capacity = Port.Capacity.Multi) =>
+            AddPort(Direction.Output, portId, portId, capacity);
+
+        /// <summary>
+        /// ID と表示名を分けて出力ポートを追加する（コンテナの出口: ID = 出口の ID、表示名 = 出口の名前）。
+        /// 表示名を変えてもエッジは壊れない。
+        /// </summary>
+        protected Port AddOutputPort(string portId, string label, Port.Capacity capacity = Port.Capacity.Multi) =>
+            AddPort(Direction.Output, portId, label, capacity);
+
+        private Port AddPort(Direction direction, string portId, string label, Port.Capacity capacity)
         {
-            var port = InstantiatePort(Orientation.Horizontal, Direction.Output, capacity, typeof(bool));
-            port.portName = portName;
-            outputContainer.Add(port);
+            var port = InstantiatePort(Orientation.Horizontal, direction, capacity, typeof(bool));
+            port.portName = label;
+            port.userData = portId;
+            (direction == Direction.Input ? inputContainer : outputContainer).Add(port);
             return port;
         }
 

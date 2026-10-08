@@ -25,8 +25,12 @@ namespace Reiga.VisualNodeEditor.Editor.Search
         }
 
         /// <inheritdoc />
-        public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context) =>
-            BuildSearchTree(NodeMenuCatalog.GetItems(), _indentIcon);
+        public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context)
+        {
+            // 表示中の階層で置けるノードだけを出す（ルートの Entry はルートだけ、コンテナの Exit はコンテナの中だけ）
+            var insideContainer = _graphView != null && _graphView.CurrentContainerId.Length > 0;
+            return BuildSearchTree(NodeMenuCatalog.GetItems(insideContainer), _indentIcon);
+        }
 
         /// <inheritdoc />
         public bool OnSelectEntry(SearchTreeEntry entry, SearchWindowContext context)

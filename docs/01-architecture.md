@@ -21,13 +21,15 @@
 ## データモデル
 
 - `NodeGraphAsset` : `List<NodeData>` を `[SerializeReference]` で、`List<EdgeData>` / `List<GroupData>` / `List<StickyNoteData>` / `List<GraphParameter>` を `[SerializeField]` で保持。
-- `NodeData` : `Id`(GUID 文字列), `Title`, `Position`, `Collapsed` を持つ抽象基底。ポート定義はサブクラスごとに Editor 側の `NodeView` が決める。
-  `Id` / `Position` / `Collapsed` は `[HideInInspector]`（インスペクタには出さない。`Collapsed` は Position と同じくエディタ専用の表示状態）。
+- `NodeData` : `Id`(GUID 文字列), `Title`, `Position`, `Collapsed`, `ParentId` を持つ抽象基底。ポート定義はサブクラスごとに Editor 側の `NodeView` が決める。
+  `Id` / `Position` / `Collapsed` / `ParentId` は `[HideInInspector]`（インスペクタには出さない。`Collapsed` は Position と同じくエディタ専用の表示状態）。
+  `ParentId` は所属するコンテナの ID（空ならルート階層）。ノードは入れ子にせず平らなリストのまま持ち、階層は `ParentId` だけで表す（「コンテナ」参照）
 - `GraphParameter` : グラフ単位のパラメータ（Blackboard）。`Id`, `Name`（グラフ内で一意）, `Type`（Bool / Int / Float / String）と型ごとの既定値。
   ノードの処理を書くためのものではなく（非目的）、ゲームから参照・更新する設定値・状態の置き場
-- `EdgeData` : `(FromNodeId, FromPort, ToNodeId, ToPort)` の 4 つ組。ポートは文字列名で識別する。
-- `GroupData` : `Id`, `Title`, `Position` と、所属ノードの ID リスト。ノードは高々 1 つのグループに属する。ノード削除時は全グループから ID を外す。
-- `StickyNoteData` : 付箋（グラフ上のコメント）。`Id`, `Title`, `Contents`, `Rect`（位置とサイズ）, `Theme`, `FontSize`。
+- `EdgeData` : `(FromNodeId, FromPort, ToNodeId, ToPort)` の 4 つ組。ポートはポート ID（文字列）で識別する（「ポート」参照）。
+- `GroupData` : `Id`, `Title`, `Position`, `ParentId` と、所属ノードの ID リスト。ノードは高々 1 つのグループに属する。ノード削除時は全グループから ID を外す。
+  グループは置かれた階層（`ParentId`）にだけ表示し、同じ階層のノードだけを含む
+- `StickyNoteData` : 付箋（グラフ上のコメント）。`Id`, `Title`, `Contents`, `Rect`（位置とサイズ）, `Theme`, `FontSize`, `ParentId`（置かれた階層）。
   ポートを持たずエッジも繋がらない。グループには入れられない（`GroupView` が付箋を受け付けない）。
   `Theme` / `FontSize` は GraphView の enum に依存しないよう Runtime 側に同じ値の enum（`StickyNoteTheme` / `StickyNoteFontSize`）を持つ。
   ポート無しの Note ノードとは役割を分ける: Note は構成要素としてのメモ（検索・検証の対象）、付箋は自由に置けるレイアウト上の注釈
@@ -56,9 +58,13 @@ Position などエディタ専用の情報も Runtime の型に持たせる（Un
 
 ## ポート
 
-- ポートは `NodeView` サブクラスが定義し、`Port.portName` がそのまま `EdgeData` のポート名になる（型システムは持たない。未決事項参照）
-- 接続可否は `NodeGraphView.GetCompatiblePorts` で判定する: 向きが逆・別ノード・同じポート対が未接続であること
-- 既定のポート構成: Entry = `out` のみ / Scene・State・Event = `in` + `out` / Note = ポート無し
+- ポートは `NodeView` サブクラスが定義する。ポートには「ID」と「表示名」があり、`EdgeData` に保存されるのは ID
+  - `AddInputPort(id)` / `AddOutputPort(id)` は ID をそのまま表示名にする（Scene・State などの `in` / `out`）
+  - `AddOutputPort(id, label)` は ID と表示名を分ける（コンテナの出口: ID = 出口の ID、表示名 = 出口の名前）。改名してもエッジが壊れない
+  - ID は `Port.userData` に持ち、`NodeView.GetPortId(port)` で取り出す（`Port.portName` は表示名）。型システムは持たない（未決事項参照）
+- 接続可否は `NodeGraphView.GetCompatiblePorts` で判定する: 向きが逆・別ノード・同じポート対が未接続・**同じ階層（`ParentId` が同じ）**であること
+- 既定のポート構成: Entry = `out` のみ / Scene・State・Event = `in` + `out` / Note = ポート無し /
+  Container = `in` + 出口ごとに 1 つ（出口の並び順）/ コンテナの Entry = `out` のみ / コンテナの Exit = `in` のみ
 
 ## エディタ ↔ アセットの同期
 
@@ -135,6 +141,76 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
   - Distribute（3 つ以上）: Horizontally / Vertically。両端のノードは動かさず、間隔を均等にする
 - 移動量の計算は純粋な関数にし、EditMode テストの対象にする。1 回の整列は 1 回の Undo で戻せる
 
+## コンテナ（サブグラフ）
+
+ゲームのテンプレート（ADV・アクションなど）の下地として、入れ子の構造を表すノード。例: 「Stage」ノードの中に Playing / Paused / GameOver / Clear があり、Clear か GameOver で外へ出る。
+テンプレート自体と、テンプレート専用のコンテナのサブクラスはまだ作らない。
+
+### データモデル（Runtime）
+
+| 型 | 役割 |
+|---|---|
+| `ContainerNode`（`[NodeMenu("Flow/Container")]`） | 他のノードを含むノード。子は子の `ParentId` だけで表す（コンテナ側に子の一覧は持たない）。出口の一覧 `_exits` を持つ |
+| `ContainerExit` | コンテナの出口 1 つ。`Id`（作成後は変わらない GUID 文字列）と `Name`（表示名、編集可） |
+| `ContainerEntryNode` | コンテナの中の開始点。コンテナごとにちょうど 1 つ |
+| `ContainerExitNode` | コンテナの中の出口。親コンテナの出口のどれかを `_exitId` で指す。同じ出口を複数の Exit ノードが指してよい |
+
+- ルート階層の開始点は従来どおり `EntryNode`（`Flow/Entry`）。`ContainerEntryNode` / `ContainerExitNode` とは別の型（ルートの始め方は未決事項）
+- コンテナのポート: 入力 1 つ（`in`）と、`_exits` の並び順に出口ごとの出力 1 つ。出力ポートの ID = 出口の `Id`、表示名 = 出口の `Name`。
+  エッジは ID を保存するので、出口を改名・並べ替えてもエッジは壊れない
+- 出口は作成時にだけ `DefaultExitNames`（`protected virtual IEnumerable<string>`、既定は `{ "Next" }`）から作る。作成後はインスタンスごとのデータで、エディタから追加・改名・並べ替え・削除する。
+  サブクラスで上書きすると初期の出口を変えられる（例: 将来のステージ用コンテナは `{ "Clear", "GameOver" }`）
+- 名前で出口を引く `TryGetExit(name, out exit)` を用意する（テンプレートやゲームのコードから使う）
+
+### 守るべき条件（検証で Error にする）
+
+1. エッジは同じ `ParentId` のノード同士だけを結ぶ
+2. コンテナごとに `ContainerEntryNode` がちょうど 1 つある
+3. `ContainerEntryNode` / `ContainerExitNode` はコンテナの中にだけ置ける（ルート階層には置けない）。逆に、ルートの `EntryNode` はコンテナの中に置けない
+4. `ParentId` は存在する `ContainerNode` を指し、親をたどって輪にならない
+5. 出口の名前は空でなく、コンテナの中で重複しない。出口の ID もコンテナの中で重複しない
+6. `ContainerExitNode` の `_exitId` は親コンテナに存在する出口を指す
+7. コンテナの出力ポートから出るエッジは、存在する出口 ID を指す
+8. コンテナを削除すると、子孫（入れ子のコンテナの中身も含む）とそれらのエッジ・グループ・付箋もすべて削除する（`NodeGraphAsset.RemoveNode` が行う）
+9. コンテナの Entry は単独では削除・複製できない（エディタで削除・コピーの対象から外す。それでも欠けたり増えたりすれば条件 2 で検出）
+
+### 出口の削除
+
+- 出口を削除すると、その出力ポートから出るエッジも同じ Undo 単位で削除する
+- その出口を指していた Exit ノードは削除しない。付け替えるまで条件 6 の Error として表示する
+- エッジか、指している Exit ノードがある出口を削除するときは、影響を受けるもの（エッジの行き先、Exit ノード）を一覧した確認ダイアログを出す
+
+### ランタイムの進み方
+
+- コンテナに着いたら、そのコンテナに入り、中の Entry から続ける（通過ノードとして扱う）
+- Exit ノードに着いたら、そのコンテナから出て、コンテナの出力ポートのうち ID が Exit の `_exitId` と同じものから続ける（親の階層の次のノードへ）
+- 入れ子の深さに制限は無い。今どのコンテナの中にいるかは、現在のノードの `ParentId` の連なりで決まり、`GraphRunner.ContainerPath` で取れる（入るたびに積み、出るたびに下ろすスタックと同じ）
+- データだけで遷移先を引く API を `GraphQuery` に置く: `GetNextNode(nodeId, portId)`（あるポートの先）、`GetContainerEntry(container)`、`GetExitTarget(exitNode)`（Exit から出た先）
+- Exit に対応する出力ポートが繋がっていない場合の扱いは未決事項。**当面は**、出口の無い Event と同じく「どこにも入らず、直前の待機ノードに留まって警告を出す」
+- Entry の無いコンテナに着いたときも同じく、入らずに留まって警告を出す。`Start()` の直後でまだ待機ノードが無ければ、ルートの Entry に入って留まる（Entry の先が無いときと同じ）
+
+### エディタ
+
+- 表示は階層ごとに切り替える（ドリルダウン）。コンテナをダブルクリック（または右クリック → Open Container）で中へ入り、
+  ツールバーの下のパンくず（Root > Stage > …、コンテナの中にいるときだけ出す）か、背景の右クリック → Open Parent Level で上の階層へ戻る。
+  表示中の階層はウィンドウに保存する（ドメインリロード後も維持。別のアセットを開くとルートから）
+- Play 中の実行ノードの強調と、検証の枠の色は、対象がより深い階層にあれば、それを含む表示中の階層のコンテナに出す
+- 表示するのは `ParentId` が表示中の階層と同じノード・グループ・付箋だけ。新しく作るものには表示中の階層を `ParentId` に入れる
+- 条件 1 は `GetCompatiblePorts` でも守り、階層をまたぐエッジは作れない
+- コンテナを作ると、`DefaultExitNames` から出口を作り、中に Entry と、既定の出口ごとに Exit ノードを 1 つずつ作る
+- コンテナのインスペクタ: 出口の一覧を編集できる（追加・改名・ドラッグで並べ替え・削除）。変更はすぐ出力ポートに反映する（グラフを作り直し、同じノードを選び直す）。
+  名前は前後の空白を除き、空や同じコンテナの中での重複は受け付けない（理由を出して元の名前に戻す）。追加した出口は Exit, Exit 2, … と名付ける
+- Exit ノードのインスペクタ: 出口を、親コンテナの出口から選ぶドロップダウンで表示する。最後の「+ New exit…」で親に出口を追加して選ぶ。
+  選んでいる出口の名前もここで変えられる（親の出口の改名なので、同じ出口を指す Exit ノードとコンテナのポートにも反映される）
+- Exit ノードのタイトルは指している出口の名前（改名にも追従）。ユーザーがタイトルを付けたらそちらを出し、出口の名前はサマリー行に出す。
+  コンテナのサマリー行は子ノードの数（Entry / Exit は数えない）
+- コンテナの Entry / Exit は専用のカテゴリ色（`container`）で、通常のノードと区別する。Exit は Create Node メニューの `Container/Exit`（コンテナの中でだけ出す）。
+  Entry はコンテナと一緒に自動で作るのでメニューには出さない。ルートの `EntryNode` はルート階層でだけメニューに出す
+- コピー・貼り付け: コンテナをコピーすると子孫も新しい ID でコピーし、`ParentId` を付け替える（出口の ID はコンテナの中だけで意味を持つのでそのまま）。
+  コンテナの Entry は単独ではコピーしない（そのコンテナごとコピーしたときだけ含める）
+- ノード検索は表示中の階層が対象。問題一覧から別の階層のノードを選ぶと、その階層へ移ってから選択する
+- すべて Undo 対応。Undo で表示中のコンテナが消えたら、存在する一番近い親の階層へ戻る
+
 ## 検証（Validation）
 
 グラフの整合性チェックは Runtime 側の純粋な C#（`GraphValidator`）で実装し、EditMode テストの対象にする。
@@ -150,7 +226,8 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
 | Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
-| Error | 名前が空のパラメータ / 名前が重複するパラメータ（Blackboard） |
+| Error | 名前が空のパラメータ / 名前が重複するパラメータ / ID が重複するパラメータ（Blackboard） |
+| Error | コンテナの条件 1〜7（階層をまたぐエッジ、Entry の数、Entry / Exit を置ける階層、親の参照と輪、出口の名前と ID、Exit が指す出口、出力ポートが指す出口）。「コンテナ」参照 |
 | Warning | （エディタのみ）Build Settings に有効な状態で入っていないシーンを参照する Scene ノード（参照先のシーンが削除されていれば、その旨の警告） |
 
 循環は許可する（State 間・Scene 遷移とも）。
@@ -182,6 +259,7 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
   - 一致する遷移が無ければ何もせず false を返す
 - `Advance()`: 現在のノードから Event 以外のノードへ出ている最初のエッジの先へ進む（イベントを介さない「次へ」）
 - 遷移先が複数ある場合は、アセット内のエッジの順で最初のものを使う
+- コンテナ・コンテナの Entry / Exit は通過ノード。コンテナに入って中の Entry から続け、Exit で出て親の階層の対応する出力ポートから続ける（「コンテナ」の「ランタイムの進み方」参照）
 - 通過ノードだけで輪になっている場合（Event → Event → …）は無限ループせず、警告を出して止める
 - 通知（`NodeEntered` など）の中で `Stop()` したら、そのノードの残りの処理（シーンの読み込み・イベントの通知）は行わない
 - `Stop()` は `NodeExited` を通知する前に停止状態にする。その通知の中で `Raise` / `Advance` を呼んでも false を返して何もしない（次の `Start()` 後に実行されないように）
@@ -233,6 +311,7 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
 | `NodeGraphEditor.uss` | ウィンドウのルート | レイアウト、ツールバー、インスペクタ、問題一覧、カテゴリ色の変数 |
 | `NodeGraphView.uss` | `NodeGraphView` 自身 | グリッド |
 | `NodeView.uss` | 各 `NodeView` 自身 | ノードのカテゴリ帯、サマリー行、ポートラベル、検証結果の枠色 |
+| `NodeGraphAssetInspector.uss` | アセットのインスペクタ（`NodeGraphAssetEditor`） | 概要・パラメータ一覧・注記（レイアウトは `NodeGraphAssetInspector.uxml`） |
 
 GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルールは要素に近い USS が勝つため、
 グリッドやノードのスタイルはウィンドウのルートではなく、その要素自身に USS を付けて確実に効かせる。
@@ -286,6 +365,22 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - 問題一覧は既定で閉じる。新しいエラーが出たら自動で開く（アセットを開いた時点で既にあるエラーでは開かない）
 - 問題が無いときは、トグルの状態に関わらず一覧を表示しない（空の一覧の "List is empty" も出さない）
 - 一覧の項目をクリックすると該当ノードを選択してフレームに収める
+- 問題の集め方（`GraphValidator` + Build Settings の確認）は `GraphIssues.Collect` にまとめ、ウィンドウとアセットのインスペクタで共有する
+
+### アセットのインスペクタ（`NodeGraphAssetEditor`）
+
+Project ビューでグラフアセットを選んだときの Inspector。Unity 既定のインスペクタは `_nodes` / `_parameters` などの生のリストを編集可能に見せてしまい、
+リストの「+」で要素を複製すると内部 ID まで複製される（Blackboard や同期は ID で要素を引くため、別の要素を変更してしまう）。
+そのため生のデータは出さず、次だけを表示する（編集はグラフウィンドウで行う）。
+
+- 「Open in Visual Node Editor」ボタン
+- 問題の件数（ウィンドウのツールバーと同じ文言・色）
+- ノード・エッジ・グループ・付箋・パラメータの数
+- パラメータの一覧（名前・型・既定値。読み取り専用）
+- グラフウィンドウで編集すると、表示中のインスペクタも更新する（`TrackSerializedObjectValue`）
+
+生のデータは Inspector の Debug モードでは引き続き見えるため、検証でもパラメータ ID の重複を Error にする（最後の防波堤）。
+件数・パラメータの表示文字列は純粋な関数（`GraphSummary`）にし、EditMode テストの対象にする。
 
 ## 技術的な注意
 

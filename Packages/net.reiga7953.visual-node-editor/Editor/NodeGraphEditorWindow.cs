@@ -24,10 +24,15 @@ namespace Reiga.VisualNodeEditor.Editor
         private const string IssueErrorClassName = "vne-issue--error";
         private const string IssueWarningClassName = "vne-issue--warning";
         private const string IssueListHiddenClassName = "vne-issue-list--hidden";
+        private const string LevelBarHiddenClassName = "vne-level-bar--hidden";
+        private const string RootLevelLabel = "Root";
         private const long AssetLabelRefreshIntervalMs = 500;
 
         // ドメインリロード後も同じアセットを開き直せるようシリアライズする
         [SerializeField] private NodeGraphAsset _asset;
+
+        // 表示中の階層（コンテナの ID、空ならルート）もドメインリロード後に保つ
+        [SerializeField] private string _levelContainerId = string.Empty;
 
         // View メニューの表示状態もドメインリロード後に保つ
         [SerializeField] private bool _miniMapVisible;
@@ -44,6 +49,8 @@ namespace Reiga.VisualNodeEditor.Editor
         private List<string> _searchMatches = new();
         private int _searchIndex = -1;
         private Label _assetNameLabel;
+        private VisualElement _levelBar;
+        private ToolbarBreadcrumbs _levelBreadcrumbs;
         private readonly List<GraphIssue> _issues = new();
         private readonly HashSet<string> _knownErrorKeys = new();
         private bool _resetIssueBaseline = true;
@@ -108,6 +115,9 @@ namespace Reiga.VisualNodeEditor.Editor
             container.Add(_graphView);
             _graphView.GraphChanged += Revalidate;
             _graphView.SelectedNodeChanged += OnSelectedNodeChanged;
+            _graphView.LevelChanged += OnLevelChanged;
+            _levelBar = rootVisualElement.Q("level-bar");
+            _levelBreadcrumbs = rootVisualElement.Q<ToolbarBreadcrumbs>("level-breadcrumbs");
 
             _searchWindow = CreateInstance<NodeSearchWindow>();
             _searchWindow.hideFlags = HideFlags.HideAndDontSave;
@@ -117,6 +127,7 @@ namespace Reiga.VisualNodeEditor.Editor
             _inspector = new NodeInspectorView();
             (rootVisualElement.Q("inspector") ?? rootVisualElement).Add(_inspector);
             _inspector.NodeChanged += OnInspectorNodeChanged;
+            _inspector.StructureChanged += OnInspectorStructureChanged;
 
             _issueList = rootVisualElement.Q<ListView>("issue-list");
             if (_issueList != null)
@@ -217,6 +228,12 @@ namespace Reiga.VisualNodeEditor.Editor
 
         private void Load(NodeGraphAsset asset)
         {
+            // 別のアセットはルートから開く（同じアセットを開き直したときは今の階層のまま）
+            if (asset != _asset)
+            {
+                _levelContainerId = string.Empty;
+            }
+
             _asset = asset;
             Refresh();
         }
@@ -236,8 +253,36 @@ namespace Reiga.VisualNodeEditor.Editor
             // アセットを開いた時点で既にあるエラーでは一覧を自動で開かない
             _resetIssueBaseline = true;
             _inspector?.Show(null, null);
-            _graphView?.Populate(_asset);
+            _graphView?.Populate(_asset, _levelContainerId);
             ObserveRunnerForAsset();
+        }
+
+        private void OnLevelChanged()
+        {
+            _levelContainerId = _graphView.CurrentContainerId;
+            UpdateBreadcrumbs();
+        }
+
+        /// <summary>パンくず（Root > Stage > …）を表示中の階層に合わせる。上の階層をクリックするとそこへ戻る。ルートでは隠す。</summary>
+        private void UpdateBreadcrumbs()
+        {
+            if (_levelBreadcrumbs == null || _graphView == null)
+            {
+                return;
+            }
+
+            var path = _graphView.LevelPath;
+            _levelBar?.EnableInClassList(LevelBarHiddenClassName, path.Count == 0);
+            _levelBreadcrumbs.Clear();
+            _levelBreadcrumbs.PushItem(RootLevelLabel, () => _graphView.EnterLevel(string.Empty));
+            foreach (var containerId in path)
+            {
+                var container = _asset != null ? _asset.FindNode(containerId) : null;
+                var label = container != null
+                    ? NodeDisplay.ResolveTitle(container.Title, NodeDisplay.GetTypeDisplayName(container.GetType()))
+                    : containerId;
+                _levelBreadcrumbs.PushItem(label, () => _graphView.EnterLevel(containerId));
+            }
         }
 
         /// <summary>開いているグラフを実行中の Runner があれば、その現在のノードを強調し、遷移を追う。</summary>
@@ -341,12 +386,7 @@ namespace Reiga.VisualNodeEditor.Editor
         private void Revalidate()
         {
             _issues.Clear();
-            if (_asset != null)
-            {
-                _issues.AddRange(GraphValidator.Validate(_asset));
-                _issues.AddRange(BuildSettingsSync.GetIssues(
-                    _asset, BuildSettingsSync.GetEnabledSceneGuids(EditorBuildSettings.scenes), AssetDatabase.GUIDToAssetPath));
-            }
+            _issues.AddRange(GraphIssues.Collect(_asset));
 
             _graphView?.ShowIssues(_issues);
             _issueList?.Rebuild();
@@ -355,6 +395,9 @@ namespace Reiga.VisualNodeEditor.Editor
             // ノードの追加・削除・改名で一致するノードが変わるので、検索結果も更新する
             RefreshSearch(resetIndex: false);
             UpdateAssetLabel();
+
+            // コンテナの改名（インスペクタ・Undo）をパンくずにも反映する
+            UpdateBreadcrumbs();
         }
 
         private void RefreshSearch(bool resetIndex)
@@ -478,6 +521,26 @@ namespace Reiga.VisualNodeEditor.Editor
         {
             _graphView.RefreshNode(nodeId);
             Revalidate();
+        }
+
+        /// <summary>
+        /// コンテナの出口の編集などでポートが変わったら、グラフを作り直して同じノードを選び直す（インスペクタも作り直される）。
+        /// 編集中の UI（一覧の並べ替えなど）のコールバックの中で自分を壊さないよう、イベントの後で行う。
+        /// </summary>
+        private void OnInspectorStructureChanged(string nodeId)
+        {
+            rootVisualElement.schedule.Execute(() =>
+            {
+                if (_graphView == null || _asset == null)
+                {
+                    return;
+                }
+
+                // 名前欄からフォーカスを外すクリックで別のノードを選んでいたら、そちらの選択を保つ
+                var selected = _inspector?.NodeId ?? nodeId;
+                _graphView.Populate(_asset);
+                _graphView.SelectNode(selected);
+            });
         }
 
         private void OnNodeCreationRequest(NodeCreationContext context)

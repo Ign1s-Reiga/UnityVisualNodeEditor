@@ -12,9 +12,17 @@ namespace Reiga.VisualNodeEditor
         [SerializeField] private string _title = "Group";
         [SerializeField] private Vector2 _position;
         [SerializeField] private List<string> _nodeIds = new();
+        [SerializeField] private string _parentId;
 
         /// <summary>グラフ内で一意な ID。</summary>
         public string Id => _id;
+
+        /// <summary>置かれている階層（コンテナの ID。空文字ならルート）。同じ階層のノードだけを含む。</summary>
+        public string ParentId
+        {
+            get => _parentId ?? string.Empty;
+            set => _parentId = value ?? string.Empty;
+        }
 
         /// <summary>枠に表示するタイトル。</summary>
         public string Title

@@ -22,6 +22,7 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
 
         /// <summary>
         /// 指定した要素をクリップボード文字列にする。グループを含めるとその所属ノードも含める。
+        /// コンテナを含めると、その子孫と、中のグループ・付箋も含める。コンテナの Entry は、そのコンテナごとでなければ含めない。
         /// エッジは両端のノードがどちらも含まれるものだけを含める。何も含まれなければ空文字を返す。
         /// </summary>
         public static string Serialize(
@@ -39,9 +40,21 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
                 .Select(source.FindGroup).Where(g => g != null).Distinct().ToList();
             var nodeIdSet = new HashSet<string>(nodeIds ?? Enumerable.Empty<string>());
             nodeIdSet.UnionWith(groups.SelectMany(g => g.NodeIds));
+            foreach (var selected in source.Nodes.OfType<ContainerNode>().Where(c => nodeIdSet.Contains(c.Id)).ToList())
+            {
+                nodeIdSet.UnionWith(source.GetDescendants(selected.Id).Select(n => n.Id));
+            }
+
+            // Entry は単独では複製しない（コンテナごとに 1 つだけ。検証の条件 2・9）
+            nodeIdSet.RemoveWhere(id => source.FindNode(id) is ContainerEntryNode entry && !nodeIdSet.Contains(entry.ParentId));
+
             var nodes = source.Nodes.Where(n => n != null && nodeIdSet.Contains(n.Id)).ToList();
+            var containerIds = new HashSet<string>(nodes.OfType<ContainerNode>().Select(c => c.Id));
+            groups.AddRange(source.Groups.Where(g => containerIds.Contains(g.ParentId) && !groups.Contains(g)));
             var stickyNotes = (stickyNoteIds ?? Enumerable.Empty<string>())
-                .Select(source.FindStickyNote).Where(s => s != null).Distinct().ToList();
+                .Select(source.FindStickyNote).Where(s => s != null)
+                .Concat(source.StickyNotes.Where(s => containerIds.Contains(s.ParentId)))
+                .Distinct().ToList();
             if (nodes.Count == 0 && groups.Count == 0 && stickyNotes.Count == 0)
             {
                 return string.Empty;
@@ -75,10 +88,11 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
             !string.IsNullOrEmpty(data) && data.StartsWith(Header, StringComparison.Ordinal);
 
         /// <summary>
-        /// クリップボード文字列から、新しい ID を振り直した要素一式を作る。位置は <paramref name="offset"/> だけずらす。
-        /// このツールの文字列でなければ null を返す。
+        /// クリップボード文字列から、新しい ID を振り直した要素一式を作る。このツールの文字列でなければ null を返す。
+        /// 一緒にコピーしたコンテナの中にあったものは、新しいコンテナの中に入れる。
+        /// それ以外は <paramref name="targetParentId"/> の階層（空文字ならルート）に置き、位置を <paramref name="offset"/> だけずらす。
         /// </summary>
-        public static GraphClipboardContent Deserialize(string data, Vector2 offset)
+        public static GraphClipboardContent Deserialize(string data, Vector2 offset, string targetParentId = "")
         {
             if (!CanPaste(data))
             {
@@ -97,7 +111,7 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
                     return null;
                 }
 
-                return Remap(container, offset);
+                return Remap(container, offset, targetParentId ?? string.Empty);
             }
             finally
             {
@@ -105,22 +119,33 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
             }
         }
 
-        private static GraphClipboardContent Remap(NodeGraphAsset copied, Vector2 offset)
+        private static GraphClipboardContent Remap(NodeGraphAsset copied, Vector2 offset, string targetParentId)
         {
+            // 型が削除・改名されて読めなかったノードは貼り付けない
+            var copiedNodes = copied.Nodes.Where(n => n != null).ToList();
             var newIds = new Dictionary<string, string>();
-            var nodes = new List<NodeData>();
-            foreach (var node in copied.Nodes)
+            foreach (var node in copiedNodes)
             {
-                // 型が削除・改名されて読めなかったノードは貼り付けない
-                if (node == null)
-                {
-                    continue;
-                }
-
                 var oldId = node.Id;
                 node.AssignNewId();
-                node.Position += offset;
                 newIds[oldId] = node.Id;
+            }
+
+            // 一緒にコピーしたコンテナの中身はその新しいコンテナへ、それ以外は貼り付け先の階層へ。
+            // 中身はコンテナの中の座標なので、ずらすのは貼り付け先の階層に置くものだけ
+            var nodes = new List<NodeData>();
+            foreach (var node in copiedNodes)
+            {
+                if (node.ParentId.Length > 0 && newIds.TryGetValue(node.ParentId, out var newParentId))
+                {
+                    node.ParentId = newParentId;
+                }
+                else
+                {
+                    node.ParentId = targetParentId;
+                    node.Position += offset;
+                }
+
                 nodes.Add(node);
             }
 
@@ -133,7 +158,16 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
             foreach (var group in copied.Groups)
             {
                 group.AssignNewId();
-                group.Position += offset;
+                if (group.ParentId.Length > 0 && newIds.TryGetValue(group.ParentId, out var newParentId))
+                {
+                    group.ParentId = newParentId;
+                }
+                else
+                {
+                    group.ParentId = targetParentId;
+                    group.Position += offset;
+                }
+
                 group.ReplaceNodeIds(group.NodeIds.Where(newIds.ContainsKey).Select(id => newIds[id]).ToList());
                 groups.Add(group);
             }
@@ -142,7 +176,16 @@ namespace Reiga.VisualNodeEditor.Editor.Clipboard
             foreach (var stickyNote in copied.StickyNotes)
             {
                 stickyNote.AssignNewId();
-                stickyNote.Rect = new Rect(stickyNote.Rect.position + offset, stickyNote.Rect.size);
+                if (stickyNote.ParentId.Length > 0 && newIds.TryGetValue(stickyNote.ParentId, out var newParentId))
+                {
+                    stickyNote.ParentId = newParentId;
+                }
+                else
+                {
+                    stickyNote.ParentId = targetParentId;
+                    stickyNote.Rect = new Rect(stickyNote.Rect.position + offset, stickyNote.Rect.size);
+                }
+
                 stickyNotes.Add(stickyNote);
             }
 

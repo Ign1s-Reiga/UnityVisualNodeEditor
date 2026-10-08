@@ -28,7 +28,8 @@ namespace Reiga.VisualNodeEditor
                 }
             }
 
-            Entry = graph.Nodes.OfType<EntryNode>().FirstOrDefault();
+            // ルート階層の開始点（コンテナの中に置かれた EntryNode は検証で Error になり、開始点にはしない）
+            Entry = graph.Nodes.OfType<EntryNode>().FirstOrDefault(e => e.IsAtRoot);
 
             foreach (var edge in graph.Edges)
             {
@@ -70,6 +71,50 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>Event 以外の最初の遷移先（<see cref="GraphRunner.Advance"/> の行き先）。無ければ null。</summary>
         public NodeData GetFirstNonEventNext(string nodeId) => GetNext(nodeId).FirstOrDefault(n => !(n is EventNode));
+
+        /// <summary>
+        /// ノードの特定のポートから出ている最初のエッジの先（エッジの順）。繋がっていなければ null。
+        /// コンテナの出力ポートなら <paramref name="portId"/> は出口の ID。
+        /// </summary>
+        public NodeData GetNextNode(string nodeId, string portId) =>
+            GetOutgoingEdges(nodeId)
+                .Where(e => string.Equals(e.FromPort, portId, StringComparison.Ordinal))
+                .Select(e => FindNode(e.ToNodeId))
+                .FirstOrDefault(n => n != null);
+
+        /// <summary>ノードが入っているコンテナ。ルート階層、または親がコンテナでなければ null。</summary>
+        public ContainerNode GetParentContainer(NodeData node) =>
+            node == null || node.IsAtRoot ? null : FindNode(node.ParentId) as ContainerNode;
+
+        /// <summary>コンテナに入ったときに始まる Entry（中の <see cref="ContainerEntryNode"/>、アセット内の順で最初のもの）。無ければ null。</summary>
+        public ContainerEntryNode GetContainerEntry(ContainerNode container) =>
+            container == null
+                ? null
+                : Graph.Nodes.OfType<ContainerEntryNode>().FirstOrDefault(e => e.ParentId == container.Id);
+
+        /// <summary>
+        /// Exit ノードからコンテナを出た先: 親コンテナの出力ポートのうち、ID が <see cref="ContainerExitNode.ExitId"/> のものの先。
+        /// 親がコンテナでない、またはそのポートが繋がっていなければ null。
+        /// </summary>
+        public NodeData GetExitTarget(ContainerExitNode exitNode)
+        {
+            var container = GetParentContainer(exitNode);
+            return container == null ? null : GetNextNode(container.Id, exitNode.ExitId);
+        }
+
+        /// <summary>ノードを囲むコンテナを外側から順に返す（ルート階層なら空）。親の参照が輪になっていても止まる。</summary>
+        public List<ContainerNode> GetContainerPath(NodeData node)
+        {
+            var path = new List<ContainerNode>();
+            var visited = new HashSet<string>();
+            for (var container = GetParentContainer(node); container != null && visited.Add(container.Id);
+                 container = GetParentContainer(container))
+            {
+                path.Insert(0, container);
+            }
+
+            return path;
+        }
 
         /// <summary>
         /// ノードから出ている、イベント名が一致する最初の Event ノード（<see cref="GraphRunner.Raise"/> の行き先）。無ければ null。

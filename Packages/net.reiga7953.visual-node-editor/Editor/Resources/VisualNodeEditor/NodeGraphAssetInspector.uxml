@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+  <ui:VisualElement name="asset-inspector" class="vne-asset-inspector">
+    <ui:Button name="open-button" class="vne-asset-inspector__open" text="Open in Visual Node Editor" />
+    <ui:Label name="issues" class="vne-asset-inspector__issues" />
+    <ui:Label class="vne-asset-inspector__heading" text="Contents" />
+    <ui:VisualElement name="counts" class="vne-asset-inspector__section" />
+    <ui:Label class="vne-asset-inspector__heading" text="Parameters" />
+    <ui:VisualElement name="parameters" class="vne-asset-inspector__section" />
+    <ui:Label class="vne-asset-inspector__note" text="Edit this graph in the Visual Node Editor window. The raw data is not shown here, so that items cannot be duplicated together with their internal IDs." />
+  </ui:VisualElement>
+</ui:UXML>

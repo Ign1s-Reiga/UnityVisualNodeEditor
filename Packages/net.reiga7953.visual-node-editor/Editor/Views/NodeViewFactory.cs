@@ -17,7 +17,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private static Dictionary<Type, Type> ViewTypes => _viewTypes ??= CollectViewTypes();
 
         /// <summary><paramref name="data"/> を表示する View を生成し、ポートまで構築して返す。</summary>
-        public static NodeView Create(NodeData data)
+        public static NodeView Create(NodeData data, NodeGraphAsset graph = null)
         {
             if (data == null)
             {
@@ -25,7 +25,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             var view = (NodeView)Activator.CreateInstance(ResolveViewType(data.GetType()));
-            view.Initialize(data);
+            view.Initialize(data, graph);
             return view;
         }
 

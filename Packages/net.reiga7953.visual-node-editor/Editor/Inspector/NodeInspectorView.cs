@@ -32,6 +32,12 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         /// <summary>表示中のノードが編集されたときに、そのノード ID を伴って呼ばれる。</summary>
         public event Action<string> NodeChanged;
 
+        /// <summary>
+        /// ポートの構成が変わる編集（コンテナの出口の追加・改名・並べ替え・削除、Exit ノードの出口の付け替え）の後に、
+        /// 表示中のノード ID を伴って呼ばれる。受け取った側でグラフを作り直す（このインスペクタも作り直してよい）。
+        /// </summary>
+        public event Action<string> StructureChanged;
+
         /// <summary>表示中のノード ID。何も表示していなければ null。</summary>
         public string NodeId { get; private set; }
 
@@ -73,6 +79,21 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 }
 
                 hasChild = child.NextVisible(false);
+            }
+
+            // 出口はポートとエッジに関わるので、PropertyField ではなく専用の UI で編集する
+            switch (asset.Nodes[_index])
+            {
+                case ContainerNode container:
+                    var exitList = new ContainerExitListView(asset, container);
+                    exitList.Changed += OnStructureChanged;
+                    content.Add(exitList);
+                    break;
+                case ContainerExitNode exitNode:
+                    var exitPicker = new ContainerExitPicker(asset, exitNode);
+                    exitPicker.Changed += OnStructureChanged;
+                    content.Add(exitPicker);
+                    break;
             }
 
             Add(content);
@@ -138,6 +159,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             }
 
             NodeChanged?.Invoke(NodeId);
+        }
+
+        private void OnStructureChanged()
+        {
+            if (NodeId != null)
+            {
+                StructureChanged?.Invoke(NodeId);
+            }
         }
 
         private static int IndexOfNode(NodeGraphAsset asset, string nodeId)

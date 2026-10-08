@@ -41,6 +41,23 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Validator_ReportsDuplicateIds()
+        {
+            // Inspector のリストで「+」を押したときと同じく、ID ごと複製してから名前だけ変える
+            var original = new GraphParameter("Lives", GraphParameterType.Int);
+            var copy = JsonUtility.FromJson<GraphParameter>(JsonUtility.ToJson(original));
+            copy.Name = "Score";
+            _graph.AddParameter(original);
+            _graph.AddParameter(copy);
+            Assert.That(copy.Id, Is.EqualTo(original.Id), "precondition: the copy shares the ID");
+
+            var issue = GraphValidator.Validate(_graph).Single();
+
+            Assert.That(issue.Severity, Is.EqualTo(GraphIssueSeverity.Error));
+            Assert.That(issue.Message, Does.Contain("same ID"));
+        }
+
+        [Test]
         public void Validator_ReportsEmptyAndDuplicateNamesOnce()
         {
             _graph.AddParameter(new GraphParameter("", GraphParameterType.Bool));

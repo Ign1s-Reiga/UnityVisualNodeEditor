@@ -16,9 +16,17 @@ namespace Reiga.VisualNodeEditor
         [SerializeField] private Rect _rect = new Rect(Vector2.zero, DefaultSize);
         [SerializeField] private StickyNoteTheme _theme = StickyNoteTheme.Classic;
         [SerializeField] private StickyNoteFontSize _fontSize = StickyNoteFontSize.Medium;
+        [SerializeField] private string _parentId;
 
         /// <summary>グラフ内で一意な ID。</summary>
         public string Id => _id;
+
+        /// <summary>置かれている階層（コンテナの ID。空文字ならルート）。</summary>
+        public string ParentId
+        {
+            get => _parentId ?? string.Empty;
+            set => _parentId = value ?? string.Empty;
+        }
 
         /// <summary>見出し。</summary>
         public string Title

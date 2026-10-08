@@ -14,6 +14,7 @@ namespace Reiga.VisualNodeEditor
         [SerializeField] private string _title;
         [SerializeField, HideInInspector] private Vector2 _position;
         [SerializeField, HideInInspector] private bool _collapsed;
+        [SerializeField, HideInInspector] private string _parentId;
 
         /// <summary>グラフ内で一意な ID。</summary>
         public string Id => _id;
@@ -23,6 +24,9 @@ namespace Reiga.VisualNodeEditor
             get => string.IsNullOrEmpty(_title) ? DefaultTitle : _title;
             set => _title = value;
         }
+
+        /// <summary>ユーザーがタイトルを付けたか（付けていなければ <see cref="Title"/> は型ごとの既定名を返す）。</summary>
+        public bool HasCustomTitle => !string.IsNullOrWhiteSpace(_title);
 
         /// <summary>エディタ上の表示位置（Runtime では無視される）。</summary>
         public Vector2 Position
@@ -37,6 +41,19 @@ namespace Reiga.VisualNodeEditor
             get => _collapsed;
             set => _collapsed = value;
         }
+
+        /// <summary>
+        /// 所属するコンテナ（<see cref="ContainerNode"/>）の ID。空文字ならルート階層。
+        /// ノードは平らなリストのまま持ち、階層はこの値だけで表す。
+        /// </summary>
+        public string ParentId
+        {
+            get => _parentId ?? string.Empty;
+            set => _parentId = value ?? string.Empty;
+        }
+
+        /// <summary>ルート階層（どのコンテナにも入っていない）か。</summary>
+        public bool IsAtRoot => string.IsNullOrEmpty(_parentId);
 
         /// <summary>タイトル未設定時に表示される既定名。</summary>
         protected abstract string DefaultTitle { get; }

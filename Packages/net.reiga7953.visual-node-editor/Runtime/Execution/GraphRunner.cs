@@ -9,7 +9,7 @@ namespace Reiga.VisualNodeEditor
     /// グラフをシーン遷移表・ステートマシンとして実行する。MonoBehaviour に依存しない純粋な C# なので、テストから直接動かせる。
     /// <list type="bullet">
     /// <item>待機ノード（Scene・State など）: 入ると止まる。Scene に入るとシーンを読み込む</item>
-    /// <item>通過ノード（Entry・Event）: 入ったら止まらずに次へ進む</item>
+    /// <item>通過ノード（Entry・Event・コンテナとその Entry / Exit）: 入ったら止まらずに次へ進む。コンテナに入ると中の Entry から、Exit で出ると親の階層の対応する出力ポートから続く</item>
     /// </list>
     /// 遷移先が複数あるときは、アセット内のエッジの順で最初のものを使う。
     /// </summary>
@@ -181,6 +181,12 @@ namespace Reiga.VisualNodeEditor
         /// <summary>実行中か。</summary>
         public bool IsRunning { get; private set; }
 
+        /// <summary>
+        /// 現在のノードを囲むコンテナ（外側から順）。ルート階層にいれば空。
+        /// コンテナに入るたびに積み、Exit で出るたびに下ろすスタックと同じ内容を、現在のノードの親の連なりから求める。
+        /// </summary>
+        public IReadOnlyList<ContainerNode> ContainerPath => Query.GetContainerPath(Current);
+
         /// <summary>Entry から実行を始める。すでに実行中なら何もしない。</summary>
         /// <exception cref="InvalidOperationException">グラフに Entry が無い。</exception>
         public void Start()
@@ -342,11 +348,12 @@ namespace Reiga.VisualNodeEditor
         private void MoveTo(NodeData target)
         {
             var generation = _generation;
-            var path = ResolvePath(target, out var endsInDeadEndEvent);
+            var path = ResolvePath(target, out var endsInDeadEnd);
 
-            // 通過ノードの連鎖が出力の無い Event で終わるなら、どこにも入らず通知だけ行い、いまの待機ノードに留まる
+            // 通過ノードの連鎖が行き止まり（出力の無い Event、Entry の無いコンテナ、繋がっていない出口）で終わるなら、
+            // どこにも入らず途中の Event の通知だけ行い、いまの待機ノードに留まる
             // （入ってしまうと出口が無く、以後どの Raise / Advance でも動けなくなる）
-            if (endsInDeadEndEvent)
+            if (endsInDeadEnd)
             {
                 foreach (var eventNode in path.OfType<EventNode>())
                 {
@@ -356,6 +363,12 @@ namespace Reiga.VisualNodeEditor
                     }
 
                     TriggerEvent(eventNode.EventName);
+                }
+
+                // 開始直後（まだどこにもいない）なら、Entry に入ってそこに留まる（Entry の先が無いときと同じ）
+                if (Current == null && path.Count > 0 && IsCurrentGeneration(generation))
+                {
+                    Enter(path[0], generation);
                 }
 
                 return;
@@ -373,12 +386,13 @@ namespace Reiga.VisualNodeEditor
         /// <summary>
         /// <paramref name="target"/> から通過ノード（Entry・Event）をたどり、入るノードを順に返す。
         /// 待機ノードに着くか、Entry の先に Event 以外が無ければそこで終わる。
-        /// 出力の無い Event に行き着いたら <paramref name="endsInDeadEndEvent"/> を true にする（その Event も含めて返し、通知に使う）。
+        /// 行き止まり（出力の無い Event、Entry の無いコンテナ、繋がっていない出口）に行き着いたら <paramref name="endsInDeadEnd"/> を true にする
+        /// （そこまでのノードも返し、途中の Event の通知に使う）。コンテナ・Entry・Exit も通過ノードとしてたどる。
         /// 通過ノードが輪になっていたら、警告を出して輪に入る手前までで止める。
         /// </summary>
-        private List<NodeData> ResolvePath(NodeData target, out bool endsInDeadEndEvent)
+        private List<NodeData> ResolvePath(NodeData target, out bool endsInDeadEnd)
         {
-            endsInDeadEndEvent = false;
+            endsInDeadEnd = false;
             var path = new List<NodeData>();
             var visited = new HashSet<string>();
             var node = target;
@@ -396,7 +410,7 @@ namespace Reiga.VisualNodeEditor
                     path.Add(node);
                     if (next == null)
                     {
-                        endsInDeadEndEvent = true;
+                        endsInDeadEnd = true;
                         break;
                     }
 
@@ -405,7 +419,41 @@ namespace Reiga.VisualNodeEditor
                 }
 
                 path.Add(node);
-                node = node is EntryNode entryNode ? Query.GetFirstNonEventNext(entryNode.Id) : null;
+                switch (node)
+                {
+                    // コンテナに着いたら中に入り、中の Entry から続ける
+                    case ContainerNode container:
+                        node = Query.GetContainerEntry(container);
+                        if (node == null)
+                        {
+                            Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': container '{container.Title}' has no Entry. Stayed before it.");
+                            endsInDeadEnd = true;
+                        }
+
+                        break;
+
+                    // Exit に着いたらコンテナを出て、出力ポートのうち ID が同じものの先へ続ける
+                    case ContainerExitNode exitNode:
+                        node = Query.GetExitTarget(exitNode);
+                        if (node == null)
+                        {
+                            // 繋がっていないときの扱いは未決事項。当面は出口の無い Event と同じく、直前の待機ノードに留まる
+                            var exitName = Query.GetParentContainer(exitNode)?.FindExit(exitNode.ExitId)?.Name ?? exitNode.ExitId;
+                            Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': exit '{exitName}' of '{Query.GetParentContainer(exitNode)?.Title}' is not connected. Stayed before it.");
+                            endsInDeadEnd = true;
+                        }
+
+                        break;
+
+                    case EntryNode _:
+                    case ContainerEntryNode _:
+                        node = Query.GetFirstNonEventNext(node.Id);
+                        break;
+
+                    default:
+                        node = null;
+                        break;
+                }
             }
 
             return path;

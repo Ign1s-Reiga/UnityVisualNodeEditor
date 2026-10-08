@@ -28,3 +28,11 @@ runner.Raise("StartGame");
 - Blackboard（View メニュー）で定義したパラメータは、実行中に `runner.GetInt("Lives")` / `runner.SetInt("Lives", 2)` のように読み書きできる（値は Runner ごと、`Start()` のたびに既定値へ戻る）
 
 詳しい規則はリポジトリの `docs/01-architecture.md`「ランタイム実行（GraphRunner）」を参照。
+
+## コンテナ（入れ子）
+
+- `Flow/Container` ノードの中にノードを入れられる。ダブルクリックで中を開き、ツールバー下のパンくずで戻る
+- 中は Entry から始まり、Exit ノードに着くと、コンテナの同じ出口の出力ポートから外へ進む。出口はコンテナのインスペクタで追加・改名・並べ替えできる
+- ゲームのコードからは `container.TryGetExit("Clear", out var exit)` で出口を名前で引ける。実行中に今いるコンテナは `runner.ContainerPath`
+
+詳しくは `docs/01-architecture.md`「コンテナ（サブグラフ）」を参照。

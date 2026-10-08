@@ -1,0 +1,47 @@
+/* Inspector for NodeGraphAsset (NodeGraphAssetEditor): a summary instead of the raw lists */
+
+.vne-asset-inspector {
+  padding-top: 4px;
+}
+
+.vne-asset-inspector__open {
+  height: 26px;
+  margin-bottom: 6px;
+  -unity-font-style: bold;
+}
+
+.vne-asset-inspector__issues {
+  margin-bottom: 6px;
+  margin-left: 3px;
+}
+
+.vne-asset-inspector__issues--warning {
+  color: #e0a030;
+}
+
+.vne-asset-inspector__issues--error {
+  color: #e04040;
+}
+
+.vne-asset-inspector__heading {
+  -unity-font-style: bold;
+  margin-top: 6px;
+  margin-left: 3px;
+}
+
+.vne-asset-inspector__section {
+  margin-left: 12px;
+  margin-bottom: 2px;
+}
+
+.vne-asset-inspector__empty {
+  color: #888888;
+}
+
+.vne-asset-inspector__note {
+  margin-top: 10px;
+  margin-left: 3px;
+  color: #888888;
+  white-space: normal;
+  font-size: 10px;
+}
