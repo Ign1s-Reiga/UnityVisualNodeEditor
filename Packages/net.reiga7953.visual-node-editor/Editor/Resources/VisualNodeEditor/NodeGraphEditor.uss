@@ -1,7 +1,7 @@
 .vne-root {
   flex-grow: 1;
 
-  /* Category colors, shared by nodes (NodeView.uss) and the inspector header */
+  /* Category colors, shared by nodes (NodeView.uss), the inspector header and the node tree */
   --vne-category-default: #6e6e6e;
   --vne-category-flow: #4a90d9;
   --vne-category-state: #4caf6a;
@@ -11,27 +11,33 @@
   --vne-category-container: #d9668a;
 }
 
-.vne-inspector-view__icon.vne-category--flow {
+.vne-inspector-view__icon.vne-category--flow,
+.vne-node-tree__icon.vne-category--flow {
   background-color: var(--vne-category-flow);
 }
 
-.vne-inspector-view__icon.vne-category--state {
+.vne-inspector-view__icon.vne-category--state,
+.vne-node-tree__icon.vne-category--state {
   background-color: var(--vne-category-state);
 }
 
-.vne-inspector-view__icon.vne-category--event {
+.vne-inspector-view__icon.vne-category--event,
+.vne-node-tree__icon.vne-category--event {
   background-color: var(--vne-category-event);
 }
 
-.vne-inspector-view__icon.vne-category--entity {
+.vne-inspector-view__icon.vne-category--entity,
+.vne-node-tree__icon.vne-category--entity {
   background-color: var(--vne-category-entity);
 }
 
-.vne-inspector-view__icon.vne-category--system {
+.vne-inspector-view__icon.vne-category--system,
+.vne-node-tree__icon.vne-category--system {
   background-color: var(--vne-category-system);
 }
 
-.vne-inspector-view__icon.vne-category--container {
+.vne-inspector-view__icon.vne-category--container,
+.vne-node-tree__icon.vne-category--container {
   background-color: var(--vne-category-container);
 }
 
@@ -65,7 +71,14 @@
   color: #ffffff;
 }
 
-/* Container levels: breadcrumbs (Root > Stage > ...), shown only inside a container */
+/* Container levels: breadcrumbs (Root > Stage > ...) below the graph like a status bar, shown only inside a container */
+
+.vne-level-bar {
+  flex-shrink: 0;
+  border-top-width: 1px;
+  border-top-color: #191919;
+  border-bottom-width: 0;
+}
 
 .vne-level-bar--hidden {
   display: none;
@@ -76,15 +89,90 @@
   overflow: hidden;
 }
 
-/* Layout: TwoPaneSplitView (graph | inspector) */
+/* Layout: TwoPaneSplitView (node tree | TwoPaneSplitView (graph | inspector)) */
 
 .vne-main {
   flex-grow: 1;
 }
 
+.vne-body {
+  flex-grow: 1;
+}
+
+/* Node tree (left pane): every node, with the contents of containers as children */
+
+.vne-node-tree-pane {
+  min-width: 140px;
+  border-right-width: 1px;
+  border-right-color: #191919;
+  background-color: #282828;
+}
+
+.vne-node-tree {
+  flex-grow: 1;
+}
+
+.vne-node-tree__header {
+  padding: 3px 6px 3px 6px;
+  color: #b4b4b4;
+  -unity-font-style: bold;
+  border-bottom-width: 1px;
+  border-bottom-color: #191919;
+}
+
+.vne-node-tree__list {
+  flex-grow: 1;
+}
+
+.vne-node-tree__item {
+  flex-direction: row;
+  align-items: center;
+}
+
+.vne-node-tree__icon {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 4px;
+  background-color: var(--vne-category-default);
+}
+
+.vne-node-tree__label {
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vne-node-tree__item--container .vne-node-tree__label {
+  -unity-font-style: bold;
+}
+
+/* The container whose level the graph is showing */
+.vne-node-tree__item--level .vne-node-tree__label {
+  color: #9ec7ff;
+}
+
+/* Play Mode: the running node, and (fainter) the containers it is in */
+.vne-node-tree__item--running-path .vne-node-tree__label {
+  color: rgba(74, 222, 128, 0.7);
+}
+
+.vne-node-tree__item--running .vne-node-tree__label {
+  color: #4ade80;
+}
+
+/* Graph area: the canvas, then the level breadcrumbs */
+.vne-graph-area {
+  flex-grow: 1;
+  flex-direction: column;
+  min-width: 200px;
+}
+
 .vne-graph-container {
   flex-grow: 1;
-  min-width: 200px;
 }
 
 /* Inspector */

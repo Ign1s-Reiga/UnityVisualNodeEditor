@@ -41,8 +41,11 @@ namespace Reiga.VisualNodeEditor.Editor
         [SerializeField] private bool _miniMapVisible;
         [SerializeField] private bool _blackboardVisible = true;
         [SerializeField] private bool _snapToGrid;
+        [SerializeField] private bool _nodeTreeVisible = true;
 
         private NodeGraphView _graphView;
+        private NodeTreePanel _nodeTree;
+        private TwoPaneSplitView _body;
         private NodeSearchWindow _searchWindow;
         private NodeInspectorView _inspector;
         private RuntimePanel _runtimePanel;
@@ -102,8 +105,8 @@ namespace Reiga.VisualNodeEditor.Editor
 
         private void CreateGUI()
         {
-            // グラフとインスペクタの最小幅（USS）+ 境界線が収まる大きさ。これより狭くするとはみ出す
-            minSize = new Vector2(480f, 240f);
+            // ノードツリー・グラフ・インスペクタの最小幅（USS）+ 境界線が収まる大きさ。これより狭くするとはみ出す
+            minSize = new Vector2(600f, 240f);
 
             var uxml = Resources.Load<VisualTreeAsset>("VisualNodeEditor/NodeGraphEditorWindow");
             uxml?.CloneTree(rootVisualElement);
@@ -130,6 +133,14 @@ namespace Reiga.VisualNodeEditor.Editor
             _graphView.nodeCreationRequest = OnNodeCreationRequest;
             _graphView.ConnectedNodeRequested += OnConnectedNodeRequested;
             _graphView.NotificationRequested += message => ShowNotification(new GUIContent(message));
+
+            // 左のノードツリー: クリックでそのノードへ（別の階層なら開いて）、ダブルクリックでコンテナの中へ
+            _nodeTree = new NodeTreePanel();
+            rootVisualElement.Q("node-tree-pane")?.Add(_nodeTree);
+            _nodeTree.NodeSelected += nodeId => _graphView.FocusNode(nodeId);
+            _nodeTree.NodeOpened += nodeId => _graphView.EnterLevel(nodeId);
+            _body = rootVisualElement.Q<TwoPaneSplitView>("body");
+            SetNodeTreeVisible(_nodeTreeVisible);
 
             _inspector = new NodeInspectorView();
             var inspectorPane = rootVisualElement.Q("inspector") ?? rootVisualElement;
@@ -199,6 +210,11 @@ namespace Reiga.VisualNodeEditor.Editor
                 {
                     _snapToGrid = value;
                     _graphView.SnapToGrid = value;
+                });
+                AddViewToggle(viewMenu, "Node Tree", () => _nodeTreeVisible, value =>
+                {
+                    _nodeTreeVisible = value;
+                    SetNodeTreeVisible(value);
                 });
             }
 
@@ -284,6 +300,32 @@ namespace Reiga.VisualNodeEditor.Editor
         {
             _levelContainerId = _graphView.CurrentContainerId;
             UpdateBreadcrumbs();
+            _nodeTree?.ShowLevel(_levelContainerId);
+        }
+
+        /// <summary>左のノードツリーを出す・畳む（View メニューの Node Tree）。</summary>
+        private void SetNodeTreeVisible(bool visible)
+        {
+            if (_body == null)
+            {
+                return;
+            }
+
+            if (visible)
+            {
+                _body.UnCollapse();
+            }
+            else
+            {
+                _body.CollapseChild(0);
+            }
+        }
+
+        /// <summary>Play 中に実行中のノードを、グラフとノードツリーの両方で強調する（null で消す）。</summary>
+        private void ShowRunningNode(string nodeId)
+        {
+            _graphView?.SetRunningNode(nodeId);
+            _nodeTree?.ShowRunning(nodeId);
         }
 
         /// <summary>パンくず（Root > Stage > …）を表示中の階層に合わせる。上の階層をクリックするとそこへ戻る。ルートでは隠す。</summary>
@@ -326,7 +368,7 @@ namespace Reiga.VisualNodeEditor.Editor
             _observedRunner = runner;
             runner.NodeEntered += OnObservedNodeEntered;
             runner.ParameterChanged += OnObservedParameterChanged;
-            _graphView.SetRunningNode(runner.Current?.Id);
+            ShowRunningNode(runner.Current?.Id);
             _graphView.ClearTrail();
             _graphView.Blackboard.ShowRuntimeValues(runner);
             _runtimePanel?.Show(runner);
@@ -341,14 +383,14 @@ namespace Reiga.VisualNodeEditor.Editor
                 _observedRunner = null;
             }
 
-            _graphView?.SetRunningNode(null);
+            ShowRunningNode(null);
             _graphView?.Blackboard.ShowRuntimeValues(null);
             _runtimePanel?.Show(null);
         }
 
         private void OnObservedNodeEntered(NodeData node)
         {
-            _graphView?.SetRunningNode(node.Id);
+            ShowRunningNode(node.Id);
             _runtimePanel?.Refresh();
         }
 
@@ -456,6 +498,9 @@ namespace Reiga.VisualNodeEditor.Editor
 
             // コンテナの改名（インスペクタ・Undo）をパンくずにも反映する
             UpdateBreadcrumbs();
+
+            // ノードの追加・削除・改名・階層の変化をノードツリーにも反映する（変わっていなければ作り直さない）
+            _nodeTree?.Show(_asset);
         }
 
         private void RefreshSearch(bool resetIndex)
@@ -643,6 +688,9 @@ namespace Reiga.VisualNodeEditor.Editor
             {
                 _inspector.Show(_asset, nodeId);
             }
+
+            // ツリーでも同じノードを選ぶ（ツリーからの移動は起こさない）
+            _nodeTree?.Select(nodeId);
         }
 
         private void OnInspectorNodeChanged(string nodeId)
