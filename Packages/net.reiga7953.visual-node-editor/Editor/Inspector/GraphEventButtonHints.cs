@@ -15,8 +15,10 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         /// <param name="action">送る操作。</param>
         /// <param name="sendOnClick">同じ GameObject のボタンのクリックで送るか。</param>
         /// <param name="hasClickSource">同じ GameObject に onClick を持つコンポーネントがあるか。</param>
+        /// <param name="clickAlreadyCallsSend">その onClick が、インスペクタで既にこのコンポーネントの Send を呼んでいるか。</param>
         public static List<string> Get(
-            IReadOnlyList<string> graphEvents, string eventName, GraphEventButtonAction action, bool sendOnClick, bool hasClickSource)
+            IReadOnlyList<string> graphEvents, string eventName, GraphEventButtonAction action, bool sendOnClick, bool hasClickSource,
+            bool clickAlreadyCallsSend = false)
         {
             var hints = new List<string>();
             if (action == GraphEventButtonAction.Raise)
@@ -43,6 +45,10 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             if (sendOnClick && !hasClickSource)
             {
                 hints.Add("No button on this GameObject. Add a UI Button here, or call Send() from any UnityEvent.");
+            }
+            else if (sendOnClick && clickAlreadyCallsSend)
+            {
+                hints.Add("The button's OnClick already calls Send(), so Send On Click does not hook it again (one click sends once).");
             }
 
             return hints;
