@@ -41,7 +41,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         }
 
         /// <summary>
-        /// 文章の中でノードを呼ぶ名前（グラフのタイトルと同じ規則）: ユーザーのタイトル、無ければ Scene ノードはシーン名、それ以外は型の表示名。
+        /// 文章の中でノードを呼ぶ名前（グラフのタイトルと同じ規則）: ユーザーのタイトル、無ければ Scene ノードはシーン名、
+        /// Event ノードはイベント名、それ以外（とシーン名・イベント名が空のとき）は型の表示名。
         /// </summary>
         public static string GetNodeLabel(NodeData node)
         {
@@ -55,9 +56,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 return node.Title.Trim();
             }
 
-            return node is SceneNode scene && !string.IsNullOrEmpty(scene.SceneName)
-                ? scene.SceneName
-                : GetTypeDisplayName(node.GetType());
+            switch (node)
+            {
+                case SceneNode scene when !string.IsNullOrEmpty(scene.SceneName):
+                    return scene.SceneName;
+                // イベント名は Raise で比べる文字列そのものなので、前後の空白も削らずに出す（検証の警告と見比べられるように）
+                case EventNode eventNode when !string.IsNullOrWhiteSpace(eventNode.EventName):
+                    return eventNode.EventName;
+                default:
+                    return GetTypeDisplayName(node.GetType());
+            }
         }
 
         /// <summary>表示するタイトル。ユーザーの入力が空（空白のみを含む）なら型の表示名を使う。</summary>

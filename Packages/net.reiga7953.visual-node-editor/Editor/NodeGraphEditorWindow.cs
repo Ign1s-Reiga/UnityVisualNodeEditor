@@ -542,28 +542,98 @@ namespace Reiga.VisualNodeEditor.Editor
 
         private VisualElement MakeIssueItem()
         {
+            var row = new VisualElement();
+            row.AddToClassList("vne-issue-list__item");
             var label = new Label();
-            label.AddToClassList("vne-issue-list__item");
+            label.AddToClassList("vne-issue-list__message");
+            var fix = new Button();
+            fix.AddToClassList("vne-issue-list__fix");
+            row.Add(label);
+            row.Add(fix);
 
             // 選択状態に頼らずクリックごとに反応させる（同じ項目を続けてクリックしてもフォーカスし直せる）
             label.RegisterCallback<ClickEvent>(_ =>
             {
-                if (label.userData is GraphIssue issue && issue.NodeId != null)
+                if (row.userData is GraphIssue issue && issue.NodeId != null)
                 {
                     _graphView.FocusNode(issue.NodeId);
                 }
             });
-            return label;
+            fix.clicked += () =>
+            {
+                if (row.userData is GraphIssue issue)
+                {
+                    FixIssue(issue, fix);
+                }
+            };
+            return row;
         }
 
         private void BindIssueItem(VisualElement element, int index)
         {
             var issue = _issues[index];
-            var label = (Label)element;
-            label.userData = issue;
+            element.userData = issue;
+            element.EnableInClassList(IssueErrorClassName, issue.Severity == GraphIssueSeverity.Error);
+            element.EnableInClassList(IssueWarningClassName, issue.Severity == GraphIssueSeverity.Warning);
+
+            var label = element.Q<Label>(className: "vne-issue-list__message");
             label.text = issue.Message;
-            label.EnableInClassList(IssueErrorClassName, issue.Severity == GraphIssueSeverity.Error);
-            label.EnableInClassList(IssueWarningClassName, issue.Severity == GraphIssueSeverity.Warning);
+            label.tooltip = issue.Message;
+
+            // 直し方の決まっている問題には、直すボタンを出す（行き止まりで止まらないように）
+            var fixLabel = IssueFixes.GetLabel(issue);
+            var fix = element.Q<Button>(className: "vne-issue-list__fix");
+            fix.text = fixLabel ?? string.Empty;
+            fix.EnableInClassList("vne-issue-list__fix--hidden", fixLabel == null);
+        }
+
+        private void FixIssue(GraphIssue issue, VisualElement anchor)
+        {
+            if (_asset == null || _graphView == null)
+            {
+                return;
+            }
+
+            switch (issue.Kind)
+            {
+                case GraphIssueKind.MissingEntry:
+                    // ルートの Entry はルート階層にしか置けない
+                    if (_graphView.CurrentContainerId.Length > 0)
+                    {
+                        _graphView.EnterLevel(string.Empty);
+                    }
+
+                    _graphView.AddEntry();
+                    break;
+                case GraphIssueKind.SceneNotSet:
+                case GraphIssueKind.SceneMissing:
+                    var nodeId = issue.NodeId;
+                    var title = _asset.FindNode(nodeId) is NodeData node && node.HasCustomTitle ? node.Title : null;
+                    ScenePicker.ShowMenu(anchor.worldBound, scene => AssignScene(nodeId, scene), ScenePicker.ToFileName(title));
+                    break;
+                case GraphIssueKind.SceneNotInBuildSettings:
+                    AddScenesToBuildSettings();
+                    break;
+                case GraphIssueKind.NoGraphRunner:
+                    PlaySetup.PrepareWithoutPlaying(_asset, message => ShowNotification(new GUIContent(message)));
+                    Revalidate();
+                    break;
+            }
+        }
+
+        private void AssignScene(string nodeId, SceneAsset scene)
+        {
+            var path = scene != null ? AssetDatabase.GetAssetPath(scene) : null;
+            if (string.IsNullOrEmpty(path) || !_graphView.AssignScene(nodeId, new SceneReference(AssetDatabase.AssetPathToGUID(path), path)))
+            {
+                return;
+            }
+
+            // インスペクタのシーンの欄はバインドではないので、表示中なら作り直す
+            if (_inspector != null && _inspector.NodeId == nodeId)
+            {
+                _inspector.Show(_asset, nodeId);
+            }
         }
 
         private void OnSelectedNodeChanged(NodeView view)

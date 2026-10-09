@@ -272,6 +272,26 @@
 
 /* Event name field: text plus a button that picks a name already used in the graph */
 
+/* Scene field: Pick… and Create Scene… while no scene is set */
+.vne-scene-field__actions {
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.vne-scene-field__actions Button {
+  margin-left: 2px;
+  margin-right: 0;
+}
+
+/* Small note under a node's fields (e.g. how a Scene node behaves when the flow comes back) */
+.vne-inspector-view__note {
+  margin: 4px 3px 2px 3px;
+  font-size: 10px;
+  color: #8a8a8a;
+  white-space: normal;
+}
+
 .vne-event-name-field {
   flex-direction: row;
   align-items: center;
@@ -405,9 +425,34 @@
   display: none;
 }
 
+/* One issue: the message, then a button that fixes it when there is a known fix */
 .vne-issue-list__item {
-  -unity-text-align: middle-left;
+  flex-direction: row;
+  align-items: center;
   padding-left: 6px;
+  padding-right: 4px;
+}
+
+.vne-issue-list__message {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+  -unity-text-align: middle-left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vne-issue-list__fix {
+  flex-shrink: 0;
+  height: 16px;
+  margin: 0 0 0 6px;
+  padding: 0 6px 0 6px;
+  font-size: 11px;
+}
+
+.vne-issue-list__fix--hidden {
+  display: none;
 }
 
 .vne-issue-list__item:hover {

@@ -760,6 +760,25 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// <summary>ID に対応するノードの View を返す。無ければ null。</summary>
         public NodeView FindNodeView(string nodeId) => GetNodeByGuid(nodeId) as NodeView;
 
+        /// <summary>
+        /// Scene ノードにシーンを指定する（問題一覧の Pick Scene…）。表示と検証も更新する。1 回の Undo で戻せる。
+        /// Scene ノードでなければ何もせず false。
+        /// </summary>
+        public bool AssignScene(string nodeId, SceneReference scene)
+        {
+            if (_asset == null || scene == null || !(_asset.FindNode(nodeId) is SceneNode node))
+            {
+                return false;
+            }
+
+            Undo.RecordObject(_asset, "Pick Scene");
+            node.Scene = scene;
+            EditorUtility.SetDirty(_asset);
+            RefreshNode(nodeId);
+            GraphChanged?.Invoke();
+            return true;
+        }
+
         /// <summary>アセット上のデータでノードの表示（タイトルなど）を更新する。</summary>
         public void RefreshNode(string nodeId)
         {

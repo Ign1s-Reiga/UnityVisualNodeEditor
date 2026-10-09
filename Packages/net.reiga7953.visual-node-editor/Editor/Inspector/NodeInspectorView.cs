@@ -17,6 +17,10 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         internal const string IdPropertyName = "_id";
         internal const string TitlePropertyName = "_title";
 
+        /// <summary>Scene ノードのインスペクタに出す、同じシーンへ戻ったときの動き（ランタイムはアクティブなシーンと同じなら読み込まない）。</summary>
+        internal const string SceneReloadNote =
+            "Coming back to this scene while it is still loaded does not load it again, so its objects keep their state.";
+
         private const string TitlePlaceholder = "(Title)";
         private const string CategoryClassPrefix = "vne-category--";
 
@@ -84,6 +88,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 }
 
                 hasChild = child.NextVisible(false);
+            }
+
+            // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので書いておく
+            if (asset.Nodes[_index] is SceneNode)
+            {
+                var note = new Label(SceneReloadNote);
+                note.AddToClassList("vne-inspector-view__note");
+                content.Add(note);
             }
 
             // 出口はポートとエッジに関わるので、PropertyField ではなく専用の UI で編集する

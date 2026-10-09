@@ -37,10 +37,12 @@ namespace Reiga.VisualNodeEditor.Editor.Build
                     continue;
                 }
 
-                var message = string.IsNullOrEmpty(guidToPath(scene.Guid))
+                var missing = string.IsNullOrEmpty(guidToPath(scene.Guid));
+                var message = missing
                     ? $"'{node.Title}' uses scene '{scene.Name}', which no longer exists."
                     : $"'{node.Title}' uses scene '{scene.Name}', which is not enabled in Build Settings.";
-                issues.Add(new GraphIssue(GraphIssueSeverity.Warning, message, node.Id));
+                issues.Add(new GraphIssue(GraphIssueSeverity.Warning, message, node.Id,
+                    missing ? GraphIssueKind.SceneMissing : GraphIssueKind.SceneNotInBuildSettings));
             }
 
             return issues;

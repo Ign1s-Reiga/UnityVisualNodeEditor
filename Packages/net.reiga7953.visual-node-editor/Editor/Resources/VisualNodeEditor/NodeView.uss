@@ -78,6 +78,43 @@
   display: none;
 }
 
+/*
+ * Event nodes read as transitions, not states: a short tag with rounded corners whose title is the event name.
+ * Only the size and shape change; the colors still come from the category and the state classes below.
+ */
+
+.vne-node--transition #node-border,
+.vne-node--transition #selection-border {
+  border-radius: 11px;
+}
+
+.vne-node--transition #title {
+  height: 22px;
+  min-height: 22px;
+}
+
+.vne-node--transition #title-label {
+  margin: 0 10px 0 10px;
+  font-size: 11px;
+  -unity-font-style: bold;
+  -unity-text-align: middle-center;
+}
+
+/* Nothing to collapse on a node with one input and one output */
+.vne-node--transition #title-button-container {
+  display: none;
+}
+
+.vne-node--transition #input,
+.vne-node--transition #output {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.vne-node--transition Port {
+  height: 18px;
+}
+
 /* Validation */
 
 .vne-node--warning #node-border {

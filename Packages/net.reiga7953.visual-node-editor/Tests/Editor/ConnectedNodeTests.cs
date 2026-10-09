@@ -151,5 +151,27 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(requested.Direction, Is.EqualTo(Direction.Output));
             Assert.That(requested.FromWaitNode, Is.True);
         }
+
+        [Test]
+        public void DetachedEdge_UsesThePortThatStaysConnected()
+        {
+            var output = NodePort.Create(Direction.Output, Port.Capacity.Multi);
+            var input = NodePort.Create(Direction.Input, Port.Capacity.Multi);
+
+            // ポートから引いた新しいエッジ: 片側だけ
+            Assert.That(NodePort.GetDraggedPort(new Edge { output = output }), Is.SameAs(output));
+            Assert.That(NodePort.GetDraggedPort(new Edge { input = input }), Is.SameAs(input));
+
+            // 既存のエッジを出力側の端で外した: 離すまで両側が残り、ドラッグしているのは入力側
+            var detached = new Edge { output = output, input = input };
+            input.edgeConnector.edgeDragHelper.draggedPort = input;
+            Assert.That(NodePort.GetDraggedPort(detached), Is.SameAs(input));
+
+            // 入力側の端で外した
+            input.edgeConnector.edgeDragHelper.draggedPort = null;
+            output.edgeConnector.edgeDragHelper.draggedPort = output;
+            Assert.That(NodePort.GetDraggedPort(detached), Is.SameAs(output));
+            Assert.That(NodePort.GetDraggedPort(null), Is.Null);
+        }
     }
 }

@@ -82,7 +82,7 @@ namespace Reiga.VisualNodeEditor
                         break;
                     case SceneNode scene when scene.Scene.IsEmpty:
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
-                            $"'{node.Title}' has no scene assigned.", node.Id));
+                            $"'{node.Title}' has no scene assigned.", node.Id, GraphIssueKind.SceneNotSet));
                         break;
                     case EventNode eventNode when string.IsNullOrEmpty(eventNode.EventName):
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
@@ -102,7 +102,7 @@ namespace Reiga.VisualNodeEditor
 
             if (entries.Count == 0)
             {
-                issues.Add(new GraphIssue(GraphIssueSeverity.Error, "The graph has no Entry node."));
+                issues.Add(new GraphIssue(GraphIssueSeverity.Error, "The graph has no Entry node.", kind: GraphIssueKind.MissingEntry));
             }
 
             for (var i = 1; i < entries.Count; i++)

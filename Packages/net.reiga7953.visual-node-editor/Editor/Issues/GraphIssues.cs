@@ -28,7 +28,7 @@ namespace Reiga.VisualNodeEditor.Editor.Issues
             // シーンを遷移するグラフなのに、どのシーンにもこのグラフの Graph Runner が無ければ、Play しても何も起きない
             if (graph.Nodes.Any(n => n is SceneNode scene && !scene.Scene.IsEmpty) && !RunnerUsage.IsUsedInBuildScenes(graph))
             {
-                issues.Add(new GraphIssue(GraphIssueSeverity.Warning, NoRunnerMessage));
+                issues.Add(new GraphIssue(GraphIssueSeverity.Warning, NoRunnerMessage, kind: GraphIssueKind.NoGraphRunner));
             }
 
             return issues;

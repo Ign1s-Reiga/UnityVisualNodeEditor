@@ -1,4 +1,5 @@
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Scenes;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine.UIElements;
@@ -35,10 +36,29 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             root.Add(field);
             root.Add(help);
 
+            // シーンが空のときの次の一手: 一覧から選ぶ / 新しく作る（見た目は NodeGraphEditor.uss の .vne-scene-field__actions）
+            var actions = new VisualElement();
+            actions.AddToClassList(ActionsClassName);
+            var pick = new Button { text = PickLabel, tooltip = "Pick a scene from this project" };
+            pick.clicked += () => ScenePicker.ShowMenu(pick.worldBound, picked => field.value = picked, GetSuggestedName(property));
+            var create = new Button { text = CreateLabel, tooltip = "Create a new empty scene and use it here" };
+            create.clicked += () =>
+            {
+                var created = ScenePicker.CreateScene(GetSuggestedName(property));
+                if (created != null)
+                {
+                    field.value = created;
+                }
+            };
+            actions.Add(pick);
+            actions.Add(create);
+            root.Add(actions);
+
             var scene = Resolve(guidProperty.stringValue, pathProperty.stringValue);
             field.SetValueWithoutNotify(scene);
             SyncMovedScene(scene, pathProperty);
             UpdateHelp(help, guidProperty.stringValue, scene);
+            UpdateActions(actions, scene);
 
             field.RegisterValueChangedCallback(evt =>
             {
@@ -47,9 +67,28 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 pathProperty.stringValue = path;
                 property.serializedObject.ApplyModifiedProperties();
                 UpdateHelp(help, guidProperty.stringValue, evt.newValue as SceneAsset);
+                UpdateActions(actions, evt.newValue as SceneAsset);
             });
 
             return root;
+        }
+
+        /// <summary>シーンが空のときに出す、Pick… と Create Scene… の行の USS クラス。</summary>
+        internal const string ActionsClassName = "vne-scene-field__actions";
+
+        internal const string PickLabel = "Pick…";
+        internal const string CreateLabel = "Create Scene…";
+
+        private static void UpdateActions(VisualElement actions, SceneAsset scene) =>
+            actions.style.display = scene == null ? DisplayStyle.Flex : DisplayStyle.None;
+
+        // 新しいシーンの名前の候補: シーンの欄を持つノードのタイトル（付けていれば）
+        private static string GetSuggestedName(SerializedProperty property)
+        {
+            var path = property.propertyPath;
+            var dot = path.LastIndexOf('.');
+            var title = dot > 0 ? property.serializedObject.FindProperty(path.Substring(0, dot) + "." + NodeInspectorView.TitlePropertyName) : null;
+            return ScenePicker.ToFileName(title?.propertyType == SerializedPropertyType.String ? title.stringValue : null);
         }
 
         private static SceneAsset Resolve(string guid, string path)

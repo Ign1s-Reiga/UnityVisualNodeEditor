@@ -475,7 +475,9 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 
 ### ポートから作って繋ぐ
 
-- ポートからエッジをドラッグして空き地で離すと、ノードの検索を開く。選んだノードをそこに作り、ドラッグ元のポートと繋いで選択する（作成と接続で 1 回の Undo）
+- ポートからエッジをドラッグして空き地で離すと、ノードの検索を開く。選んだノードをそこに作り、ドラッグ元のポートと繋いで選択する（作成と接続で 1 回の Undo）。
+  既存のエッジを端から外して空き地で離したとき（元のエッジは GraphView の既定どおり消える）は、繋がったままの側のポートに繋ぐ。
+  GraphView は離すまで外した側の端もエッジに残すことがあるので、両端があれば、その端の `EdgeDragHelper.draggedPort` が自分自身の側を選ぶ（`NodePort.GetDraggedPort`。ShaderGraph と同じ判定）
 - 検索には、ドラッグ元と繋げるノードだけを出す（出力からなら入力ポートを持つ型、入力からなら出力ポートを持つ型。表示中の階層の規則も同じ）。
   State・Scene の出力からなら、遷移を作ることが多いので Event を一覧の先頭に出す
 - ポートは `NodePort`（GraphView の `Port` のサブクラス）で作り、独自の `IEdgeConnectorListener` を持たせる。ポートの上で離したときの動きは GraphView の既定と同じ
@@ -497,8 +499,11 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - タイトル = ユーザーが入力したタイトル。空（空白のみを含む）なら型の表示名（`[NodeMenu]` パスの末尾、無ければ型名から `Node` を除いたもの）
 - Scene ノードは、ユーザーがタイトルを付けていなければシーン名をタイトルにする（シーンも未設定なら「Scene」）。
   同じ「Scene」が並んで見分けが付かない、を無くすため
+- Event ノードは遷移として読めるようにする: タイトルを付けていなければイベント名をタイトルにし（イベント名も空なら「Event」）、
+  ステートの箱と見分けられるよう、背が低く角の丸い札の形にする（USS クラス `vne-node--transition`。見た目は USS だけで決める）
+- 文章の中でノードを呼ぶ名前（`NodeDisplay.GetNodeLabel`。Now running の場所、Group into Container の理由など）も、このタイトルと同じ規則にする
 - タイトルの直下にサマリー 1 行。内容は `NodeView.GetSummary()`（virtual）で型ごとに決める。空なら行ごと出さない
-  - Event = イベント名、Scene = シーン名（タイトルがシーン名のときは出さない）、State = 説明の 1 行目、Note = 本文の 1 行目
+  - Event = イベント名（タイトルがイベント名のときは出さない）、Scene = シーン名（タイトルがシーン名のときは出さない）、State = 説明の 1 行目、Note = 本文の 1 行目
 - 入力・出力がそれぞれ 1 つ以下のノードはポートラベル（`in` / `out`）を隠す（`vne-node--hide-port-labels`）。ポート名自体はエッジの識別子なので変えない
 - インスペクタでの編集は、タイトル・サマリーへ即座に反映する
 
@@ -518,7 +523,21 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - 問題一覧は既定で閉じる。新しいエラーが出たら自動で開く（アセットを開いた時点で既にあるエラーでは開かない）
 - 問題が無いときは、トグルの状態に関わらず一覧を表示しない（空の一覧の "List is empty" も出さない）
 - 一覧の項目をクリックすると該当ノードを選択してフレームに収める
+- 直し方が決まっている問題は、項目の右に直すボタンを出す（行き止まりで止まらないように）。問題の種類は `GraphIssue.Kind`（`GraphIssueKind`）で見分け、
+  ボタンの文言は純粋関数 `IssueFixes.GetLabel` で決める
+  - Entry が無い（`MissingEntry`）→ Add Entry（ルート階層に戻って Entry を作る）
+  - Scene ノードにシーンが無い・シーンが削除された（`SceneNotSet` / `SceneMissing`）→ Pick Scene…（プロジェクトの `Assets` 以下のシーンの一覧と、最後に Create Scene…）
+  - シーンが Build Settings で有効でない（`SceneNotInBuildSettings`）→ Add to Build Settings（ツールバーの Add Scenes to Build と同じ）
+  - Graph Runner が無い（`NoGraphRunner`）→ Add Graph Runner…（ツールバーの Play と同じ準備をして、Play には入らない）
 - 問題の集め方（`GraphValidator` + Build Settings の確認）は `GraphIssues.Collect` にまとめ、ウィンドウとアセットのインスペクタで共有する
+
+### シーンの指定（`SceneReferenceDrawer`）
+
+- シーンの欄（SceneAsset の ObjectField）が空のときは、下に Pick…（`ScenePicker` のシーンの一覧）と Create Scene…（保存先を選んで新しいシーンを作り、欄に入れる）を出す
+- Create Scene… は、空のシーン（Camera と Light）を追加で開いて保存し、すぐ閉じる。今開いているシーンは切り替えない。
+  未保存の無題のシーンが開いているとき（Unity が追加でシーンを作れない）と Play 中は作らず、理由を出す
+- Scene ノードのインスペクタには「読み込み済みのシーンへ戻っても読み直さない（シーンの中の物は前の状態のまま）」ことを常に小さく出す
+  （ランタイムは、アクティブなシーンと同じシーンへの遷移では読み込まない。`SceneManagerSceneLoader`）
 
 ### Graph Event Button のインスペクタ（`GraphEventButtonEditor`）
 

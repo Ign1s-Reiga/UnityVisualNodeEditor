@@ -81,11 +81,35 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void Create_EventShowsEventNameAsSummary()
+        public void Create_EventReadsAsATransition()
         {
+            // タイトルを付けていなければイベント名がタイトル（2 行目には出さない）。札の形の USS クラスが付く
             var view = NodeViewFactory.Create(new EventNode { EventName = "OnBossDefeated" });
 
+            Assert.That(view.title, Is.EqualTo("OnBossDefeated"));
+            Assert.That(view.Summary, Is.Empty);
+            Assert.That(view.ClassListContains(EventNodeView.TransitionClassName), Is.True);
+            Assert.That(NodeViewFactory.Create(new EventNode()).title, Is.EqualTo("Event"), "no event name yet");
+        }
+
+        [Test]
+        public void Create_TitledEventShowsEventNameAsSummary()
+        {
+            var view = NodeViewFactory.Create(new EventNode { Title = "Boss down", EventName = "OnBossDefeated" });
+
+            Assert.That(view.title, Is.EqualTo("Boss down"));
             Assert.That(view.Summary, Is.EqualTo("OnBossDefeated"));
+        }
+
+        [Test]
+        public void NodeLabel_FollowsTheTitleRules()
+        {
+            Assert.That(NodeDisplay.GetNodeLabel(new EventNode { EventName = "Finish" }), Is.EqualTo("Finish"));
+            Assert.That(NodeDisplay.GetNodeLabel(new EventNode { EventName = "Finish ", Title = "" }), Is.EqualTo("Finish "),
+                "the exact name Raise compares, so a stray space stays visible");
+            Assert.That(NodeDisplay.GetNodeLabel(new EventNode { EventName = "  " }), Is.EqualTo("Event"));
+            Assert.That(NodeDisplay.GetNodeLabel(new EventNode { Title = "Boss down", EventName = "Finish" }), Is.EqualTo("Boss down"));
+            Assert.That(NodeDisplay.GetNodeLabel(new StateNode()), Is.EqualTo("State"));
         }
 
         [Test]

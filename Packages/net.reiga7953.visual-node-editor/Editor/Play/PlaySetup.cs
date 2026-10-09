@@ -32,11 +32,41 @@ namespace Reiga.VisualNodeEditor.Editor.Play
                 return;
             }
 
+            if (Prepare(graph, notify, "Add and Play"))
+            {
+                EditorApplication.EnterPlaymode();
+            }
+        }
+
+        /// <summary>
+        /// 問題一覧の Add Graph Runner…: Play と同じ準備（Build Settings、始まるシーンを開く、Graph Runner を確認して追加・保存）だけを行い、
+        /// Play には入らない。準備できたら true。
+        /// </summary>
+        public static bool PrepareWithoutPlaying(NodeGraphAsset graph, Action<string> notify)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                notify?.Invoke("Stop Play first.");
+                return false;
+            }
+
+            if (!Prepare(graph, notify, "Add"))
+            {
+                return false;
+            }
+
+            notify?.Invoke($"'{SceneManager.GetActiveScene().name}' has a Graph Runner for '{graph.name}'.");
+            return true;
+        }
+
+        // シーンと Graph Runner を用意する。取り消し・失敗なら false
+        private static bool Prepare(NodeGraphAsset graph, Action<string> notify, string addButtonLabel)
+        {
             var graphPath = graph != null ? AssetDatabase.GetAssetPath(graph) : null;
             if (string.IsNullOrEmpty(graphPath))
             {
                 notify?.Invoke("Open a saved Node Graph asset first.");
-                return;
+                return false;
             }
 
             // Runner を置いて開くシーン。グラフにシーンが無ければ、今開いているシーンを使う
@@ -47,19 +77,19 @@ namespace Reiga.VisualNodeEditor.Editor.Play
                 notify?.Invoke(start != null
                     ? $"The scene '{start.Name}' was not found. Pick the scene again on its Scene node."
                     : "Save the open scene first, or add a Scene node to the graph.");
-                return;
+                return false;
             }
 
             if (!PrepareBuildSettings(graph, graphPath, start, hostPath))
             {
-                return;
+                return false;
             }
 
             if (SceneManager.GetActiveScene().path != hostPath)
             {
                 if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 {
-                    return;
+                    return false;
                 }
 
                 EditorSceneManager.OpenScene(hostPath, OpenSceneMode.Single);
@@ -71,16 +101,16 @@ namespace Reiga.VisualNodeEditor.Editor.Play
                 if (!EditorUtility.DisplayDialog(DialogTitle,
                         $"'{scene.name}' has no Graph Runner for '{graph.name}', so nothing would run.\n\n" +
                         $"Add one (a new GameObject named '{GetRunnerObjectName(graph)}') and save the scene?",
-                        "Add and Play", "Cancel"))
+                        addButtonLabel, "Cancel"))
                 {
-                    return;
+                    return false;
                 }
 
                 AddRunner(scene, graph);
                 EditorSceneManager.SaveScene(scene);
             }
 
-            EditorApplication.EnterPlaymode();
+            return true;
         }
 
         /// <summary>シーンの中で、<paramref name="graph"/> を動かす Graph Runner。無ければ null。</summary>

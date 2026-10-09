@@ -76,7 +76,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             var split = sourcesByEvent.FirstOrDefault(p => p.Value.Any(moved.Contains) && !p.Value.All(moved.Contains));
             if (split.Key != null)
             {
-                problem = $"Cannot group: event '{Describe(asset.FindNode(split.Key))}' comes from nodes both inside and outside the selection. " +
+                problem = $"Cannot group: event '{NodeDisplay.GetNodeLabel(asset.FindNode(split.Key))}' comes from nodes both inside and outside the selection. " +
                           "Select all of them, or none.";
                 return null;
             }
@@ -94,7 +94,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 .ToList();
             if (entryPoints.Count > 1)
             {
-                var names = string.Join(", ", entryPoints.Select(id => $"'{Describe(asset.FindNode(id))}'"));
+                var names = string.Join(", ", entryPoints.Select(id => $"'{NodeDisplay.GetNodeLabel(asset.FindNode(id))}'"));
                 problem = $"Cannot group: the selection is entered from outside at {names}. A container has one way in, so group nodes that are entered at one place.";
                 return null;
             }
@@ -214,12 +214,6 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             return NodeDisplay.GetNodeLabel(asset.FindNode(outgoing.First(e => e.FromNodeId == fromNodeId).ToNodeId));
         }
-
-        // 理由の文で呼ぶ名前: 名前のある Event はイベント名（タイトルの無い Event は型名の "Event" になり、どれか分からないため）
-        private static string Describe(NodeData node) =>
-            node is EventNode eventNode && !eventNode.HasCustomTitle && !string.IsNullOrEmpty(eventNode.EventName)
-                ? eventNode.EventName
-                : NodeDisplay.GetNodeLabel(node);
 
         private static Vector2 GetExitPosition(float maxX, float midY, int index) =>
             new Vector2(maxX + SideMargin, midY + ExitSpacing * index);
