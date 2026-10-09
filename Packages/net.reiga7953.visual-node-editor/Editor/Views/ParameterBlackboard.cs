@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor.Debugging;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -16,6 +17,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
     {
         private readonly BlackboardSection _section = new BlackboardSection { title = string.Empty };
         private NodeGraphAsset _asset;
+
+        // Play 中に値を出している Runner（無ければ型名だけを出す）
+        private GraphRunner _runtimeRunner;
 
         public ParameterBlackboard(GraphView graphView) : base(graphView)
         {
@@ -46,6 +50,35 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             foreach (var parameter in asset.Parameters.Where(p => p != null))
             {
                 _section.Add(CreateRow(parameter));
+            }
+
+            RefreshRuntimeValues();
+        }
+
+        /// <summary>
+        /// Play 中、各パラメータの型の欄に <paramref name="runner"/> の今の値を出す（例: "Int = 2"）。null で型名だけの表示に戻す。
+        /// 値が変わったら <see cref="RefreshRuntimeValues"/> を呼ぶ。
+        /// </summary>
+        public void ShowRuntimeValues(GraphRunner runner)
+        {
+            _runtimeRunner = runner;
+            RefreshRuntimeValues();
+        }
+
+        /// <summary>表示中の Runner の値で、型の欄を更新する。</summary>
+        public void RefreshRuntimeValues()
+        {
+            foreach (var field in _section.Query<BlackboardField>().ToList())
+            {
+                var parameter = _asset != null ? _asset.FindParameter(field.userData as string) : null;
+                if (parameter == null)
+                {
+                    continue;
+                }
+
+                var value = RuntimeParameterText.GetValue(_runtimeRunner, parameter, out var hasValue);
+                field.typeText = RuntimeParameterText.Format(parameter.Type, hasValue, value);
+                field.EnableInClassList("vne-blackboard__field--live", hasValue);
             }
         }
 

@@ -162,6 +162,22 @@ namespace Reiga.VisualNodeEditor
 
         public bool RemoveEdge(EdgeData edge) => _edges.Remove(edge);
 
+        /// <summary>
+        /// <paramref name="edge"/> を、同じ位置のまま <paramref name="replacement"/> に置き換える。<paramref name="edge"/> が無ければ何もせず false。
+        /// エッジの並び順は行き先を決める（Advance などは最初のエッジに進む）ので、付け替えで順を変えないために使う。
+        /// </summary>
+        public bool ReplaceEdge(EdgeData edge, EdgeData replacement)
+        {
+            var index = replacement == null ? -1 : _edges.IndexOf(edge);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            _edges[index] = replacement;
+            return true;
+        }
+
         public void AddGroup(GroupData group) => _groups.Add(group);
 
         public bool RemoveGroup(GroupData group) => _groups.Remove(group);

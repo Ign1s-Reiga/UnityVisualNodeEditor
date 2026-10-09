@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
@@ -16,6 +17,7 @@ namespace Reiga.VisualNodeEditor.Editor.Search
         private EditorWindow _window;
         private NodeGraphView _graphView;
         private Texture2D _indentIcon;
+        private PendingConnection _pending;
 
         /// <summary>ノードの追加先と、マウス座標の変換に使うウィンドウを設定する。</summary>
         public void Initialize(EditorWindow window, NodeGraphView graphView)
@@ -24,12 +26,24 @@ namespace Reiga.VisualNodeEditor.Editor.Search
             _graphView = graphView;
         }
 
+        /// <summary>
+        /// 次に選ぶノードを、<paramref name="pending"/> のポートと繋いで作る（空き地へエッジを落としたとき）。null なら繋がずに作る。
+        /// </summary>
+        public void SetPendingConnection(PendingConnection pending) => _pending = pending;
+
         /// <inheritdoc />
         public List<SearchTreeEntry> CreateSearchTree(SearchWindowContext context)
         {
-            // 表示中の階層で置けるノードだけを出す（ルートの Entry はルートだけ、コンテナの Exit はコンテナの中だけ）
+            // 表示中の階層で置けるノードだけを出す（ルートの Entry はルートだけ、コンテナの Exit はコンテナの中だけ）。
+            // エッジから作るときは、そのポートと繋げるノードだけ
             var insideContainer = _graphView != null && _graphView.CurrentContainerId.Length > 0;
-            return BuildSearchTree(NodeMenuCatalog.GetItems(insideContainer), _indentIcon);
+            var items = NodeMenuCatalog.GetItems(insideContainer);
+            if (_pending != null)
+            {
+                items = items.FindAll(item => ConnectionCandidates.CanConnect(item.NodeType, _pending.Direction));
+            }
+
+            return BuildSearchTree(items, _indentIcon, ConnectionCandidates.GetFeaturedType(_pending));
         }
 
         /// <inheritdoc />
@@ -44,18 +58,33 @@ namespace Reiga.VisualNodeEditor.Editor.Search
             var windowMouse = root.ChangeCoordinatesTo(root.parent,
                 context.screenMousePosition - _window.position.position);
             var graphMouse = _graphView.contentViewContainer.WorldToLocal(windowMouse);
-            return _graphView.CreateNode(nodeType, graphMouse) != null;
+            var pending = _pending;
+            _pending = null;
+            return pending != null
+                ? _graphView.CreateConnectedNode(nodeType, graphMouse, pending) != null
+                : _graphView.CreateNode(nodeType, graphMouse) != null;
         }
 
         /// <summary>
         /// パス順に並んだ項目から検索ツリーを組み立てる。"A/B/C" は グループ A → グループ B → 項目 C になる。
+        /// <paramref name="featuredType"/> が項目にあれば、その項目を最上位の先頭にも出す（よく使うものをすぐ選べるように）。
         /// </summary>
-        public static List<SearchTreeEntry> BuildSearchTree(IEnumerable<NodeMenuItem> items, Texture icon)
+        public static List<SearchTreeEntry> BuildSearchTree(IEnumerable<NodeMenuItem> items, Texture icon, Type featuredType = null)
         {
             var tree = new List<SearchTreeEntry> { new SearchTreeGroupEntry(new GUIContent("Create Node"), 0) };
             var openGroups = new List<string>();
+            var itemList = items.ToList();
+            var featured = itemList.FirstOrDefault(item => featuredType != null && item.NodeType == featuredType);
+            if (featured.NodeType != null)
+            {
+                tree.Add(new SearchTreeEntry(new GUIContent(featured.Path.Split('/').Last(), icon))
+                {
+                    level = 1,
+                    userData = featured.NodeType,
+                });
+            }
 
-            foreach (var item in items)
+            foreach (var item in itemList)
             {
                 var segments = item.Path.Split('/');
                 var groupCount = segments.Length - 1;

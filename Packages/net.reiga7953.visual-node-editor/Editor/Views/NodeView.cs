@@ -26,6 +26,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private const string WarningClassName = "vne-node--warning";
         private const string ErrorClassName = "vne-node--error";
         private const string RunningClassName = "vne-node--running";
+        private const string VisitedClassName = "vne-node--visited";
         private const string CollapsedClassName = "vne-node--collapsed";
         private const string SearchMatchClassName = "vne-node--search-match";
         private const string SearchDimmedClassName = "vne-node--search-dimmed";
@@ -174,6 +175,13 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             set => EnableInClassList(RunningClassName, value);
         }
 
+        /// <summary>Play 中に直近で通ったノードとして薄く強調するか（軌跡）。</summary>
+        public bool IsVisited
+        {
+            get => ClassListContains(VisitedClassName);
+            set => EnableInClassList(VisitedClassName, value);
+        }
+
         /// <summary>
         /// 指定した向き・ID のポートを返す。存在しなければ null。
         /// </summary>
@@ -220,9 +228,14 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         protected Port AddOutputPort(string portId, string label, Port.Capacity capacity = Port.Capacity.Multi) =>
             AddPort(Direction.Output, portId, label, capacity);
 
+        /// <summary>指定した向きの最初のポート。無ければ null。</summary>
+        public Port FirstPort(Direction direction) =>
+            (direction == Direction.Input ? inputContainer : outputContainer).Q<Port>();
+
         private Port AddPort(Direction direction, string portId, string label, Port.Capacity capacity)
         {
-            var port = InstantiatePort(Orientation.Horizontal, direction, capacity, typeof(bool));
+            // 空き地へエッジを落としたときにノードを作って繋げるよう、独自のポートを使う
+            var port = NodePort.Create(direction, capacity);
             port.portName = label;
             port.userData = portId;
             (direction == Direction.Input ? inputContainer : outputContainer).Add(port);

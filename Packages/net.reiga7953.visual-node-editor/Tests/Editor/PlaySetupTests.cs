@@ -178,6 +178,24 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void PrefabDependencies_AreLookedUpOncePerPrefabUntilTheProjectChanges()
+        {
+            // 依存をたどるのは重いので、編集のたびの再検証では覚えた結果を使う。プレハブの代わりにパッケージの UXML で確かめる
+            const string assetPath = "Packages/net.reiga7953.visual-node-editor/Editor/Resources/VisualNodeEditor/NodeGraphAssetInspector.uxml";
+            var guid = AssetDatabase.AssetPathToGUID(assetPath);
+            RunnerUsage.ClearPrefabDependencies();
+
+            var first = RunnerUsage.GetPrefabDependencies(guid);
+            Assert.That(first, Has.Member(assetPath));
+            Assert.That(RunnerUsage.GetPrefabDependencies(guid), Is.SameAs(first), "remembered");
+
+            RunnerUsage.ClearPrefabDependencies();
+            Assert.That(RunnerUsage.GetPrefabDependencies(guid), Is.Not.SameAs(first), "looked up again after the project changes");
+            Assert.That(RunnerUsage.GetPrefabDependencies("0000000000000000ffffffffffffffff"), Is.Empty, "missing prefab");
+            Assert.That(RunnerUsage.GetPrefabDependencies(null), Is.Empty);
+        }
+
+        [Test]
         public void UnsavedGraph_IsNotReportedAsMissingARunner()
         {
             Connect(_entry, Add(Scene("Title")));

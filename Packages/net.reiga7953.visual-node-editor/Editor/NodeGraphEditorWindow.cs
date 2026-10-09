@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Behaviours;
 using Reiga.VisualNodeEditor.Editor.Build;
+using Reiga.VisualNodeEditor.Editor.Debugging;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
 using Reiga.VisualNodeEditor.Editor.Play;
@@ -44,6 +45,7 @@ namespace Reiga.VisualNodeEditor.Editor
         private NodeGraphView _graphView;
         private NodeSearchWindow _searchWindow;
         private NodeInspectorView _inspector;
+        private RuntimePanel _runtimePanel;
         private ListView _issueList;
         private ToolbarToggle _issueToggle;
         private ToolbarSearchField _searchField;
@@ -126,9 +128,16 @@ namespace Reiga.VisualNodeEditor.Editor
             _searchWindow.hideFlags = HideFlags.HideAndDontSave;
             _searchWindow.Initialize(this, _graphView);
             _graphView.nodeCreationRequest = OnNodeCreationRequest;
+            _graphView.ConnectedNodeRequested += OnConnectedNodeRequested;
+            _graphView.NotificationRequested += message => ShowNotification(new GUIContent(message));
 
             _inspector = new NodeInspectorView();
-            (rootVisualElement.Q("inspector") ?? rootVisualElement).Add(_inspector);
+            var inspectorPane = rootVisualElement.Q("inspector") ?? rootVisualElement;
+            inspectorPane.Add(_inspector);
+
+            // Play 中だけ、インスペクタの上に「Now running」（今いるノードと、そこから起こせる操作）を出す
+            _runtimePanel = new RuntimePanel();
+            inspectorPane.Insert(0, _runtimePanel);
             _inspector.NodeChanged += OnInspectorNodeChanged;
             _inspector.StructureChanged += OnInspectorStructureChanged;
 
@@ -316,7 +325,11 @@ namespace Reiga.VisualNodeEditor.Editor
 
             _observedRunner = runner;
             runner.NodeEntered += OnObservedNodeEntered;
+            runner.ParameterChanged += OnObservedParameterChanged;
             _graphView.SetRunningNode(runner.Current?.Id);
+            _graphView.ClearTrail();
+            _graphView.Blackboard.ShowRuntimeValues(runner);
+            _runtimePanel?.Show(runner);
         }
 
         private void StopObservingRunner()
@@ -324,13 +337,22 @@ namespace Reiga.VisualNodeEditor.Editor
             if (_observedRunner != null)
             {
                 _observedRunner.NodeEntered -= OnObservedNodeEntered;
+                _observedRunner.ParameterChanged -= OnObservedParameterChanged;
                 _observedRunner = null;
             }
 
             _graphView?.SetRunningNode(null);
+            _graphView?.Blackboard.ShowRuntimeValues(null);
+            _runtimePanel?.Show(null);
         }
 
-        private void OnObservedNodeEntered(NodeData node) => _graphView?.SetRunningNode(node.Id);
+        private void OnObservedNodeEntered(NodeData node)
+        {
+            _graphView?.SetRunningNode(node.Id);
+            _runtimePanel?.Refresh();
+        }
+
+        private void OnObservedParameterChanged(string parameterName) => _graphView?.Blackboard.RefreshRuntimeValues();
 
         private void OnRunnerStarted(GraphRunner runner)
         {
@@ -354,6 +376,9 @@ namespace Reiga.VisualNodeEditor.Editor
             if (change == PlayModeStateChange.ExitingPlayMode || change == PlayModeStateChange.EnteredEditMode)
             {
                 StopObservingRunner();
+
+                // Play を終えたら軌跡も消す（編集中に前回の実行の跡が残らないように）
+                _graphView?.ClearTrail();
             }
 
             UpdatePlayButton();
@@ -596,7 +621,23 @@ namespace Reiga.VisualNodeEditor.Editor
                 return;
             }
 
+            _searchWindow.SetPendingConnection(null);
             SearchWindow.Open(new SearchWindowContext(context.screenMousePosition), _searchWindow);
+        }
+
+        /// <summary>ポートからエッジを空き地へ落としたら、そこに作って繋ぐノードを検索で選ばせる。</summary>
+        private void OnConnectedNodeRequested(PendingConnection pending, Vector2 worldPosition)
+        {
+            if (_asset == null)
+            {
+                return;
+            }
+
+            _searchWindow.SetPendingConnection(pending);
+            var screenPosition = Event.current != null
+                ? GUIUtility.GUIToScreenPoint(Event.current.mousePosition)
+                : position.position + worldPosition;
+            SearchWindow.Open(new SearchWindowContext(screenPosition), _searchWindow);
         }
 
         private void Save()

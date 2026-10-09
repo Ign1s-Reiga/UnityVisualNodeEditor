@@ -71,7 +71,12 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             while (hasChild && !SerializedProperty.EqualContents(child, end))
             {
                 // タイトルはヘッダーで、振る舞いのリストは NodeBehaviourListView で編集する
-                if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName)
+                if (child.name == EventNameField.EventNamePropertyName && asset.Nodes[_index] is EventNode)
+                {
+                    // イベント名はグラフにある名前から選べる欄にする
+                    content.Add(new EventNameField(child.Copy(), asset));
+                }
+                else if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName)
                 {
                     var field = new PropertyField(child.Copy(), NodeDisplay.GetFieldLabel(child.name));
                     field.AddToClassList("vne-inspector-view__field");

@@ -98,6 +98,8 @@ namespace Reiga.VisualNodeEditor
                 }
             }
 
+            issues.AddRange(ValidateEventNames(nodes));
+
             if (entries.Count == 0)
             {
                 issues.Add(new GraphIssue(GraphIssueSeverity.Error, "The graph has no Entry node."));
@@ -144,6 +146,34 @@ namespace Reiga.VisualNodeEditor
 
             issues.AddRange(ContainerValidator.Validate(nodes, edges, nodesById));
             return issues;
+        }
+
+        // Raise は完全一致なので、大文字小文字・前後の空白だけが違う名前（表記ゆれ）と、前後の空白を警告する
+        private static IEnumerable<GraphIssue> ValidateEventNames(IReadOnlyList<NodeData> nodes)
+        {
+            var events = nodes.OfType<EventNode>().Where(e => !string.IsNullOrEmpty(e.EventName)).ToList();
+            foreach (var eventNode in events.Where(e => EventNameCheck.HasSurroundingSpaces(e.EventName)))
+            {
+                yield return new GraphIssue(GraphIssueSeverity.Warning,
+                    $"'{eventNode.Title}' has spaces at the start or end of its event name \"{eventNode.EventName}\". " +
+                    "Raise must match exactly, so remove them.", eventNode.Id);
+            }
+
+            var reported = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (var (name, looksLike) in EventNameCheck.FindNearDuplicates(events.Select(e => e.EventName)))
+            {
+                if (!reported.Add(name))
+                {
+                    continue;
+                }
+
+                foreach (var eventNode in events.Where(e => e.EventName == name))
+                {
+                    yield return new GraphIssue(GraphIssueSeverity.Warning,
+                        $"Event name \"{name}\" differs from \"{looksLike}\" only in case or spaces. " +
+                        "Raise must match exactly, so use one spelling.", eventNode.Id);
+                }
+            }
         }
     }
 }

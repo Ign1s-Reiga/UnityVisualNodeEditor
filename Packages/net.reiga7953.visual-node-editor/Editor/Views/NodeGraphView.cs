@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Clipboard;
+using Reiga.VisualNodeEditor.Editor.Debugging;
 using UnityEditor;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
@@ -41,6 +42,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         // 表示中の階層（ルートから外側順のコンテナ ID）。空ならルート階層
         private readonly List<string> _levelPath = new();
+
+        // Play 中に直近で通ったノード（薄く強調する）
+        private readonly RunTrail _trail = new();
 
         // 位置・大きさは NodeGraphView.uss（#vne-minimap）で決める
         private readonly MiniMap _miniMap = new MiniMap { anchored = true, name = "vne-minimap" };
@@ -95,6 +99,53 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             // Project ビューからシーンアセットをドロップすると Scene ノードを作る
             RegisterCallback<DragUpdatedEvent>(OnDragUpdated);
             RegisterCallback<DragPerformEvent>(OnDragPerform);
+        }
+
+        /// <summary>
+        /// ポートからエッジを空き地へ落としたとき。ウィンドウがノードの検索を開く（第 2 引数は落とした位置。パネル座標）。
+        /// </summary>
+        public event Action<PendingConnection, Vector2> ConnectedNodeRequested;
+
+        /// <summary><paramref name="port"/> からのエッジが空き地に落とされた（<see cref="NodePort"/> が呼ぶ）。</summary>
+        internal void RequestConnectedNode(Port port, Vector2 worldPosition)
+        {
+            if (_asset == null || !(port?.node is NodeView view))
+            {
+                return;
+            }
+
+            var pending = new PendingConnection(view.NodeId, NodeView.GetPortId(port), port.direction,
+                ConnectionCandidates.IsWaitNode(view.Data));
+            ConnectedNodeRequested?.Invoke(pending, worldPosition);
+        }
+
+        /// <summary>
+        /// <paramref name="nodeType"/> のノードを <paramref name="position"/>（グラフ座標）に作り、<paramref name="pending"/> のポートと繋いで選択する。
+        /// 作成と接続は 1 回の Undo で戻せる。作れなければ null。
+        /// </summary>
+        public NodeView CreateConnectedNode(Type nodeType, Vector2 position, PendingConnection pending)
+        {
+            var group = Undo.GetCurrentGroup();
+            var view = CreateNode(nodeType, position);
+            if (view == null)
+            {
+                return null;
+            }
+
+            var newPort = view.FirstPort(pending.Direction == Direction.Output ? Direction.Input : Direction.Output);
+            if (newPort != null && _asset.FindNode(pending.NodeId) != null)
+            {
+                Undo.RecordObject(_asset, "Connect Ports");
+                _asset.AddEdge(pending.Direction == Direction.Output
+                    ? new EdgeData(pending.NodeId, pending.PortId, view.NodeId, NodeView.GetPortId(newPort))
+                    : new EdgeData(view.NodeId, NodeView.GetPortId(newPort), pending.NodeId, pending.PortId));
+                EditorUtility.SetDirty(_asset);
+                Populate(_asset);
+            }
+
+            Undo.CollapseUndoOperations(group);
+            SelectNode(view.NodeId);
+            return FindNodeView(view.NodeId);
         }
 
         /// <summary>
@@ -290,6 +341,42 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             return FindNodeView(node.Id);
         }
 
+        /// <summary>選択中に、コンテナにまとめられるノードがあるか（Group into Container を出せるか）。</summary>
+        public bool CanGroupSelection =>
+            _asset != null && selection.OfType<NodeView>().Any(v => ContainerGrouping.CanGroup(v.Data));
+
+        /// <summary>
+        /// ウィンドウに短い通知を出してほしいとき（例: Group into Container できない理由）。ウィンドウが <c>ShowNotification</c> で出す。
+        /// </summary>
+        public event Action<string> NotificationRequested;
+
+        /// <summary>
+        /// 右クリックの Group into Container: 選択中のノードを新しいコンテナに入れ、境界をまたぐエッジを
+        /// 外はコンテナのポートへ、中は Entry / Exit ノードへ付け替えて、そのコンテナを選択する（<see cref="ContainerGrouping"/>）。
+        /// まとめられなければ何も変えずに理由を <see cref="NotificationRequested"/> で知らせ、null を返す。1 回の Undo で戻せる。
+        /// </summary>
+        public ContainerNode GroupSelectionIntoContainer()
+        {
+            if (!CanGroupSelection)
+            {
+                return null;
+            }
+
+            var selectedIds = selection.OfType<NodeView>().Select(v => v.NodeId).ToList();
+            if (ContainerGrouping.Plan(_asset, selectedIds, CurrentContainerId, out var problem) == null)
+            {
+                NotificationRequested?.Invoke(problem);
+                return null;
+            }
+
+            Undo.RecordObject(_asset, "Group into Container");
+            var container = ContainerGrouping.Apply(_asset, selectedIds, CurrentContainerId, out _);
+            EditorUtility.SetDirty(_asset);
+            Populate(_asset);
+            SelectNode(container.Id);
+            return container;
+        }
+
         /// <summary>表示している範囲の中央（グラフ座標）。まだレイアウトされていなければ原点。</summary>
         private Vector2 GetViewCenter()
         {
@@ -353,15 +440,35 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         public void SetRunningNode(string nodeId)
         {
             RunningNodeId = nodeId;
+            _trail.Visit(nodeId);
+            ShowRunningNode();
+        }
+
+        /// <summary>直近で通ったノード（新しい順。今いるノードは含まない）。Play 中に薄く強調する。</summary>
+        public IReadOnlyList<string> TrailNodeIds => _trail.NodeIds;
+
+        /// <summary>軌跡を消す（新しく実行を見始めたとき・Play を終えたとき）。</summary>
+        public void ClearTrail()
+        {
+            _trail.Clear();
+            if (RunningNodeId != null)
+            {
+                _trail.Visit(RunningNodeId);
+            }
+
             ShowRunningNode();
         }
 
         private void ShowRunningNode()
         {
             var visibleId = FindVisibleNodeId(RunningNodeId);
+
+            // 軌跡も、表示中の階層より深いものはそれを含むコンテナに出す
+            var visited = new HashSet<string>(_trail.NodeIds.Select(FindVisibleNodeId).Where(id => id != null));
             foreach (var view in nodes.ToList().OfType<NodeView>())
             {
                 view.IsRunning = visibleId != null && view.NodeId == visibleId;
+                view.IsVisited = !view.IsRunning && visited.Contains(view.NodeId);
             }
         }
 
@@ -731,6 +838,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 evt.menu.AppendSeparator();
                 evt.menu.AppendAction("Open Container", _ => EnterLevel(containerView.NodeId));
             }
+            else if (evt.target is EventNodeView eventView)
+            {
+                // コードから送るときに、イベント名を打ち直さなくて済むように
+                var eventName = (eventView.Data as EventNode)?.EventName;
+                evt.menu.AppendSeparator();
+                evt.menu.AppendAction("Copy Raise Call",
+                    _ => EditorGUIUtility.systemCopyBuffer = EventNameTools.FormatRaiseCall(eventName),
+                    string.IsNullOrEmpty(eventName) ? DropdownMenuAction.Status.Disabled : DropdownMenuAction.Status.Normal);
+            }
             else if (evt.target is GraphView && _levelPath.Count > 0)
             {
                 evt.menu.AppendSeparator();
@@ -738,6 +854,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             evt.menu.AppendSeparator();
+            evt.menu.AppendAction("Group into Container", _ => GroupSelectionIntoContainer(),
+                CanGroupSelection ? DropdownMenuAction.Status.Normal : DropdownMenuAction.Status.Disabled);
             evt.menu.AppendAction("Create Group", _ => CreateGroup(position));
             evt.menu.AppendAction("Create Sticky Note", _ => CreateStickyNote(position));
             evt.menu.AppendSeparator();

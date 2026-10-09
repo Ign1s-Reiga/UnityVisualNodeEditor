@@ -71,6 +71,22 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ReplaceEdge_KeepsThePosition()
+        {
+            // エッジの順は Advance などの行き先を決めるので、置き換えても同じ位置に残す
+            var first = new EdgeData("a", "out", "b", "in");
+            var last = new EdgeData("a", "out", "c", "in");
+            var replacement = new EdgeData("a", "out", "d", "in");
+            _graph.AddEdge(first);
+            _graph.AddEdge(last);
+
+            Assert.That(_graph.ReplaceEdge(first, replacement), Is.True);
+            Assert.That(_graph.Edges, Is.EqualTo(new[] { replacement, last }));
+            Assert.That(_graph.ReplaceEdge(first, replacement), Is.False, "already replaced");
+            Assert.That(_graph.ReplaceEdge(last, null), Is.False);
+        }
+
+        [Test]
         public void RemoveNode_RemovesNodeFromGroups()
         {
             var a = new StateNode();

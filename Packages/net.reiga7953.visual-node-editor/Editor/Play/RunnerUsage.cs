@@ -24,6 +24,10 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         private const string SourcePrefabPrefix = "m_SourcePrefab: {fileID: 100100000, guid: ";
         private const string ObjectReferencePrefix = "objectReference: {fileID: 11400000, guid: ";
 
+        // 元のプレハブの GUID → そのプレハブが（入れ子までたどって）依存するアセットのパス
+        private static readonly Dictionary<string, HashSet<string>> _prefabDependencies = new();
+        private static bool _listeningToProjectChanges;
+
         private static string _runnerScriptGuid;
 
         /// <summary>
@@ -153,11 +157,36 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         }
 
         // 元のプレハブ（入れ子のプレハブも含む）がグラフを参照しているか
-        private static bool PrefabUsesGraph(string prefabGuid, string graphPath)
+        private static bool PrefabUsesGraph(string prefabGuid, string graphPath) =>
+            GetPrefabDependencies(prefabGuid).Contains(graphPath);
+
+        /// <summary>
+        /// プレハブ（入れ子を含む）が依存するアセットのパス。見つからないプレハブなら空。
+        /// 依存をすべてたどるのは重いので、プレハブごとに覚えておき、プロジェクトのアセットが変わったら捨てる。
+        /// </summary>
+        internal static HashSet<string> GetPrefabDependencies(string prefabGuid)
         {
-            var prefabPath = AssetDatabase.GUIDToAssetPath(prefabGuid);
-            return !string.IsNullOrEmpty(prefabPath) && AssetDatabase.GetDependencies(prefabPath, true).Contains(graphPath);
+            if (!_listeningToProjectChanges)
+            {
+                EditorApplication.projectChanged += ClearPrefabDependencies;
+                _listeningToProjectChanges = true;
+            }
+
+            if (_prefabDependencies.TryGetValue(prefabGuid ?? string.Empty, out var cached))
+            {
+                return cached;
+            }
+
+            var prefabPath = string.IsNullOrEmpty(prefabGuid) ? null : AssetDatabase.GUIDToAssetPath(prefabGuid);
+            var dependencies = string.IsNullOrEmpty(prefabPath)
+                ? new HashSet<string>(StringComparer.Ordinal)
+                : new HashSet<string>(AssetDatabase.GetDependencies(prefabPath, true), StringComparer.Ordinal);
+            _prefabDependencies[prefabGuid ?? string.Empty] = dependencies;
+            return dependencies;
         }
+
+        /// <summary>覚えているプレハブの依存を捨てる（アセットが変わったとき）。</summary>
+        internal static void ClearPrefabDependencies() => _prefabDependencies.Clear();
 
         private static (HashSet<string> GraphGuids, PrefabReferences Prefabs) GetCachedSceneInfo(string scenePath)
         {

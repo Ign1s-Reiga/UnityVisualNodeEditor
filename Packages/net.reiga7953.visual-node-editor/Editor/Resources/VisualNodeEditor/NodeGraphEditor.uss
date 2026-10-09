@@ -221,6 +221,74 @@
   display: flex;
 }
 
+/* "Now running" panel above the inspector while playing (RuntimePanel) */
+
+.vne-runtime-panel {
+  margin: 6px 6px 0 6px;
+  padding: 6px 8px 8px 8px;
+  border-width: 1px;
+  border-color: #2f6b45;
+  border-radius: 4px;
+  background-color: rgba(74, 222, 128, 0.08);
+}
+
+.vne-runtime-panel--hidden {
+  display: none;
+}
+
+.vne-runtime-panel__header {
+  font-size: 10px;
+  color: #7fd18b;
+  -unity-font-style: bold;
+}
+
+.vne-runtime-panel__location {
+  font-size: 13px;
+  -unity-font-style: bold;
+  color: #e6e6e6;
+  white-space: normal;
+  margin-bottom: 4px;
+}
+
+.vne-runtime-panel__actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.vne-runtime-panel__action {
+  margin-left: 0;
+  margin-right: 4px;
+  margin-bottom: 2px;
+}
+
+.vne-runtime-panel__empty {
+  color: #a0a0a0;
+  white-space: normal;
+}
+
+.vne-runtime-panel__empty--hidden {
+  display: none;
+}
+
+/* Event name field: text plus a button that picks a name already used in the graph */
+
+.vne-event-name-field {
+  flex-direction: row;
+  align-items: center;
+}
+
+.vne-event-name-field__text {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.vne-event-name-field__pick {
+  width: 20px;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
 /* NodeBehaviours in the inspector of State / Scene nodes */
 
 .vne-behaviour-list {

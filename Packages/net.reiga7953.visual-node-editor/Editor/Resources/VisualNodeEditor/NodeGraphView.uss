@@ -122,3 +122,8 @@ GridBackground {
   font-size: 11px;
   color: #888888;
 }
+
+/* Blackboard while playing: the type text shows the runner's current value (e.g. "Int = 2") */
+.vne-blackboard__field--live #typeLabel {
+  color: #7fd18b;
+}

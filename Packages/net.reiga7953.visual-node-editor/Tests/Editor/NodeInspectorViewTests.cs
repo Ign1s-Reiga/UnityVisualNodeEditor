@@ -1,3 +1,4 @@
+using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using UnityEditor.UIElements;
@@ -19,17 +20,18 @@ namespace Reiga.VisualNodeEditor.Tests
         [Test]
         public void Show_ListsVisibleFieldsOnly()
         {
-            var node = new EventNode();
+            var node = new StateNode();
             _graph.AddNode(node);
             var inspector = new NodeInspectorView();
 
             inspector.Show(_graph, node.Id);
 
-            // EventName のみ（Title はヘッダー、Id / Position は HideInInspector）
+            // Description のみ（Title はヘッダー、Id / Position は HideInInspector、振る舞いは専用の一覧）
             Assert.That(inspector.NodeId, Is.EqualTo(node.Id));
-            var fields = inspector.Query<PropertyField>().ToList();
+            var fields = inspector.Query<PropertyField>().ToList()
+                .Where(f => f.GetFirstAncestorOfType<NodeBehaviourListView>() == null).ToList();
             Assert.That(fields, Has.Count.EqualTo(1));
-            Assert.That(fields[0].label, Is.EqualTo("Event Name"));
+            Assert.That(fields[0].label, Is.EqualTo("Description"));
         }
 
         [Test]

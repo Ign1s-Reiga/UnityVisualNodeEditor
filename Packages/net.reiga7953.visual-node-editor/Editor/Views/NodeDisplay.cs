@@ -40,6 +40,26 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             return ObjectNames.NicifyVariableName(name);
         }
 
+        /// <summary>
+        /// 文章の中でノードを呼ぶ名前（グラフのタイトルと同じ規則）: ユーザーのタイトル、無ければ Scene ノードはシーン名、それ以外は型の表示名。
+        /// </summary>
+        public static string GetNodeLabel(NodeData node)
+        {
+            if (node == null)
+            {
+                return string.Empty;
+            }
+
+            if (node.HasCustomTitle)
+            {
+                return node.Title.Trim();
+            }
+
+            return node is SceneNode scene && !string.IsNullOrEmpty(scene.SceneName)
+                ? scene.SceneName
+                : GetTypeDisplayName(node.GetType());
+        }
+
         /// <summary>表示するタイトル。ユーザーの入力が空（空白のみを含む）なら型の表示名を使う。</summary>
         public static string ResolveTitle(string title, string typeDisplayName) =>
             string.IsNullOrWhiteSpace(title) ? typeDisplayName : title.Trim();

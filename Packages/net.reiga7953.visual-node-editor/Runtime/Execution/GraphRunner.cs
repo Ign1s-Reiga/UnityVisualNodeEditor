@@ -57,6 +57,10 @@ namespace Reiga.VisualNodeEditor
         /// <summary>その名前のパラメータがあるか。</summary>
         public bool HasParameter(string name) => name != null && _parameterTypes.ContainsKey(name);
 
+        /// <summary>その名前と型のパラメータがあるか（ある名前でも型が違えば false。<see cref="GetBool"/> などは型が違うと例外になる）。</summary>
+        public bool HasParameter(string name, GraphParameterType type) =>
+            name != null && _parameterTypes.TryGetValue(name, out var actual) && actual == type;
+
         public bool GetBool(string name) => (bool)GetParameter(name, GraphParameterType.Bool);
 
         public int GetInt(string name) => (int)GetParameter(name, GraphParameterType.Int);

@@ -101,6 +101,13 @@
   border-width: 2px;
 }
 
+/* Play Mode: nodes the runner passed through recently (trail), fainter than the current node */
+
+.vne-node--visited #node-border {
+  border-color: rgba(74, 222, 128, 0.45);
+  border-width: 2px;
+}
+
 /* Play Mode: the node the GraphRunner is currently on (after validation so it wins) */
 
 .vne-node--running #node-border {
