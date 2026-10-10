@@ -1,6 +1,6 @@
 {
   "name": "net.reiga7953.visual-node-editor",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "displayName": "Visual Node Editor",
   "description": "ゲームの大まかな構成（シーン遷移・フロー・ステート・イベント・要素）をノードグラフで組み立てる Unity エディタ拡張。",
   "unity": "6000.0",
