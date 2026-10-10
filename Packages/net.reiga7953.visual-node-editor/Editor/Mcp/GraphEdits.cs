@@ -421,6 +421,14 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return;
             }
 
+            // ディスクにはあるが読み込まれていない（自動更新が切れているなど）フォルダは、作ったフォルダと区別できない。
+            // 作ったものとして失敗したときに消すと、中のユーザーのファイルまで消えるので断る
+            if (Directory.Exists(folder))
+            {
+                throw new McpToolException($"The folder '{folder}' exists on disk but Unity has not imported it yet (for example, Auto Refresh is off). " +
+                                           "Refresh the project (Assets > Refresh) and try again.");
+            }
+
             var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
             EnsureFolder(parent, created);
             var guid = AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));

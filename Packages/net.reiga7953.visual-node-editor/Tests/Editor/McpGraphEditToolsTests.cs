@@ -223,6 +223,29 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void CreateGraph_RefusesAFolderUnityHasNotImportedYet()
+        {
+            // ディスクにはあるが読み込まれていないフォルダ。作ったフォルダとして失敗したときに消すと、中のファイルまで消えてしまう
+            var folder = McpTempGraphs.Folder + "/NotImported";
+            var kept = folder + "/Keep.txt";
+            try
+            {
+                System.IO.Directory.CreateDirectory(folder);
+                System.IO.File.WriteAllText(kept, "the user's file");
+
+                var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", folder + "/Sub/Main.asset")));
+
+                Assert.That(isError, Is.True, text);
+                Assert.That(text, Does.Contain("has not imported"));
+                Assert.That(System.IO.File.ReadAllText(kept), Is.EqualTo("the user's file"), "the folder and its files are left alone");
+            }
+            finally
+            {
+                System.IO.Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
         public void CreateGraph_ThatFailsAfterWriting_RemovesTheAsset()
         {
             // アセットを書いた後で失敗しても（既にあったフォルダの中でも）、書いたアセットを残さない
