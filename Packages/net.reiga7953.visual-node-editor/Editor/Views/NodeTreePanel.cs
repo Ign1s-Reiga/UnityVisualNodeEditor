@@ -144,16 +144,27 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
-        /// <summary>表示中の階層（コンテナの ID。ルートなら空文字）を強調する。</summary>
+        /// <summary>表示中の階層（コンテナの ID。ルートなら空文字）を強調する。変わらなければ表示を作り直さない。</summary>
         public void ShowLevel(string containerId)
         {
-            _levelContainerId = containerId ?? string.Empty;
+            var level = containerId ?? string.Empty;
+            if (level == _levelContainerId)
+            {
+                return;
+            }
+
+            _levelContainerId = level;
             RefreshRows();
         }
 
-        /// <summary>Play 中に実行中のノードを強調する（それを含むコンテナも薄く強調する）。null で消す。</summary>
+        /// <summary>Play 中に実行中のノードを強調する（それを含むコンテナも薄く強調する）。null で消す。変わらなければ表示を作り直さない。</summary>
         public void ShowRunning(string nodeId)
         {
+            if (nodeId == _runningNodeId)
+            {
+                return;
+            }
+
             _runningNodeId = nodeId;
             RefreshRows();
         }

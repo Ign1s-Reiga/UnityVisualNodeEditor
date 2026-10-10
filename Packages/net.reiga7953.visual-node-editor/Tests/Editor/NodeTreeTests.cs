@@ -262,6 +262,29 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(panel.RefreshCount, Is.EqualTo(4));
         }
 
+        [Test]
+        public void Panel_DoesNotRedrawForTheSameHighlights()
+        {
+            // Play 中は同じ実行中のノード・同じ階層が何度も知らされる。強調が変わらなければ表示を作り直さない
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+            panel.Show(g.Asset);
+            panel.ShowLevel(g.Stage.Id);
+            panel.ShowRunning(g.Boss.Id);
+            var before = panel.RefreshCount;
+
+            panel.ShowLevel(g.Stage.Id);
+            panel.ShowRunning(g.Boss.Id);
+            Assert.That(panel.RefreshCount, Is.EqualTo(before));
+
+            panel.ShowLevel(null);
+            panel.ShowLevel(string.Empty);
+            panel.ShowRunning(null);
+            panel.ShowRunning(null);
+            Assert.That(panel.RefreshCount, Is.EqualTo(before + 2), "only real changes redraw (null is the root level)");
+            Assert.That(panel.GetStateClasses(g.Stage.Id), Is.EquivalentTo(new[] { "vne-node-tree__item--container" }));
+        }
+
         // ---- 閉じたコンテナの中の選択 ----
 
         [Test]
