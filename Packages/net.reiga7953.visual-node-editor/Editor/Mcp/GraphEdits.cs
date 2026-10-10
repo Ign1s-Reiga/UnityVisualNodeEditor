@@ -60,10 +60,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 (createAsset ?? AssetDatabase.CreateAsset)(graph, normalized);
                 AssetDatabase.SaveAssets();
 
-                // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる
+                // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる。
+                // アセットにならなかったグラフは、下の後片付けで消す
                 if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
                 {
-                    UnityEngine.Object.DestroyImmediate(graph);
                     throw new McpToolException($"Unity could not create an asset at '{normalized}' (see the Console). Pick another path.");
                 }
 

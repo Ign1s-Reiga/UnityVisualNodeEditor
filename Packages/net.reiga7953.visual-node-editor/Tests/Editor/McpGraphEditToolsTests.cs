@@ -361,6 +361,18 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(unsaved == null, Is.True, "the in-memory graph is destroyed");
         }
 
+        [Test]
+        public void CreateGraph_ThatUnitySilentlyDidNotSave_DestroysTheUnsavedGraph()
+        {
+            // Unity が例外を出さずに（ログだけで）作らなかったときも、アセットにならなかったグラフを消す
+            UnityEngine.Object unsaved = null;
+            Assert.Throws<McpToolException>(() => GraphEdits.CreateGraph(
+                McpTempGraphs.Folder + "/NotSaved.asset", (asset, _) => unsaved = asset));
+
+            Assert.That(unsaved == null, Is.True, "the in-memory graph is destroyed");
+            Assert.That(AssetDatabase.LoadMainAssetAtPath(McpTempGraphs.Folder + "/NotSaved.asset"), Is.Null);
+        }
+
         private string AddNode(params (string Key, object Value)[] fields)
         {
             var args = Args(fields);
