@@ -48,6 +48,20 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void CreateGraph_RefusesAFileUnityHasNotImportedYet()
+        {
+            // 自動更新が切れているときなど、ディスクにはあるが読み込まれていないファイル。後片付けで消してしまわないよう、作る前に断る
+            var path = McpTempGraphs.Folder + "/NotImported.asset";
+            System.IO.File.WriteAllText(path, "not imported");
+
+            var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
+
+            Assert.That(isError, Is.True, text);
+            Assert.That(text, Does.Contain("already exists"));
+            Assert.That(System.IO.File.ReadAllText(path), Is.EqualTo("not imported"), "the file is left alone");
+        }
+
+        [Test]
         public void BuiltFlow_RunsWithRaise()
         {
             var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;

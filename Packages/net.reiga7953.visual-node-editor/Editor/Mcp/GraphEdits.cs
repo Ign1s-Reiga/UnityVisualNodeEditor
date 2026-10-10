@@ -44,7 +44,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                                            $"and must not contain any of {InvalidPathCharacters}.");
             }
 
-            if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+            // 読み込まれていない（自動更新が切れているなど）ファイルも見る。失敗したときの後片付けは、このパスにあるものを消すため
+            if (AssetDatabase.LoadMainAssetAtPath(normalized) != null || File.Exists(normalized) || Directory.Exists(normalized))
             {
                 throw new McpToolException($"Something already exists at '{normalized}'. Pick another path.");
             }
