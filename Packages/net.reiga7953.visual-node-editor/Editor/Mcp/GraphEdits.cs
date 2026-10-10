@@ -89,13 +89,13 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 // 書く前に失敗したなら、そのパスにある物には触らない（その間に別の誰かが置いた物かもしれない）
                 if (startedWriting)
                 {
+                    // 読み込めなかったアセットも .meta ごと消えるよう、まず Unity に消させる（Unity が知らないパスなら何もしない）
+                    TryCleanUp(() => AssetDatabase.DeleteAsset(normalized), Debug.LogException);
+
+                    // 書いたが Unity が読み込んでいないファイルは AssetDatabase からは消せないので、ディスクから消す
+                    // （残すと、そのパスでのやり直しが「既にある」で断られ続ける）。Unity が消すのに失敗しても、こちらは行う
                     TryCleanUp(() =>
                     {
-                        // 読み込めなかったアセットも .meta ごと消えるよう、まず Unity に消させる（Unity が知らないパスなら何もしない）
-                        AssetDatabase.DeleteAsset(normalized);
-
-                        // 書いたが Unity が読み込んでいないファイルは AssetDatabase からは消せないので、ディスクから消す
-                        // （残すと、そのパスでのやり直しが「既にある」で断られ続ける）
                         if (File.Exists(normalized))
                         {
                             File.Delete(normalized);
