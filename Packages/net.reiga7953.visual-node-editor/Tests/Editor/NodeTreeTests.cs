@@ -80,6 +80,13 @@ namespace Reiga.VisualNodeEditor.Tests
 
             Assert.That(panel.IsExpanded(g.Stage.Id), Is.True);
             Assert.That(panel.IsExpanded(g.Inner.Id), Is.True, "nested containers too");
+
+            // 開いた印だけでなく、中のノードの行が本当に出ていること
+            Assert.That(g.Asset.Nodes.All(n => panel.IsRowShown(n.Id)), Is.True, "every node has a row");
+            Assert.That(panel.IsRowShown(g.Boss.Id), Is.True, "even two containers deep");
+
+            panel.SetExpanded(g.Inner.Id, false);
+            Assert.That(panel.IsRowShown(g.Boss.Id), Is.False, "a collapsed container hides its rows");
         }
 
         [Test]

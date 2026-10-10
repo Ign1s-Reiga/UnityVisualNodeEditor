@@ -284,6 +284,10 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// <summary>そのノードの項目が開いているか（テスト用）。</summary>
         internal bool IsExpanded(string nodeId) => nodeId != null && _ids.TryGetValue(nodeId, out var id) && _tree.IsExpanded(id);
 
+        /// <summary>そのノードの行が、今ツリーに出ているか（テスト用。閉じたコンテナの中なら出ていない）。</summary>
+        internal bool IsRowShown(string nodeId) =>
+            nodeId != null && _ids.TryGetValue(nodeId, out var id) && _tree.viewController.GetIndexForId(id) >= 0;
+
         /// <summary>そのノードの項目を開く・閉じる（テスト用。ユーザーの ▶ の操作と同じ）。</summary>
         internal void SetExpanded(string nodeId, bool expanded)
         {
