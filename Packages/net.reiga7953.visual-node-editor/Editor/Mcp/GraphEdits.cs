@@ -81,6 +81,13 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                     {
                         AssetDatabase.DeleteAsset(normalized);
                     }
+
+                    // 書いたが Unity が読み込めなかったファイルは AssetDatabase からは消せないので、ディスクから消す
+                    // （残すと、そのパスでのやり直しが「既にある」で断られ続ける）
+                    if (File.Exists(normalized))
+                    {
+                        File.Delete(normalized);
+                    }
                 }, Debug.LogException);
 
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
