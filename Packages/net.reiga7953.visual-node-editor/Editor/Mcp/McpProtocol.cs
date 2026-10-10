@@ -79,20 +79,14 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         // メッセージ 1 つを処理し、応答を返す（応答の要らないものには null）
         private Dictionary<string, object> HandleRequest(Dictionary<string, object> request)
         {
-            request.TryGetValue("id", out var id);
-            var hasId = request.ContainsKey("id");
-            if (!request.TryGetValue("method", out var methodValue) || !(methodValue is string method))
-            {
-                // クライアントからの応答（サーバーからは要求を送らないので、来ても無視する）か、壊れたメッセージ
-                return hasId && !request.ContainsKey("result") && !request.ContainsKey("error")
-                    ? ErrorReply(id, InvalidRequest, "Missing method.")
-                    : null;
-            }
-
-            // 通知（id が無い）には応答しない（notifications/initialized、notifications/cancelled など）
-            if (!hasId)
+            if (!NeedsReply(request, out var id))
             {
                 return null;
+            }
+
+            if (!request.TryGetValue("method", out var methodValue) || !(methodValue is string method))
+            {
+                return ErrorReply(id, InvalidRequest, "Missing method.");
             }
 
             request.TryGetValue("params", out var paramsValue);
@@ -219,18 +213,48 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return Error(null, code, message);
             }
 
-            var requests = parsed is List<object> batch ? batch : new List<object> { parsed };
-            var replies = requests
-                .OfType<Dictionary<string, object>>()
-                .Where(request => request.ContainsKey("id") && request.ContainsKey("method"))
-                .Select(request => ErrorReply(request["id"], code, message))
-                .ToList();
-            if (replies.Count == 0)
+            // 応答するかどうかは Handle と同じ規則（NeedsReply）で決める。Handle が答えるものには、時間切れでも必ず答える
+            switch (parsed)
             {
-                return null;
+                case Dictionary<string, object> request:
+                    return NeedsReply(request, out var id) ? Error(id, code, message) : null;
+                case List<object> batch when batch.Count > 0:
+                    var replies = new List<object>();
+                    foreach (var item in batch)
+                    {
+                        if (NeedsReply(item, out var itemId))
+                        {
+                            replies.Add(ErrorReply(itemId, code, message));
+                        }
+                    }
+
+                    return replies.Count == 0 ? null : McpJson.Serialize(replies);
+                default:
+                    // 空の配列・数や文字列だけの本文: Handle も id の無いエラーで答える
+                    return Error(null, code, message);
+            }
+        }
+
+        /// <summary>
+        /// メッセージ 1 つに応答が要るか。要るなら、応答に入れる <paramref name="id"/>。
+        /// 要らないのは通知（<c>method</c> があり <c>id</c> が無い）と、クライアントからの応答（<c>result</c> / <c>error</c> がある）、
+        /// <c>id</c> の無い壊れたメッセージ。オブジェクトでないもの・<c>id</c> のある壊れたメッセージには、エラーで答える。
+        /// </summary>
+        internal static bool NeedsReply(object message, out object id)
+        {
+            id = null;
+            if (!(message is Dictionary<string, object> request))
+            {
+                return true;
             }
 
-            return parsed is List<object> ? McpJson.Serialize(replies) : McpJson.Serialize(replies[0]);
+            var hasId = request.TryGetValue("id", out id);
+            if (request.TryGetValue("method", out var method) && method is string)
+            {
+                return hasId;
+            }
+
+            return hasId && !request.ContainsKey("result") && !request.ContainsKey("error");
         }
 
         /// <summary>JSON-RPC のエラー応答（JSON の文字列）。</summary>
