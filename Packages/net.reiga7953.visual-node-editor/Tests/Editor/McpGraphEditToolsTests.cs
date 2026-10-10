@@ -416,6 +416,21 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.LoadMainAssetAtPath(McpTempGraphs.Folder + "/NotSaved.asset"), Is.Null);
         }
 
+        [Test]
+        public void CreateGraph_ThatFails_RemovesAFileUnityCouldNotLoad()
+        {
+            // 書いたが Unity が読み込めなかったファイルも消す。残すと、そのパスでのやり直しが「既にある」で断られ続ける
+            var path = McpTempGraphs.Folder + "/HalfWritten.asset";
+            Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(path, (_, assetPath) =>
+            {
+                System.IO.File.WriteAllText(assetPath, "half written");
+                throw new InvalidOperationException("disk full");
+            }));
+
+            Assert.That(System.IO.File.Exists(path), Is.False);
+            Assert.That(GraphEdits.CreateGraph(path), Is.Not.Null, "the same path can be used again");
+        }
+
         private string AddNode(params (string Key, object Value)[] fields)
         {
             var args = Args(fields);
