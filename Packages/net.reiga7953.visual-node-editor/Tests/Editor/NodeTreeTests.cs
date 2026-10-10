@@ -165,6 +165,29 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Panel_TreatsARestoredContainerAsNew()
+        {
+            // コンテナを消して（Undo などで）戻すと、新しく足したコンテナと同じく開いた状態で出す
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+            panel.Show(g.Asset);
+            panel.SetExpanded(g.Inner.Id, false);
+
+            var removed = g.Asset.Nodes.Where(n => n.Id == g.Inner.Id || n.ParentId == g.Inner.Id).ToList();
+            g.Asset.RemoveNode(g.Inner);
+            panel.Show(g.Asset);
+            Assert.That(panel.KnownIdCount, Is.EqualTo(panel.NodeCount), "ids of removed nodes are forgotten");
+
+            foreach (var node in removed)
+            {
+                g.Asset.AddNode(node);
+            }
+
+            panel.Show(g.Asset);
+            Assert.That(panel.IsExpanded(g.Inner.Id), Is.True);
+        }
+
+        [Test]
         public void Panel_KeepsTheSameItemsWhenNothingChanged()
         {
             using var g = new ContainerTestGraph();
