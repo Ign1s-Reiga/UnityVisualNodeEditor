@@ -109,10 +109,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
                 // 新しく出たコンテナ（別のアセットを開いたときはすべて）を、作り直す前に開いておく。
                 // 作り直しの後に開くと、もう 1 回表示を作り直すことになる。閉じたものは、ユーザーが閉じたままにしている
-                foreach (var id in _newContainerIds)
-                {
-                    _tree.ExpandItem(id, false, false);
-                }
+                ExpandItems(_newContainerIds);
 
                 _tree.Rebuild();
 
@@ -359,6 +356,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
+        // 項目をまとめて開く（表示は作り直さない。作り直すのは呼び出し側で 1 回だけ）
+        private void ExpandItems(IEnumerable<int> ids)
+        {
+            foreach (var id in ids)
+            {
+                _tree.ExpandItem(id, false, false);
+            }
+        }
+
         // 項目をまとめて開き、表示の作り直しは最後に 1 回だけ行う（1 つ開くたびに作り直すと、コンテナが多いと重い）
         private void ExpandWithoutRefreshing(IReadOnlyCollection<int> ids)
         {
@@ -367,11 +373,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 return;
             }
 
-            foreach (var id in ids)
-            {
-                _tree.ExpandItem(id, false, false);
-            }
-
+            ExpandItems(ids);
             RefreshCount++;
             _tree.RefreshItems();
         }
