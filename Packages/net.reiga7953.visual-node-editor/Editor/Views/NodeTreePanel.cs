@@ -266,7 +266,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             if (reveal)
             {
-                ExpandWithoutRefreshing(GetAncestors(id).Reverse().ToList());
+                // 開いているコンテナは開き直さない（開くものが無ければ表示も作り直さない）
+                ExpandWithoutRefreshing(GetAncestors(id).Reverse().Where(ancestor => !_tree.IsExpanded(ancestor)).ToList());
             }
             else if (GetAncestors(id).Any(ancestor => !_tree.IsExpanded(ancestor)))
             {
@@ -372,8 +373,12 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 _tree.ExpandItem(id, false, false);
             }
 
+            RefreshCount++;
             _tree.RefreshItems();
         }
+
+        /// <summary>項目を開いたことで表示を作り直した回数（テスト用。開くものが無ければ増えない）。</summary>
+        internal int RefreshCount { get; private set; }
 
         private static VisualElement MakeItem()
         {
