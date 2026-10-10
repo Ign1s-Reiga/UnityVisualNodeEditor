@@ -112,10 +112,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 else
                 {
                     // 後から足したコンテナは開いた状態で出す（閉じたものは、ユーザーが閉じたままにしている）
-                    foreach (var id in _newContainerIds)
-                    {
-                        _tree.ExpandItem(id);
-                    }
+                    ExpandWithoutRefreshing(_newContainerIds);
                 }
 
                 // 作り直しでは選び直すだけで、閉じたコンテナを開き直さない
@@ -254,10 +251,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             if (reveal)
             {
-                foreach (var ancestor in GetAncestors(id).Reverse())
-                {
-                    _tree.ExpandItem(ancestor);
-                }
+                ExpandWithoutRefreshing(GetAncestors(id).Reverse().ToList());
             }
             else if (GetAncestors(id).Any(ancestor => !_tree.IsExpanded(ancestor)))
             {
@@ -319,6 +313,22 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             {
                 schedule.Execute(() => Choose(entry.NodeId, true));
             }
+        }
+
+        // 項目をまとめて開き、表示の作り直しは最後に 1 回だけ行う（1 つ開くたびに作り直すと、コンテナが多いと重い）
+        private void ExpandWithoutRefreshing(IReadOnlyCollection<int> ids)
+        {
+            if (ids.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var id in ids)
+            {
+                _tree.ExpandItem(id, false, false);
+            }
+
+            _tree.RefreshItems();
         }
 
         private static VisualElement MakeItem()
