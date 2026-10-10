@@ -70,6 +70,29 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        [TestCase("Docs~")]
+        [TestCase(".hidden")]
+        public void CreateGraph_ExplainsFoldersUnityIgnores(string name)
+        {
+            // Unity が読み込まない名前のフォルダは、更新しても読み込まれない。更新を促さず、その理由を返す
+            var folder = McpTempGraphs.Folder + "/" + name;
+            try
+            {
+                System.IO.Directory.CreateDirectory(folder);
+
+                var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", folder + "/Main.asset")));
+
+                Assert.That(isError, Is.True, text);
+                Assert.That(text, Does.Contain("Unity ignores"));
+                Assert.That(text, Does.Not.Contain("Refresh"));
+            }
+            finally
+            {
+                System.IO.Directory.Delete(folder, true);
+            }
+        }
+
+        [Test]
         public void BuiltFlow_RunsWithRaise()
         {
             var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;

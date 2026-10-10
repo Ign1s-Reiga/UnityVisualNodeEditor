@@ -429,11 +429,16 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
 
             // ディスクにはあるが読み込まれていない（自動更新が切れているなど）フォルダは、作ったフォルダと区別できない。
-            // 作ったものとして失敗したときに消すと、中のユーザーのファイルまで消えるので断る
+            // 作ったものとして失敗したときに消すと、中のユーザーのファイルまで消えるので断る。
+            // Unity が読み込まない名前（. で始まる・~ で終わる）なら更新しても変わらないので、更新は促さずにそう伝える
             if (Directory.Exists(folder))
             {
-                throw new McpToolException($"The folder '{folder}' exists on disk but Unity has not imported it yet (for example, Auto Refresh is off). " +
-                                           "Refresh the project (Assets > Refresh) and try again.");
+                var name = Path.GetFileName(folder);
+                var reason = name.StartsWith(".", StringComparison.Ordinal) || name.EndsWith("~", StringComparison.Ordinal)
+                    ? "Unity ignores folders whose names start with '.' or end with '~'. Pick another path."
+                    : "Either Unity has not seen it yet (for example, Auto Refresh is off: use Assets > Refresh, then try again), " +
+                      "or its name differs only in letter case from a folder Unity knows (use that folder's exact name).";
+                throw new McpToolException($"The folder '{folder}' exists on disk but Unity has not imported it. {reason}");
             }
 
             var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
