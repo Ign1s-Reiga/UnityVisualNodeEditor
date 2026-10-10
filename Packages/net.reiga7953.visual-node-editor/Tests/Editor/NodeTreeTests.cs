@@ -203,6 +203,24 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(panel.SelectedNodeId, Is.EqualTo(g.Play.Id), "the selection survives a rebuild");
         }
 
+        // ---- 表示の作り直し ----
+
+        [Test]
+        public void Panel_DoesNotRefreshWhenTheContainersAreAlreadyOpen()
+        {
+            // 開いているコンテナの中のノードを選んでも、開くものが無いので表示を作り直さない
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+            panel.Show(g.Asset);
+            var before = panel.RefreshCount;
+
+            panel.Select(g.Boss.Id);
+            panel.Select(g.Play.Id);
+
+            Assert.That(panel.RefreshCount, Is.EqualTo(before));
+            Assert.That(panel.IsSelectionShown, Is.True);
+        }
+
         // ---- 閉じたコンテナの中の選択 ----
 
         [Test]
