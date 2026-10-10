@@ -47,6 +47,14 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                                            $"and must not contain any of {InvalidPathCharacters}.");
             }
 
+            // Unity が読み込まない名前は、何かを作る前に断る（作ったフォルダを Unity が知らず、失敗しても消せない。更新しても読み込まれない）
+            var ignored = normalized.Split('/').FirstOrDefault(IsIgnoredByUnity);
+            if (ignored != null)
+            {
+                throw new McpToolException($"Unity ignores files and folders named like '{ignored}' (names that start with '.', end with '~', " +
+                                           "are 'cvs' or end with '.tmp'), so it cannot hold a graph there. Pick another path.");
+            }
+
             // 読み込まれていない（自動更新が切れているなど）ファイルも見る。失敗したときの後片付けは、このパスにあるものを消すため
             if (AssetDatabase.LoadMainAssetAtPath(normalized) != null || File.Exists(normalized) || Directory.Exists(normalized))
             {
@@ -168,6 +176,16 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd(' ');
             return !ReservedNames.Contains(baseName);
         }
+
+        /// <summary>
+        /// Unity が読み込まない（Assets の中にあっても無いものとして扱う）ファイル・フォルダの名前か。
+        /// . で始まる・~ で終わる・cvs・.tmp で終わる（Unity のマニュアルの「隠しアセット」）。
+        /// </summary>
+        internal static bool IsIgnoredByUnity(string segment) =>
+            segment.StartsWith(".", StringComparison.Ordinal) ||
+            segment.EndsWith("~", StringComparison.Ordinal) ||
+            string.Equals(segment, "cvs", StringComparison.OrdinalIgnoreCase) ||
+            segment.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase);
 
         // ツール 1 回の変更を、それだけで 1 つの Undo にする（Unity はマウスやキーの入力でしか Undo を区切らないので、
         // 区切らないと、エージェントの続けての変更やユーザーの直前の操作と 1 回の Ctrl+Z にまとまってしまう）
@@ -435,15 +453,12 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             // ディスクにはあるが読み込まれていない（自動更新が切れているなど）フォルダは、作ったフォルダと区別できない。
             // 作ったものとして失敗したときに消すと、中のユーザーのファイルまで消えるので断る。
-            // Unity が読み込まない名前（. で始まる・~ で終わる）なら更新しても変わらないので、更新は促さずにそう伝える
+            // Unity が読み込まない名前は、ここに来る前に断っている（IsIgnoredByUnity）
             if (Directory.Exists(folder))
             {
-                var name = Path.GetFileName(folder);
-                var reason = name.StartsWith(".", StringComparison.Ordinal) || name.EndsWith("~", StringComparison.Ordinal)
-                    ? "Unity ignores folders whose names start with '.' or end with '~'. Pick another path."
-                    : "Either Unity has not seen it yet (for example, Auto Refresh is off: use Assets > Refresh, then try again), " +
-                      "or its name differs only in letter case from a folder Unity knows (use that folder's exact name).";
-                throw new McpToolException($"The folder '{folder}' exists on disk but Unity has not imported it. {reason}");
+                throw new McpToolException($"The folder '{folder}' exists on disk but Unity has not imported it. " +
+                                           "Either Unity has not seen it yet (for example, Auto Refresh is off: use Assets > Refresh, then try again), " +
+                                           "or its name differs only in letter case from a folder Unity knows (use that folder's exact name).");
             }
 
             var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
