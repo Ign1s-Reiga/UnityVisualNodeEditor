@@ -132,6 +132,18 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void FailedCleanUp_DoesNotHideTheOriginalError()
+        {
+            // 後片付けの例外は記録だけして投げない（投げると元の失敗の理由が分からなくなる）
+            var logged = new List<Exception>();
+
+            Assert.DoesNotThrow(() => GraphEdits.TryCleanUp(() => throw new InvalidOperationException("cannot delete"), logged.Add));
+            GraphEdits.TryCleanUp(() => { }, logged.Add);
+
+            Assert.That(logged.Select(e => e.Message), Is.EqualTo(new[] { "cannot delete" }));
+        }
+
+        [Test]
         public void EachToolCall_IsItsOwnUndoStep()
         {
             // Unity はマウスやキーの入力でしか Undo を区切らない。ツールの呼び出しごとに区切らないと、1 回の Ctrl+Z でまとめて戻ってしまう
