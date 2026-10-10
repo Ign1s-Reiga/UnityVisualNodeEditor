@@ -150,9 +150,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return false;
             }
 
-            // 予約名は拡張子の前の部分で比べる。Windows はその部分の末尾の空白も無視する（"CON .asset" も CON）
+            // 予約名は拡張子の前の部分で比べる。Windows はその部分の末尾の半角スペースを無視する（"CON .asset" も CON）。
+            // 全角スペースやタブは無視しないので、それらが付いた名前は予約名ではない
             var dot = segment.IndexOf('.');
-            var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd();
+            var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd(' ');
             return !ReservedNames.Contains(baseName);
         }
 

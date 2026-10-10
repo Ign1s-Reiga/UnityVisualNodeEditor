@@ -199,6 +199,18 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.GetSubFolders(McpTempGraphs.Folder), Is.Empty, "nothing is created for a refused path");
         }
 
+        [TestCase("CON .asset", false)]
+        [TestCase("CON  .asset", false)]
+        [TestCase("CON　.asset", true)]
+        [TestCase("NUL\t", false)]
+        [TestCase("Game.asset", true)]
+        public void ReservedNames_IgnoreOnlyTheSpacesWindowsIgnores(string name, bool usable)
+        {
+            // Windows が無視するのは拡張子の前の半角スペースだけ。全角スペースが付いた名前は作れるので断らない
+            // （タブなどの制御文字は、それ自体が使えない文字として断る）
+            Assert.That(GraphEdits.IsUsableName(name), Is.EqualTo(usable));
+        }
+
         [Test]
         public void CreateGraph_ThatFails_RemovesTheFoldersItMade()
         {
