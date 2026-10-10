@@ -48,6 +48,20 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void CreateGraph_RefusesAFileUnityHasNotImportedYet()
+        {
+            // 自動更新が切れているときなど、ディスクにはあるが読み込まれていないファイル。後片付けで消してしまわないよう、作る前に断る
+            var path = McpTempGraphs.Folder + "/NotImported.asset";
+            System.IO.File.WriteAllText(path, "not imported");
+
+            var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
+
+            Assert.That(isError, Is.True, text);
+            Assert.That(text, Does.Contain("already exists"));
+            Assert.That(System.IO.File.ReadAllText(path), Is.EqualTo("not imported"), "the file is left alone");
+        }
+
+        [Test]
         public void BuiltFlow_RunsWithRaise()
         {
             var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;
@@ -132,6 +146,18 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void FailedCleanUp_DoesNotHideTheOriginalError()
+        {
+            // 後片付けの例外は記録だけして投げない（投げると元の失敗の理由が分からなくなる）
+            var logged = new List<Exception>();
+
+            Assert.DoesNotThrow(() => GraphEdits.TryCleanUp(() => throw new InvalidOperationException("cannot delete"), logged.Add));
+            GraphEdits.TryCleanUp(() => { }, logged.Add);
+
+            Assert.That(logged.Select(e => e.Message), Is.EqualTo(new[] { "cannot delete" }));
+        }
+
+        [Test]
         public void EachToolCall_IsItsOwnUndoStep()
         {
             // Unity はマウスやキーの入力でしか Undo を区切らない。ツールの呼び出しごとに区切らないと、1 回の Ctrl+Z でまとめて戻ってしまう
@@ -171,6 +197,18 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(isError, Is.True, text);
             Assert.That(text, Does.Contain("not a usable asset path"));
             Assert.That(AssetDatabase.GetSubFolders(McpTempGraphs.Folder), Is.Empty, "nothing is created for a refused path");
+        }
+
+        [TestCase("CON .asset", false)]
+        [TestCase("CON  .asset", false)]
+        [TestCase("CON　.asset", true)]
+        [TestCase("NUL\t", false)]
+        [TestCase("Game.asset", true)]
+        public void ReservedNames_IgnoreOnlyTheSpacesWindowsIgnores(string name, bool usable)
+        {
+            // Windows が無視するのは拡張子の前の半角スペースだけ。全角スペースが付いた名前は作れるので断らない
+            // （タブなどの制御文字は、それ自体が使えない文字として断る）
+            Assert.That(GraphEdits.IsUsableName(name), Is.EqualTo(usable));
         }
 
         [Test]
@@ -333,6 +371,18 @@ namespace Reiga.VisualNodeEditor.Tests
             }));
 
             Assert.That(unsaved == null, Is.True, "the in-memory graph is destroyed");
+        }
+
+        [Test]
+        public void CreateGraph_ThatUnitySilentlyDidNotSave_DestroysTheUnsavedGraph()
+        {
+            // Unity が例外を出さずに（ログだけで）作らなかったときも、アセットにならなかったグラフを消す
+            UnityEngine.Object unsaved = null;
+            Assert.Throws<McpToolException>(() => GraphEdits.CreateGraph(
+                McpTempGraphs.Folder + "/NotSaved.asset", (asset, _) => unsaved = asset));
+
+            Assert.That(unsaved == null, Is.True, "the in-memory graph is destroyed");
+            Assert.That(AssetDatabase.LoadMainAssetAtPath(McpTempGraphs.Folder + "/NotSaved.asset"), Is.Null);
         }
 
         private string AddNode(params (string Key, object Value)[] fields)

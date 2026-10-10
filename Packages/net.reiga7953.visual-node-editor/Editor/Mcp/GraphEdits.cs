@@ -27,7 +27,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
         /// <summary>
         /// <see cref="CreateGraph(string)"/> の本体。<paramref name="createAsset"/> はアセットを作る処理（null なら
-        /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。失敗したら、このために作ったフォルダを消す。
+        /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。
+        /// 失敗したらプロジェクトを元に戻す: <paramref name="path"/> に書いたアセットを消し（作る前に何も無いことを確かめているので、
+        /// そこにあるのはこの呼び出しが書いたもの）、このために作ったフォルダを消し、アセットにならなかったグラフをメモリから消す。
         /// </summary>
         internal static NodeGraphAsset CreateGraph(string path, Action<UnityEngine.Object, string> createAsset)
         {
@@ -44,7 +46,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                                            $"and must not contain any of {InvalidPathCharacters}.");
             }
 
-            if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+            // 読み込まれていない（自動更新が切れているなど）ファイルも見る。失敗したときの後片付けは、このパスにあるものを消すため
+            if (AssetDatabase.LoadMainAssetAtPath(normalized) != null || File.Exists(normalized) || Directory.Exists(normalized))
             {
                 throw new McpToolException($"Something already exists at '{normalized}'. Pick another path.");
             }
@@ -59,10 +62,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 (createAsset ?? AssetDatabase.CreateAsset)(graph, normalized);
                 AssetDatabase.SaveAssets();
 
-                // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる
+                // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる。
+                // アセットにならなかったグラフは、下の後片付けで消す
                 if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
                 {
-                    UnityEngine.Object.DestroyImmediate(graph);
                     throw new McpToolException($"Unity could not create an asset at '{normalized}' (see the Console). Pick another path.");
                 }
 
@@ -70,24 +73,48 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
             catch
             {
+                // 後片付けの 1 つが失敗しても残りは続け、元の失敗の理由を返す（後片付けの例外はログに残す）。
                 // 作る前には何も無かった（上で確かめた）ので、今そこにあるのはこの呼び出しが書いたアセット。既にあったフォルダの中でも消す
-                if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                TryCleanUp(() =>
                 {
-                    AssetDatabase.DeleteAsset(normalized);
-                }
+                    if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                    {
+                        AssetDatabase.DeleteAsset(normalized);
+                    }
+                }, Debug.LogException);
 
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
                 {
-                    AssetDatabase.DeleteAsset(createdFolders[i]);
+                    var folder = createdFolders[i];
+                    TryCleanUp(() => AssetDatabase.DeleteAsset(folder), Debug.LogException);
                 }
 
                 // アセットにならなかったグラフはメモリに残るだけなので消す（やり直すたびに溜まらないように）
-                if (graph != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                TryCleanUp(() =>
                 {
-                    UnityEngine.Object.DestroyImmediate(graph);
-                }
+                    if (graph != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                    {
+                        UnityEngine.Object.DestroyImmediate(graph);
+                    }
+                }, Debug.LogException);
 
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// 失敗したときの後片付けを 1 つ行う。後片付けそのものが失敗しても投げずに <paramref name="log"/> へ渡す
+        /// （後片付けの例外で、元の失敗の理由を隠さないように）。
+        /// </summary>
+        internal static void TryCleanUp(Action cleanUp, Action<Exception> log)
+        {
+            try
+            {
+                cleanUp();
+            }
+            catch (Exception exception)
+            {
+                log(exception);
             }
         }
 
@@ -123,9 +150,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return false;
             }
 
-            // 予約名は拡張子の前の部分で比べる。Windows はその部分の末尾の空白も無視する（"CON .asset" も CON）
+            // 予約名は拡張子の前の部分で比べる。Windows はその部分の末尾の半角スペースを無視する（"CON .asset" も CON）。
+            // 全角スペースやタブは無視しないので、それらが付いた名前は予約名ではない
             var dot = segment.IndexOf('.');
-            var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd();
+            var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd(' ');
             return !ReservedNames.Contains(baseName);
         }
 
