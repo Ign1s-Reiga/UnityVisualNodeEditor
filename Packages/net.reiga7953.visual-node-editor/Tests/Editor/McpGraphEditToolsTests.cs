@@ -155,12 +155,17 @@ namespace Reiga.VisualNodeEditor.Tests
         [TestCase("Assets/__VneMcpTestTemp/a|b/X.asset")]
         [TestCase("Assets/../X.asset")]
         [TestCase("Assets//X.asset")]
+        [TestCase("Assets/__VneMcpTestTemp/Flows./Main.asset")]
+        [TestCase("Assets/__VneMcpTestTemp/Flows /Main.asset")]
+        [TestCase("Assets/__VneMcpTestTemp/CON/Main.asset")]
+        [TestCase("Assets/__VneMcpTestTemp/nul.asset")]
         public void CreateGraph_RefusesUnusablePaths(string path)
         {
             var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
 
             Assert.That(isError, Is.True, text);
             Assert.That(text, Does.Contain("not a usable asset path"));
+            Assert.That(AssetDatabase.GetSubFolders(McpTempGraphs.Folder), Is.Empty, "nothing is created for a refused path");
         }
 
         [TestCase("NaN")]
