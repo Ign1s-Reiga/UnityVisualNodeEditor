@@ -71,24 +71,48 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
             catch
             {
+                // 後片付けの 1 つが失敗しても残りは続け、元の失敗の理由を返す（後片付けの例外はログに残す）。
                 // 作る前には何も無かった（上で確かめた）ので、今そこにあるのはこの呼び出しが書いたアセット。既にあったフォルダの中でも消す
-                if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                TryCleanUp(() =>
                 {
-                    AssetDatabase.DeleteAsset(normalized);
-                }
+                    if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                    {
+                        AssetDatabase.DeleteAsset(normalized);
+                    }
+                }, Debug.LogException);
 
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
                 {
-                    AssetDatabase.DeleteAsset(createdFolders[i]);
+                    var folder = createdFolders[i];
+                    TryCleanUp(() => AssetDatabase.DeleteAsset(folder), Debug.LogException);
                 }
 
                 // アセットにならなかったグラフはメモリに残るだけなので消す（やり直すたびに溜まらないように）
-                if (graph != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                TryCleanUp(() =>
                 {
-                    UnityEngine.Object.DestroyImmediate(graph);
-                }
+                    if (graph != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                    {
+                        UnityEngine.Object.DestroyImmediate(graph);
+                    }
+                }, Debug.LogException);
 
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// 失敗したときの後片付けを 1 つ行う。後片付けそのものが失敗しても投げずに <paramref name="log"/> へ渡す
+        /// （後片付けの例外で、元の失敗の理由を隠さないように）。
+        /// </summary>
+        internal static void TryCleanUp(Action cleanUp, Action<Exception> log)
+        {
+            try
+            {
+                cleanUp();
+            }
+            catch (Exception exception)
+            {
+                log(exception);
             }
         }
 
