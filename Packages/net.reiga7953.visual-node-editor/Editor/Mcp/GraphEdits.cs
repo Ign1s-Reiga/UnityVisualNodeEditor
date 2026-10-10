@@ -23,7 +23,13 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         public static event Action<NodeGraphAsset> Edited;
 
         /// <summary>新しいグラフ（Entry 入り）を <paramref name="path"/> に作る。無いフォルダは作る。</summary>
-        public static NodeGraphAsset CreateGraph(string path)
+        public static NodeGraphAsset CreateGraph(string path) => CreateGraph(path, null);
+
+        /// <summary>
+        /// <see cref="CreateGraph(string)"/> の本体。<paramref name="createAsset"/> はアセットを作る処理（null なら
+        /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。失敗したら、このために作ったフォルダを消す。
+        /// </summary>
+        internal static NodeGraphAsset CreateGraph(string path, Action<UnityEngine.Object, string> createAsset)
         {
             var normalized = (path ?? string.Empty).Replace('\\', '/').Trim();
             if (!normalized.StartsWith("Assets/", StringComparison.Ordinal) || !normalized.EndsWith(".asset", StringComparison.OrdinalIgnoreCase))
@@ -43,19 +49,33 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException($"Something already exists at '{normalized}'. Pick another path.");
             }
 
-            EnsureFolder(Path.GetDirectoryName(normalized)?.Replace('\\', '/'));
-            var graph = NodeGraphFactory.CreateNew();
-            AssetDatabase.CreateAsset(graph, normalized);
-            AssetDatabase.SaveAssets();
-
-            // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる
-            if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+            // 失敗したら、このために作ったフォルダを消す（失敗した呼び出しでプロジェクトを変えない。ほかのツールと同じ）
+            var createdFolders = new List<string>();
+            try
             {
-                UnityEngine.Object.DestroyImmediate(graph);
-                throw new McpToolException($"Unity could not create an asset at '{normalized}' (see the Console). Pick another path.");
-            }
+                EnsureFolder(Path.GetDirectoryName(normalized)?.Replace('\\', '/'), createdFolders);
+                var graph = NodeGraphFactory.CreateNew();
+                (createAsset ?? AssetDatabase.CreateAsset)(graph, normalized);
+                AssetDatabase.SaveAssets();
 
-            return graph;
+                // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる
+                if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                {
+                    UnityEngine.Object.DestroyImmediate(graph);
+                    throw new McpToolException($"Unity could not create an asset at '{normalized}' (see the Console). Pick another path.");
+                }
+
+                return graph;
+            }
+            catch
+            {
+                for (var i = createdFolders.Count - 1; i >= 0; i--)
+                {
+                    AssetDatabase.DeleteAsset(createdFolders[i]);
+                }
+
+                throw;
+            }
         }
 
         // アセットのパスに使えない文字（どの OS でも使えるパスにする）
@@ -349,7 +369,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             return loose.Count == 1 ? loose[0] : default;
         }
 
-        private static void EnsureFolder(string folder)
+        // 無いフォルダを親から順に作り、作ったフォルダを created に足す（失敗したときに消すため）。
+        // Unity が別の名前で作った（Windows が名前を変えた）ときも、実際に作ったフォルダを足してから断る
+        private static void EnsureFolder(string folder, List<string> created)
         {
             if (string.IsNullOrEmpty(folder) || AssetDatabase.IsValidFolder(folder))
             {
@@ -357,8 +379,15 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
 
             var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
-            EnsureFolder(parent);
-            if (string.IsNullOrEmpty(AssetDatabase.CreateFolder(parent, Path.GetFileName(folder))) || !AssetDatabase.IsValidFolder(folder))
+            EnsureFolder(parent, created);
+            var guid = AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
+            var createdPath = string.IsNullOrEmpty(guid) ? null : AssetDatabase.GUIDToAssetPath(guid);
+            if (!string.IsNullOrEmpty(createdPath))
+            {
+                created.Add(createdPath);
+            }
+
+            if (createdPath != folder || !AssetDatabase.IsValidFolder(folder))
             {
                 throw new McpToolException($"Unity could not create the folder '{folder}' (see the Console). Pick another path.");
             }

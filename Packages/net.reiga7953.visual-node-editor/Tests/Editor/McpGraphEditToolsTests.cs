@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -166,6 +167,17 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(isError, Is.True, text);
             Assert.That(text, Does.Contain("not a usable asset path"));
             Assert.That(AssetDatabase.GetSubFolders(McpTempGraphs.Folder), Is.Empty, "nothing is created for a refused path");
+        }
+
+        [Test]
+        public void CreateGraph_ThatFails_RemovesTheFoldersItMade()
+        {
+            // 失敗した呼び出しでプロジェクトを変えない（作りかけのフォルダを残さない）
+            Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(
+                McpTempGraphs.Folder + "/A/B/Main.asset", (_, _) => throw new InvalidOperationException("disk full")));
+
+            Assert.That(AssetDatabase.IsValidFolder(McpTempGraphs.Folder + "/A"), Is.False);
+            Assert.That(AssetDatabase.IsValidFolder(McpTempGraphs.Folder), Is.True, "folders that already existed stay");
         }
 
         [TestCase("NaN")]
