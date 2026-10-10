@@ -27,7 +27,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
         /// <summary>
         /// <see cref="CreateGraph(string)"/> の本体。<paramref name="createAsset"/> はアセットを作る処理（null なら
-        /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。失敗したら、このために作ったフォルダを消す。
+        /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。
+        /// 失敗したらプロジェクトを元に戻す: <paramref name="path"/> に書いたアセットを消し（作る前に何も無いことを確かめているので、
+        /// そこにあるのはこの呼び出しが書いたもの）、このために作ったフォルダを消し、アセットにならなかったグラフをメモリから消す。
         /// </summary>
         internal static NodeGraphAsset CreateGraph(string path, Action<UnityEngine.Object, string> createAsset)
         {
