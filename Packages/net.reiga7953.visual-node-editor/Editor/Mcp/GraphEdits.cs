@@ -31,12 +31,11 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException($"The path must be inside Assets and end with .asset, e.g. 'Assets/Flows/Main.asset' (got '{path}').");
             }
 
-            var badSegment = normalized.Split('/').FirstOrDefault(segment =>
-                segment.Length == 0 || segment == "." || segment == ".." || segment.Any(c => c < 0x20 || InvalidPathCharacters.Contains(c)));
-            if (badSegment != null)
+            if (normalized.Split('/').Any(segment => !IsUsableName(segment)))
             {
                 throw new McpToolException($"'{normalized}' is not a usable asset path: each folder and file name must be non-empty, " +
-                                           $"must not be '.' or '..', and must not contain any of {InvalidPathCharacters}.");
+                                           $"must not start or end with a space, end with '.', be '.' / '..' or a reserved name such as CON or NUL, " +
+                                           $"and must not contain any of {InvalidPathCharacters}.");
             }
 
             if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
@@ -61,6 +60,39 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
         // アセットのパスに使えない文字（どの OS でも使えるパスにする）
         private const string InvalidPathCharacters = ":*?\"<>|";
+
+        // Windows がファイル・フォルダの名前に使わせない名前（拡張子が付いていても不可）
+        private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        };
+
+        /// <summary>
+        /// パスの 1 区切り（フォルダかファイルの名前）が、どの OS でもそのまま使えるか。
+        /// Windows は末尾の '.' と空白を黙って削るので、そのまま使えない名前は先に断る（作ったフォルダの名前が変わり、やり直すたびに増えないように）。
+        /// </summary>
+        internal static bool IsUsableName(string segment)
+        {
+            if (string.IsNullOrEmpty(segment) || segment == "." || segment == "..")
+            {
+                return false;
+            }
+
+            if (char.IsWhiteSpace(segment[0]) || char.IsWhiteSpace(segment[segment.Length - 1]) || segment.EndsWith(".", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (segment.Any(c => c < 0x20 || InvalidPathCharacters.Contains(c)))
+            {
+                return false;
+            }
+
+            var dot = segment.IndexOf('.');
+            return !ReservedNames.Contains(dot < 0 ? segment : segment.Substring(0, dot));
+        }
 
         // ツール 1 回の変更を、それだけで 1 つの Undo にする（Unity はマウスやキーの入力でしか Undo を区切らないので、
         // 区切らないと、エージェントの続けての変更やユーザーの直前の操作と 1 回の Ctrl+Z にまとまってしまう）
