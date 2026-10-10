@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "visual-node-editor": {
+      "type": "http",
+      "url": "http://127.0.0.1:8790/mcp"
+    }
+  }
+}

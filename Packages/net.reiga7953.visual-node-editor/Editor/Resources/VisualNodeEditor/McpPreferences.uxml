@@ -1,0 +1,12 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+  <ui:VisualElement name="mcp-preferences" class="vne-mcp-preferences">
+    <ui:Label text="MCP server" class="vne-mcp-preferences__header" />
+    <ui:Label class="vne-mcp-preferences__text" text="Lets AI agents such as Claude Code read and edit Visual Node Editor graphs, and follow a running flow in Play mode, through the Model Context Protocol." />
+    <ui:Toggle name="mcp-enabled" label="Enable MCP server" />
+    <ui:IntegerField name="mcp-port" label="Port" is-delayed="true" />
+    <ui:Label name="mcp-status" class="vne-mcp-preferences__status" />
+    <ui:HelpBox message-type="Warning" text="While enabled, any program on this computer can read and change your graphs through the server. It only listens on 127.0.0.1, and only while this setting is on." />
+    <ui:Label text="Claude Code (.mcp.json in the project folder)" class="vne-mcp-preferences__subheader" />
+    <ui:TextField name="mcp-config" multiline="true" class="vne-mcp-preferences__config" />
+  </ui:VisualElement>
+</ui:UXML>

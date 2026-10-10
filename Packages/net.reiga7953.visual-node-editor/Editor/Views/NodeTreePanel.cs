@@ -36,6 +36,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private string _runningNodeId;
         private bool _syncing;
 
+        /// <summary>ヘッダーと空のツリーを作る。中身は <see cref="Show"/> で入れる。</summary>
         public NodeTreePanel()
         {
             AddToClassList("vne-node-tree");

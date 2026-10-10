@@ -63,15 +63,10 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         // グラフのタイトルと同じ規則。コンテナの Exit は（タイトルを付けていなければ）指している出口の名前
         private static string GetLabel(NodeGraphAsset asset, NodeData node)
         {
-            if (node is ContainerExitNode exitNode && !exitNode.HasCustomTitle
-                && asset.FindNode(exitNode.ParentId) is ContainerNode container
-                && container.FindExit(exitNode.ExitId) is ContainerExit exit
-                && !string.IsNullOrEmpty(exit.Name))
-            {
-                return exit.Name;
-            }
-
-            return NodeDisplay.GetNodeLabel(node);
+            var exitName = node is ContainerExitNode exitNode && !exitNode.HasCustomTitle
+                ? ContainerExitNodeView.GetExitName(asset, exitNode)
+                : null;
+            return string.IsNullOrEmpty(exitName) ? NodeDisplay.GetNodeLabel(node) : exitName;
         }
     }
 }

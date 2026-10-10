@@ -87,6 +87,12 @@
 - [x] 階層のパンくずをグラフの下へ移す
 - [x] 左にノードツリー（ノードとコンテナの階層を一覧し、どの階層のノードへも移れる）
 
+## MCP とエージェント用スキル
+- [x] MCP サーバー（エディタの中の HTTP、opt-in・127.0.0.1 のみ）と読み取りのツール（`list_graphs` / `get_graph` / `validate_graph` / `open_graph`）
+- [x] グラフを書き換えるツール（`create_graph` / `add_node` / `update_node` / `remove_node` / `connect` / `disconnect` / `group_into_container`）
+- [x] Play 中のツール（`get_runtime_state` / `send_event`）
+- [x] スキル: Computer Use（`editor-visual-check` / `ux-scenario-run`）と MCP（`build-flow-with-mcp` / `debug-flow-with-mcp`）
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
@@ -114,3 +120,6 @@
   - 未決: 条件を Event ノードに持たせるか、エッジに持たせるか。自動遷移の判定を毎フレーム行うか、値の変化時だけにするか
 - UX: イベント名の定数クラスを生成するか（骨組みコード生成の一部。`GraphEvents.StartGame` のように書けて打ち間違いが無くなるが、生成物の置き場所と更新のタイミングを決める必要がある）
 - UX: シナリオの所要時間は実機で計測する（`docs/04-ux-audit.md` の現状は机上の通しによる手数と見積もり）
+- MCP: 認証を持つか（当面は 127.0.0.1 だけで待ち受け、`Origin` を確かめ、既定で止めておく。同じ PC の他のプロセスからは書き換えられる）
+- MCP: エディタ全般の操作（Play の開始・終了、テストの実行、ウィンドウのスクリーンショット）までツールにするか（当面はグラフの操作だけ）
+- スキル: パッケージにも入れて、取り込んだゲームのプロジェクトでも使えるようにするか（当面はこのリポジトリの `.claude/skills/` だけ）

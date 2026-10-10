@@ -1,0 +1,39 @@
+/* Edit > Preferences > Visual Node Editor (McpSettingsProvider) */
+
+.vne-mcp-preferences {
+  padding: 8px 10px 8px 10px;
+}
+
+.vne-mcp-preferences__header {
+  margin-bottom: 4px;
+  font-size: 13px;
+  -unity-font-style: bold;
+}
+
+.vne-mcp-preferences__subheader {
+  margin-top: 10px;
+  margin-bottom: 2px;
+  -unity-font-style: bold;
+}
+
+.vne-mcp-preferences__text {
+  margin-bottom: 6px;
+  white-space: normal;
+}
+
+.vne-mcp-preferences__status {
+  margin: 4px 3px 6px 3px;
+  white-space: normal;
+}
+
+.vne-mcp-preferences__status--running {
+  color: #7fd18b;
+}
+
+.vne-mcp-preferences__status--error {
+  color: #e04040;
+}
+
+.vne-mcp-preferences__config > .unity-base-text-field__input {
+  white-space: normal;
+}

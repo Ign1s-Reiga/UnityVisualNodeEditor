@@ -23,13 +23,15 @@ Unity 上で「ゲームの大まかな構成」をノードグラフとして�
 ```
 .
 ├── CLAUDE.md
+├── .mcp.json                    # Claude Code から Unity エディタの MCP サーバー（visual-node-editor）へ繋ぐ設定
+├── .claude/skills/              # Claude Code のスキル（Computer Use での確認・MCP での組み立て。パッケージには入れない）
 ├── Assets/                      # 開発用ホストプロジェクト（サンプル・動作確認用。パッケージ本体は置かない）
 ├── Packages/
 │   ├── manifest.json
 │   └── net.reiga7953.visual-node-editor/   # ★ パッケージ本体（embedded package）
 │       ├── package.json
 │       ├── Runtime/             # ランタイムで参照されるデータ型・実行器（Editor 依存禁止）
-│       ├── Editor/              # GraphView ウィンドウ・ノード UI・インスペクタ
+│       ├── Editor/              # GraphView ウィンドウ・ノード UI・インスペクタ・MCP サーバー（Editor/Mcp）
 │       ├── Tests/Editor/        # EditMode テスト
 │       └── Tests/Runtime/       # PlayMode テスト
 ├── ProjectSettings/

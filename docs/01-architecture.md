@@ -582,6 +582,74 @@ Project ビューでグラフアセットを選んだときの Inspector。Unity
 生のデータは Inspector の Debug モードでは引き続き見えるため、検証でもパラメータ ID の重複を Error にする（最後の防波堤）。
 件数・パラメータの表示文字列は純粋な関数（`GraphSummary`）にし、EditMode テストの対象にする。
 
+## MCP サーバー（AI エージェントからグラフを読み書きする）
+
+Claude Code などの AI エージェントが、グラフを読み・組み立て・検証し、Play 中の流れを確かめられるようにする
+（[Model Context Protocol](https://modelcontextprotocol.io/)）。範囲はグラフの操作だけで、エディタ全般の操作（任意のメニュー・シーンの編集など）は持たない。
+
+### サーバー（`Editor/Mcp/`、名前空間 `Reiga.VisualNodeEditor.Editor.Mcp`）
+
+- Unity エディタの中で動く HTTP サーバー（MCP の Streamable HTTP）。`http://127.0.0.1:<port>/mcp`（既定のポートは 8790）。外部の実行環境・パッケージは使わない
+- **既定では止まっている**（opt-in）。`Edit > Preferences > Visual Node Editor` の「Enable MCP server」で有効にする。
+  有効・ポートはユーザーごとの設定（`EditorPrefs`）で、プロジェクトには保存しない。ドメインリロードの前に止め、後に（有効なら）また始める。エディタの終了時に止める
+- 安全のため 127.0.0.1 だけで待ち受ける。`Origin` ヘッダーがあれば localhost / 127.0.0.1 のものだけ受け付ける（ブラウザからの DNS リバインディング対策。MCP の仕様どおり）。
+  有効にしている間は、同じ PC のどのプロセスからでもグラフを書き換えられることを設定画面に書いておく
+- HTTP: `POST /mcp` に JSON-RPC 2.0 のメッセージ 1 つ（または 2025-03-26 以前のクライアントが送るメッセージの配列。応答も配列）。
+  応答は `application/json`（SSE は使わない）。応答の要らないもの（通知・クライアントからの応答）だけなら 202。`GET` / `DELETE` は 405。
+  セッション（`Mcp-Session-Id`）は使わない。本文は 1 MB まで（超えたら 413）、JSON の入れ子は 64 段まで（読むのが再帰なので、深すぎる本文でエディタごと落ちないように）
+- MCP のメソッド: `initialize`（クライアントの `protocolVersion` が 2025-06-18 / 2025-03-26 / 2024-11-05 のどれかならそれを、そうでなければ最新を返す。`capabilities.tools`）、
+  `ping`、`tools/list`、`tools/call`。それ以外は JSON-RPC の Method not found。解析できない本文は Parse error
+- 受け取りは別スレッドで行い、処理（ツールの実行）はすべてメインスレッドで行う（`EditorApplication.update` で順に実行。AssetDatabase などはメインスレッドでしか使えない）。
+  コンパイル中などで 30 秒以内に**始まらなければ**取り消してエラーを返す（何も変えない）。始まった処理は終わるまで待つ
+  （保存まで済んだ編集を「失敗」と返すと、エージェントがやり直して同じノードを重ねてしまうため）
+- 始められなかったとき（ポートが使われているなど。ドメインリロードの直後は前のポートがまだ放されていないことがある）は、1 秒おきに 3 回までやり直す
+- JSON は依存を増やさないよう、小さな自前の読み書き（`McpJson`）で扱う。プロトコルの処理（`McpProtocol`）は HTTP と切り離した純粋なクラスにし、EditMode テストの対象にする
+- ツールが失敗したとき（グラフが見つからない、置けない階層など）は、JSON-RPC のエラーではなく `isError: true` の結果に、エージェントが直せる理由の文を入れて返す（MCP の仕様どおり）
+
+### ツール
+
+グラフはアセットのパス（`Assets/…/Flow.asset`）で、ノードは ID で指す（`get_graph` で分かる）。結果は JSON の文字列（`content` の text）。
+
+| ツール | 内容 |
+|---|---|
+| `list_graphs` | プロジェクトのグラフ（パス・名前・ノード数） |
+| `get_graph` | グラフの中身: ノード（ID・型・名前・親のコンテナ・位置・型ごとの値・ポート）、エッジ、パラメータ、コンテナの出口 |
+| `create_graph` | 新しいグラフを作る（Entry 入り。`Assets/Create` と同じ） |
+| `add_node` | ノードを作る（型は表示名 `Scene` / `State` / `Event` / `Container` / `Exit` / `Note` / `Entry`、メニューのパス、クラス名のどれでも）。親のコンテナ・位置・タイトル・イベント名・シーン・本文を指定できる。コンテナは中に Entry / Exit も作る（エディタと同じ）。置けない階層なら理由を返す |
+| `update_node` | タイトル・イベント名・シーン・説明・本文・位置を変える |
+| `remove_node` | ノードを消す（コンテナなら中身ごと。コンテナの Entry は単独では消さない。エディタと同じ） |
+| `connect` / `disconnect` | エッジを足す・消す。ポートは省略すると `out` → `in`。コンテナの出力は出口の名前でも指せる。階層をまたぐ・無いポート・重複は理由を返す |
+| `group_into_container` | 選んだノードをコンテナにまとめる（Group into Container と同じ規則。まとめられなければ理由） |
+| `validate_graph` | 問題の一覧（重要度・種類・メッセージ・ノード）。エディタの問題一覧と同じ |
+| `open_graph` | グラフを Visual Node Editor のウィンドウで開く（Computer Use で画面を確かめるとき用） |
+| `get_runtime_state` | Play 中、そのグラフを動かしている Runner の今いるノード・場所（`Stage › Play`）・起こせる操作・パラメータの値。Play 中でなければそう返す |
+| `send_event` | Play 中、イベントを Raise する（または Advance する）。Now running パネルのボタンと同じ |
+
+- 書き換えるツールは、エディタでの操作と同じく `Undo.RecordObject` で記録し（エディタで Undo できる）、終わったらアセットを保存する（エージェントの変更が保存し忘れで消えないように）
+- 値はすべて確かめてから変える（`update_node` などで一部の値だけが変わったまま残らないように）
+- ポート・出口を名前で指すときは、まず完全一致、無ければ大文字小文字を区別せずに 1 つだけ当てはまるもの。いくつも当てはまるときは選ばずに理由を返す
+- 開いているウィンドウのグラフが書き換わったら、ウィンドウは表示中の階層のまま作り直す（`GraphEdits.Edited` を受け取る）
+- 書き換えの処理（`GraphEdits`）とグラフの説明（`GraphDescription`）はアセットだけを相手にするので、EditMode テストの対象にする。
+  コンテナの中身（Entry と出口ごとの Exit）の作り方はエディタの `CreateNode` と共有する（`ContainerContents`）
+
+### Claude Code から使う
+
+- リポジトリの `.mcp.json` に `visual-node-editor`（`type: http`、`http://127.0.0.1:8790/mcp`）を置く。Unity 側でサーバーを有効にしてから Claude Code を使う
+- 他のプロジェクトでは、同じ設定を自分の `.mcp.json` に書く（README）
+
+## エージェント用スキル（`.claude/skills/`、このリポジトリだけ）
+
+Claude Code のスキル。パッケージには入れない（このリポジトリでの開発・確認用）。
+
+| スキル | 内容 |
+|---|---|
+| `editor-visual-check` | Computer Use で Unity エディタを操作し、Visual Node Editor の見た目と操作を確かめる（Event の札、ノードツリー、パンくず、問題を直すボタン、シーンの Pick… / Create Scene…、エッジを外して落としたときの繋ぎ先など）。スクリーンショット付きで報告する |
+| `ux-scenario-run` | Computer Use でシナリオ A・B（`docs/04-ux-audit.md`）を実機で通して時間を計り、Before / After に記入する |
+| `build-flow-with-mcp` | MCP のツールで、説明からゲームの流れのグラフを組み立て、検証まで行う |
+| `debug-flow-with-mcp` | MCP のツールで、Play 中の流れ（今いる場所・起こせるイベント・パラメータ）を確かめ、イベントを送って進める |
+
+- Computer Use のスキルは、MCP のツールで準備（グラフを作る・開く）と確認（`get_graph` / `get_runtime_state`）をし、画面の操作だけを Computer Use で行う（クリックの手数を減らし、結果を確実に確かめるため）
+
 ## 技術的な注意
 
 - `UnityEditor.Experimental.GraphView` は Experimental だが Unity 6 でも利用可能。将来 UI Toolkit に正式なグラフ API が来たら移行を検討する（docs で提案してから）。

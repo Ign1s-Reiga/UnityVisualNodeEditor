@@ -6,6 +6,7 @@ using Reiga.VisualNodeEditor.Editor.Build;
 using Reiga.VisualNodeEditor.Editor.Debugging;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Issues;
+using Reiga.VisualNodeEditor.Editor.Mcp;
 using Reiga.VisualNodeEditor.Editor.Play;
 using Reiga.VisualNodeEditor.Editor.Scenes;
 using Reiga.VisualNodeEditor.Editor.Search;
@@ -241,6 +242,9 @@ namespace Reiga.VisualNodeEditor.Editor
             // Create Script… で作ったスクリプトが、コンパイル後にノードへ追加されたとき
             NodeBehaviourScriptCreator.BehaviourAdded += OnBehaviourScriptAdded;
 
+            // MCP のツールがグラフを書き換えたとき
+            GraphEdits.Edited += OnGraphEditedByMcp;
+
             _assetNameLabel = rootVisualElement.Q<Label>("asset-name");
             _assetNameLabel?.RegisterCallback<ClickEvent>(_ => PingAsset());
 
@@ -257,6 +261,7 @@ namespace Reiga.VisualNodeEditor.Editor
             GraphRunner.Stopped -= OnRunnerStopped;
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             NodeBehaviourScriptCreator.BehaviourAdded -= OnBehaviourScriptAdded;
+            GraphEdits.Edited -= OnGraphEditedByMcp;
             StopObservingRunner();
 
             if (_searchWindow != null)
@@ -729,6 +734,20 @@ namespace Reiga.VisualNodeEditor.Editor
 
             _graphView.Populate(_asset);
             _graphView.SelectNode(nodeId);
+        }
+
+        // MCP のツール（AI エージェント）が開いているグラフを書き換えたら、表示中の階層のまま作り直し、選んでいたノードを選び直す
+        private void OnGraphEditedByMcp(NodeGraphAsset asset)
+        {
+            if (asset != _asset || _graphView == null)
+            {
+                return;
+            }
+
+            var selected = _inspector?.NodeId;
+            _graphView.Populate(_asset);
+            _graphView.SelectNode(selected);
+            _inspector?.Show(_asset, _asset.FindNode(selected) != null ? selected : null);
         }
 
         private void OnNodeCreationRequest(NodeCreationContext context)

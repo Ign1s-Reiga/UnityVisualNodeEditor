@@ -1,0 +1,263 @@
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using Reiga.VisualNodeEditor.Editor.Mcp;
+using UnityEditor;
+using UnityEngine;
+
+namespace Reiga.VisualNodeEditor.Tests
+{
+    /// <summary>グラフを書き換える MCP のツール（エディタと同じ規則・Undo・保存・ウィンドウへの通知）。</summary>
+    public sealed class McpGraphEditToolsTests
+    {
+        private McpTempGraphs _temp;
+        private McpProtocol _protocol;
+        private string _path;
+        private NodeGraphAsset _graph;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _temp = new McpTempGraphs();
+            _protocol = new McpProtocol("test", "0", McpServerHost.CreateTools());
+            _path = McpTempGraphs.Folder + "/Flow.asset";
+            McpTestClient.CallToolForObject(_protocol, "create_graph", Args(("path", _path)));
+            _graph = AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(_path);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (var runner in GraphRunner.Running.ToList())
+            {
+                runner.Stop();
+            }
+
+            _temp.Dispose();
+        }
+
+        [Test]
+        public void CreateGraph_StartsWithAnEntry_AndRefusesBadPaths()
+        {
+            Assert.That(_graph, Is.Not.Null);
+            Assert.That(_graph.Nodes.OfType<EntryNode>().Count(), Is.EqualTo(1));
+
+            Assert.That(McpTestClient.CallTool(_protocol, "create_graph", Args(("path", "Flow.asset"))).IsError, Is.True);
+            Assert.That(McpTestClient.CallTool(_protocol, "create_graph", Args(("path", _path))).Text, Does.Contain("already exists"));
+        }
+
+        [Test]
+        public void BuiltFlow_RunsWithRaise()
+        {
+            var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;
+            var title = AddNode(("type", "State"), ("title", "Title"));
+            var start = AddNode(("type", "Event"), ("eventName", "StartGame"));
+            var game = AddNode(("type", "State"), ("title", "Game"));
+            Connect(entry, title);
+            Connect(title, start);
+            Connect(start, game);
+
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+            Assert.That(runner.Current.Id, Is.EqualTo(title));
+            Assert.That(runner.Raise("StartGame"), Is.True);
+            Assert.That(runner.Current.Id, Is.EqualTo(game));
+            Assert.That(EditorUtility.IsDirty(_graph), Is.False, "edits are saved");
+        }
+
+        [Test]
+        public void AddNode_FollowsTheEditorRules()
+        {
+            var stage = McpTestClient.CallToolForObject(_protocol, "add_node",
+                Args(("graph", _path), ("type", "Container"), ("title", "Stage"), ("exits", new List<object> { "Clear", "GameOver" })));
+            var stageId = (string)stage["id"];
+            var children = _graph.GetChildren(stageId).ToList();
+            Assert.That(children.OfType<ContainerEntryNode>().Count(), Is.EqualTo(1), "a container gets its Entry");
+            Assert.That(children.OfType<ContainerExitNode>().Count(), Is.EqualTo(2), "and one Exit node per exit");
+
+            var exit = McpTestClient.CallToolForObject(_protocol, "add_node",
+                Args(("graph", _path), ("type", "Exit"), ("parent", stageId), ("exit", "GameOver")));
+            Assert.That(((Dictionary<string, object>)exit["exit"])["name"], Is.EqualTo("GameOver"));
+
+            Assert.That(Error(("type", "Exit")), Does.Contain("inside a container"));
+            Assert.That(Error(("type", "Entry"), ("parent", stageId)), Does.Contain("root"));
+            Assert.That(Error(("type", "Spaceship")), Does.Contain("Unknown node type").And.Contain("Scene"));
+            Assert.That(Error(("type", "State"), ("eventName", "Go")), Does.Contain("'eventName' is not used by State"));
+            Assert.That(Error(("type", "Scene"), ("scene", "Assets/Missing.unity")), Does.Contain("No scene"));
+            Assert.That(_graph.Nodes.OfType<StateNode>(), Is.Empty, "a refused node is not added");
+        }
+
+        [Test]
+        public void Connect_UsesPortNamesAndKeepsEdgesInOneLevel()
+        {
+            var stage = (string)McpTestClient.CallToolForObject(_protocol, "add_node",
+                Args(("graph", _path), ("type", "Container"), ("exits", new List<object> { "Clear", "GameOver" })))["id"];
+            var result = AddNode(("type", "State"), ("title", "Result"));
+            var inner = (string)McpTestClient.CallToolForObject(_protocol, "add_node",
+                Args(("graph", _path), ("type", "State"), ("parent", stage)))["id"];
+
+            var edge = McpTestClient.CallToolForObject(_protocol, "connect", Args(("graph", _path), ("from", stage), ("fromPort", "clear"), ("to", result)));
+            Assert.That(edge["fromPort"], Is.EqualTo(_graph.FindNode(stage) is ContainerNode c && c.TryGetExit("Clear", out var clear) ? clear.Id : null));
+
+            Assert.That(McpTestClient.CallTool(_protocol, "connect", Args(("graph", _path), ("from", stage), ("to", result))).Text,
+                Does.Contain("several output ports"));
+            Assert.That(McpTestClient.CallTool(_protocol, "connect", Args(("graph", _path), ("from", result), ("to", inner))).Text,
+                Does.Contain("different containers"));
+            Assert.That(McpTestClient.CallTool(_protocol, "connect", Args(("graph", _path), ("from", stage), ("fromPort", "Clear"), ("to", result))).Text,
+                Does.Contain("already connected"));
+
+            var removed = McpTestClient.CallToolForObject(_protocol, "disconnect", Args(("graph", _path), ("from", stage), ("to", result)));
+            Assert.That(removed["removed"], Is.EqualTo(1L));
+        }
+
+        [Test]
+        public void UpdateAndRemove_ChangeOnlyWhatIsAsked()
+        {
+            var state = AddNode(("type", "State"), ("title", "Title"), ("x", 100), ("y", 50));
+            McpTestClient.CallToolForObject(_protocol, "update_node", Args(("graph", _path), ("node", state), ("description", "The title screen"), ("y", 80)));
+
+            var node = (StateNode)_graph.FindNode(state);
+            Assert.That(node.Title, Is.EqualTo("Title"));
+            Assert.That(node.Description, Is.EqualTo("The title screen"));
+            Assert.That(node.Position, Is.EqualTo(new Vector2(100f, 80f)));
+
+            var stage = (string)McpTestClient.CallToolForObject(_protocol, "add_node", Args(("graph", _path), ("type", "Container")))["id"];
+            var stageEntry = _graph.GetChildren(stage).OfType<ContainerEntryNode>().Single().Id;
+            Assert.That(McpTestClient.CallTool(_protocol, "remove_node", Args(("graph", _path), ("node", stageEntry))).IsError, Is.True);
+
+            McpTestClient.CallTool(_protocol, "remove_node", Args(("graph", _path), ("node", stage)));
+            Assert.That(_graph.FindNode(stage), Is.Null);
+            Assert.That(_graph.FindNode(stageEntry), Is.Null, "the container's contents go with it");
+        }
+
+        [Test]
+        public void RefusedUpdate_ChangesNothing()
+        {
+            // title は正しいが eventName は State に無い: 何も変えずに理由を返す（一部だけ変わったまま残さない）
+            var state = AddNode(("type", "State"), ("title", "Title"));
+            var (text, isError) = McpTestClient.CallTool(_protocol, "update_node",
+                Args(("graph", _path), ("node", state), ("title", "Changed"), ("eventName", "Go")));
+
+            Assert.That(isError, Is.True, text);
+            Assert.That(_graph.FindNode(state).Title, Is.EqualTo("Title"));
+        }
+
+        [Test]
+        public void CreateGraph_ReturnsThePathItWasSavedAt()
+        {
+            var result = McpTestClient.CallToolForObject(_protocol, "create_graph",
+                Args(("path", "  " + McpTempGraphs.Folder.Replace('/', '\\') + "\\Other.asset ")));
+
+            Assert.That(result["path"], Is.EqualTo(McpTempGraphs.Folder + "/Other.asset"));
+            Assert.That(McpTestClient.CallTool(_protocol, "get_graph", Args(("graph", result["path"]))).IsError, Is.False,
+                "the returned path can be used straight away");
+        }
+
+        [Test]
+        public void Names_MatchExactlyFirst_AndRefuseToGuess()
+        {
+            var stage = (string)McpTestClient.CallToolForObject(_protocol, "add_node",
+                Args(("graph", _path), ("type", "Container"), ("exits", new List<object> { "Clear", "clear" })))["id"];
+            var next = AddNode(("type", "State"));
+            var container = (ContainerNode)_graph.FindNode(stage);
+
+            var edge = McpTestClient.CallToolForObject(_protocol, "connect", Args(("graph", _path), ("from", stage), ("fromPort", "clear"), ("to", next)));
+            Assert.That(edge["fromPort"], Is.EqualTo(container.Exits[1].Id), "the exact name wins over a case-insensitive one");
+
+            var ambiguous = McpTestClient.CallTool(_protocol, "connect", Args(("graph", _path), ("from", stage), ("fromPort", "CLEAR"), ("to", next)));
+            Assert.That(ambiguous.IsError, Is.True);
+            Assert.That(ambiguous.Text, Does.Contain("More than one"));
+        }
+
+        [Test]
+        public void Group_MakesANamedContainer()
+        {
+            var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;
+            var title = AddNode(("type", "State"), ("title", "Title"));
+            var game = AddNode(("type", "State"), ("title", "Game"));
+            Connect(entry, title);
+            Connect(title, game);
+
+            var container = McpTestClient.CallToolForObject(_protocol, "group_into_container",
+                Args(("graph", _path), ("nodes", new List<object> { game }), ("title", "Stage")));
+
+            Assert.That(container["label"], Is.EqualTo("Stage"));
+            Assert.That(_graph.FindNode(game).ParentId, Is.EqualTo(container["id"]));
+        }
+
+        [Test]
+        public void Edits_CanBeUndone_AndTellTheWindow()
+        {
+            NodeGraphAsset edited = null;
+            void OnEdited(NodeGraphAsset asset) => edited = asset;
+            GraphEdits.Edited += OnEdited;
+            try
+            {
+                Undo.IncrementCurrentGroup();
+                var state = AddNode(("type", "State"));
+                Assert.That(edited, Is.SameAs(_graph));
+
+                Undo.PerformUndo();
+                Assert.That(_graph.FindNode(state), Is.Null);
+            }
+            finally
+            {
+                GraphEdits.Edited -= OnEdited;
+            }
+        }
+
+        // ---- 実行中の流れ ----
+
+        [Test]
+        public void RuntimeTools_ShowWhereTheFlowIsAndMoveIt()
+        {
+            var entry = _graph.Nodes.OfType<EntryNode>().Single().Id;
+            var title = AddNode(("type", "State"), ("title", "Title"));
+            var start = AddNode(("type", "Event"), ("eventName", "StartGame"));
+            var game = AddNode(("type", "State"), ("title", "Game"));
+            Connect(entry, title);
+            Connect(title, start);
+            Connect(start, game);
+
+            var idle = McpTestClient.CallToolForObject(_protocol, "get_runtime_state");
+            Assert.That(idle["runners"], Is.Empty);
+            Assert.That(McpTestClient.CallTool(_protocol, "send_event", Args(("event", "StartGame"))).Text, Does.Contain("No graph is running"));
+
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+            var state = McpTestClient.CallToolForObject(_protocol, "get_runtime_state", Args(("graph", _path)));
+            var running = (Dictionary<string, object>)((List<object>)state["runners"]).Single();
+            Assert.That(running["location"], Is.EqualTo("Title"));
+            Assert.That(((List<object>)running["actions"]).Cast<Dictionary<string, object>>().Select(a => a["event"]), Is.EqualTo(new[] { "StartGame" }));
+
+            var wrong = McpTestClient.CallTool(_protocol, "send_event", Args(("event", "Finish")));
+            Assert.That(wrong.IsError, Is.True);
+            Assert.That(wrong.Text, Does.Contain("It can: StartGame"));
+
+            var moved = McpTestClient.CallToolForObject(_protocol, "send_event", Args(("event", "StartGame")));
+            Assert.That(((Dictionary<string, object>)moved["current"])["id"], Is.EqualTo(game));
+        }
+
+        private string AddNode(params (string Key, object Value)[] fields)
+        {
+            var args = Args(fields);
+            args["graph"] = _path;
+            return (string)McpTestClient.CallToolForObject(_protocol, "add_node", args)["id"];
+        }
+
+        private void Connect(string from, string to) =>
+            McpTestClient.CallToolForObject(_protocol, "connect", Args(("graph", _path), ("from", from), ("to", to)));
+
+        private string Error(params (string Key, object Value)[] fields)
+        {
+            var args = Args(fields);
+            args["graph"] = _path;
+            var (text, isError) = McpTestClient.CallTool(_protocol, "add_node", args);
+            Assert.That(isError, Is.True, text);
+            return text;
+        }
+
+        private static Dictionary<string, object> Args(params (string Key, object Value)[] fields) =>
+            fields.ToDictionary(f => f.Key, f => f.Value is int i ? (object)(long)i : f.Value);
+    }
+}

@@ -24,10 +24,6 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         // 貼り付けた要素を元の位置から少しずらす量。同じ内容を続けて貼るたびに、さらにこの分ずらす
         private static readonly Vector2 PasteOffset = new Vector2(30f, 30f);
 
-        // 新しいコンテナの中に自動で作る Exit ノードの位置（Entry は原点）
-        private static readonly Vector2 ContainerExitOrigin = new Vector2(400f, 0f);
-        private static readonly Vector2 ContainerExitSpacing = new Vector2(0f, 100f);
-
         // 案内の Add First Scene で、Entry から右へずらして Scene ノードを置く量
         private static readonly Vector2 FirstSceneOffset = new Vector2(300f, 0f);
 
@@ -648,17 +644,16 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             var data = (NodeData)Activator.CreateInstance(nodeType);
             data.Position = position;
             data.ParentId = CurrentContainerId;
-            if (data is ContainerExitNode exitNode && _asset.FindNode(CurrentContainerId) is ContainerNode parent
-                && parent.Exits.Count > 0)
+            if (data is ContainerExitNode exitNode)
             {
-                exitNode.ExitId = parent.Exits[0].Id;
+                ContainerContents.PointAtFirstExit(_asset, exitNode);
             }
 
             Undo.RecordObject(_asset, "Add Node");
             _asset.AddNode(data);
             if (data is ContainerNode container)
             {
-                AddContainerContents(container);
+                ContainerContents.Create(_asset, container);
             }
 
             EditorUtility.SetDirty(_asset);
@@ -667,30 +662,6 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             AddElement(view);
             GraphChanged?.Invoke();
             return view;
-        }
-
-        /// <summary>
-        /// 新しいコンテナの中に、Entry と出口ごとの Exit ノードを作る（中の階層の左に Entry、右に Exit を縦に並べる）。
-        /// Entry は最初の出口の Exit ノードに繋ぎ、作ったばかりのコンテナがそのまま通り抜けられるようにする。
-        /// </summary>
-        private void AddContainerContents(ContainerNode container)
-        {
-            var entry = new ContainerEntryNode { ParentId = container.Id, Position = Vector2.zero };
-            _asset.AddNode(entry);
-            for (var i = 0; i < container.Exits.Count; i++)
-            {
-                var exitNode = new ContainerExitNode
-                {
-                    ParentId = container.Id,
-                    ExitId = container.Exits[i].Id,
-                    Position = ContainerExitOrigin + ContainerExitSpacing * i,
-                };
-                _asset.AddNode(exitNode);
-                if (i == 0)
-                {
-                    _asset.AddEdge(new EdgeData(entry.Id, NodeView.OutputPortName, exitNode.Id, NodeView.InputPortName));
-                }
-            }
         }
 
         private NodeView CreateNodeView(NodeData data)
