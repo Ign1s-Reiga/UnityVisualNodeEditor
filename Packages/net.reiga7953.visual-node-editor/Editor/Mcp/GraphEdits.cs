@@ -84,9 +84,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         // Windows がファイル・フォルダの名前に使わせない名前（拡張子が付いていても不可）
         private static readonly HashSet<string> ReservedNames = new(StringComparer.OrdinalIgnoreCase)
         {
-            "CON", "PRN", "AUX", "NUL",
-            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+            "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "COM¹", "COM²", "COM³",
+            "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "LPT¹", "LPT²", "LPT³",
         };
 
         /// <summary>
@@ -110,8 +110,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return false;
             }
 
+            // 予約名は拡張子の前の部分で比べる。Windows はその部分の末尾の空白も無視する（"CON .asset" も CON）
             var dot = segment.IndexOf('.');
-            return !ReservedNames.Contains(dot < 0 ? segment : segment.Substring(0, dot));
+            var baseName = (dot < 0 ? segment : segment.Substring(0, dot)).TrimEnd();
+            return !ReservedNames.Contains(baseName);
         }
 
         // ツール 1 回の変更を、それだけで 1 つの Undo にする（Unity はマウスやキーの入力でしか Undo を区切らないので、
