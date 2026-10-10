@@ -106,16 +106,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             {
                 _tree.SetRootItems(ToItems(roots, 0));
                 ForgetRemovedNodes();
+
+                // 新しく出たコンテナ（別のアセットを開いたときはすべて）を、作り直す前に開いておく。
+                // 作り直しの後に開くと、もう 1 回表示を作り直すことになる。閉じたものは、ユーザーが閉じたままにしている
+                foreach (var id in _newContainerIds)
+                {
+                    _tree.ExpandItem(id, false, false);
+                }
+
                 _tree.Rebuild();
-                if (assetChanged)
-                {
-                    _tree.ExpandAll();
-                }
-                else
-                {
-                    // 後から足したコンテナは開いた状態で出す（閉じたものは、ユーザーが閉じたままにしている）
-                    ExpandWithoutRefreshing(_newContainerIds);
-                }
 
                 // 作り直しでは選び直すだけで、閉じたコンテナを開き直さない
                 ApplySelection(reveal: false);

@@ -71,6 +71,18 @@ namespace Reiga.VisualNodeEditor.Tests
         // ---- パネル ----
 
         [Test]
+        public void Panel_OpensEveryContainerOfANewlyShownGraph()
+        {
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+
+            panel.Show(g.Asset);
+
+            Assert.That(panel.IsExpanded(g.Stage.Id), Is.True);
+            Assert.That(panel.IsExpanded(g.Inner.Id), Is.True, "nested containers too");
+        }
+
+        [Test]
         public void Panel_ListsEveryNodeAndFollowsTheGraphSelection()
         {
             using var g = new ContainerTestGraph();
