@@ -301,6 +301,22 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(((Dictionary<string, object>)moved["current"])["id"], Is.EqualTo(game));
         }
 
+        // ---- 失敗したときに残さないもの ----
+
+        [Test]
+        public void CreateGraph_ThatFails_DestroysTheUnsavedGraph()
+        {
+            // アセットにならなかったグラフはメモリに残るだけ。失敗のたびに溜まらないよう消す
+            UnityEngine.Object unsaved = null;
+            Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(McpTempGraphs.Folder + "/Lost.asset", (asset, _) =>
+            {
+                unsaved = asset;
+                throw new InvalidOperationException("disk full");
+            }));
+
+            Assert.That(unsaved == null, Is.True, "the in-memory graph is destroyed");
+        }
+
         private string AddNode(params (string Key, object Value)[] fields)
         {
             var args = Args(fields);

@@ -51,10 +51,11 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             // 失敗したら、このために作ったフォルダを消す（失敗した呼び出しでプロジェクトを変えない。ほかのツールと同じ）
             var createdFolders = new List<string>();
+            NodeGraphAsset graph = null;
             try
             {
                 EnsureFolder(Path.GetDirectoryName(normalized)?.Replace('\\', '/'), createdFolders);
-                var graph = NodeGraphFactory.CreateNew();
+                graph = NodeGraphFactory.CreateNew();
                 (createAsset ?? AssetDatabase.CreateAsset)(graph, normalized);
                 AssetDatabase.SaveAssets();
 
@@ -72,6 +73,12 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
                 {
                     AssetDatabase.DeleteAsset(createdFolders[i]);
+                }
+
+                // アセットにならなかったグラフはメモリに残るだけなので消す（やり直すたびに溜まらないように）
+                if (graph != null && string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+                {
+                    UnityEngine.Object.DestroyImmediate(graph);
                 }
 
                 throw;
