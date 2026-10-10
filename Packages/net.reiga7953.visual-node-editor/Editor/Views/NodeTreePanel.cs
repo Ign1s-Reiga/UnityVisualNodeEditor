@@ -111,7 +111,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 // 作り直しの後に開くと、もう 1 回表示を作り直すことになる。閉じたものは、ユーザーが閉じたままにしている
                 ExpandItems(_newContainerIds);
 
-                _tree.Rebuild();
+                RebuildRows();
 
                 // 作り直しでは選び直すだけで、閉じたコンテナを開き直さない
                 ApplySelection(reveal: false);
@@ -148,14 +148,14 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         public void ShowLevel(string containerId)
         {
             _levelContainerId = containerId ?? string.Empty;
-            _tree.RefreshItems();
+            RefreshRows();
         }
 
         /// <summary>Play 中に実行中のノードを強調する（それを含むコンテナも薄く強調する）。null で消す。</summary>
         public void ShowRunning(string nodeId)
         {
             _runningNodeId = nodeId;
-            _tree.RefreshItems();
+            RefreshRows();
         }
 
         /// <summary>そのノードの項目に付ける状態の USS クラス（コンテナ・表示中の階層・実行中・実行中のノードを含むコンテナ）。</summary>
@@ -374,12 +374,28 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
 
             ExpandItems(ids);
+            RefreshRows();
+        }
+
+        /// <summary>
+        /// 表示を作り直した回数（テスト用）。項目を作り直す（<see cref="RebuildRows"/>）のも、表示だけ更新する（<see cref="RefreshRows"/>）のも、
+        /// すべてここを通るので、どこで作り直しても数える。
+        /// </summary>
+        internal int RefreshCount { get; private set; }
+
+        // 項目を作り直す（階層が変わったとき）
+        private void RebuildRows()
+        {
+            RefreshCount++;
+            _tree.Rebuild();
+        }
+
+        // 項目はそのままで表示を更新する（開閉・強調の変化）
+        private void RefreshRows()
+        {
             RefreshCount++;
             _tree.RefreshItems();
         }
-
-        /// <summary>項目を開いたことで表示を作り直した回数（テスト用。開くものが無ければ増えない）。</summary>
-        internal int RefreshCount { get; private set; }
 
         private static VisualElement MakeItem()
         {

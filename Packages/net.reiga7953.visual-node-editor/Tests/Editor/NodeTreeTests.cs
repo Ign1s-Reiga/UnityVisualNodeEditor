@@ -233,6 +233,28 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(panel.IsSelectionShown, Is.True);
         }
 
+        [Test]
+        public void RefreshCount_CountsEveryRedraw()
+        {
+            // 作り直しを数えるのがどこか 1 か所だけだと、「作り直さない」テストが余計な作り直しを見逃す
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+
+            panel.Show(g.Asset);
+            Assert.That(panel.RefreshCount, Is.EqualTo(1), "the first build");
+
+            panel.ShowLevel(g.Stage.Id);
+            panel.ShowRunning(g.Play.Id);
+            Assert.That(panel.RefreshCount, Is.EqualTo(3), "highlights refresh the rows");
+
+            panel.Show(g.Asset);
+            Assert.That(panel.RefreshCount, Is.EqualTo(3), "nothing changed, nothing redrawn");
+
+            g.Result.Title = "Score";
+            panel.Show(g.Asset);
+            Assert.That(panel.RefreshCount, Is.EqualTo(4));
+        }
+
         // ---- 閉じたコンテナの中の選択 ----
 
         [Test]
