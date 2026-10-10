@@ -28,8 +28,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         /// <summary>
         /// <see cref="CreateGraph(string)"/> の本体。<paramref name="createAsset"/> はアセットを作る処理（null なら
         /// <see cref="AssetDatabase.CreateAsset"/>。テストで作るのに失敗させるため）。
-        /// 失敗したらプロジェクトを元に戻す: <paramref name="path"/> に書いたアセットを消し（作る前に何も無いことを確かめているので、
-        /// そこにあるのはこの呼び出しが書いたもの）、このために作ったフォルダを消し、アセットにならなかったグラフをメモリから消す。
+        /// 失敗したらプロジェクトを元に戻す: <paramref name="path"/> に書いたアセットを .meta ごと消し（作る前に何も無いことを確かめているので、
+        /// そこにあるのはこの呼び出しが書いたもの。書き始める前に失敗したなら、そのパスの物には触らない）、
+        /// このために作ったフォルダを消し、アセットにならなかったグラフをメモリから消す。
         /// </summary>
         internal static NodeGraphAsset CreateGraph(string path, Action<UnityEngine.Object, string> createAsset)
         {
@@ -55,10 +56,12 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             // 失敗したら、このために作ったフォルダを消す（失敗した呼び出しでプロジェクトを変えない。ほかのツールと同じ）
             var createdFolders = new List<string>();
             NodeGraphAsset graph = null;
+            var startedWriting = false;
             try
             {
                 EnsureFolder(Path.GetDirectoryName(normalized)?.Replace('\\', '/'), createdFolders);
                 graph = NodeGraphFactory.CreateNew();
+                startedWriting = true;
                 (createAsset ?? AssetDatabase.CreateAsset)(graph, normalized);
                 AssetDatabase.SaveAssets();
 
@@ -74,21 +77,23 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             catch
             {
                 // 後片付けの 1 つが失敗しても残りは続け、元の失敗の理由を返す（後片付けの例外はログに残す）。
-                // 作る前には何も無かった（上で確かめた）ので、今そこにあるのはこの呼び出しが書いたアセット。既にあったフォルダの中でも消す
-                TryCleanUp(() =>
+                // 書き始めていたら、作る前には何も無かった（上で確かめた）ので、今そこにあるのはこの呼び出しが書いたもの。既にあったフォルダの中でも消す。
+                // 書く前に失敗したなら、そのパスにある物には触らない（その間に別の誰かが置いた物かもしれない）
+                if (startedWriting)
                 {
-                    if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                    TryCleanUp(() =>
                     {
+                        // 読み込めなかったアセットも .meta ごと消えるよう、まず Unity に消させる（Unity が知らないパスなら何もしない）
                         AssetDatabase.DeleteAsset(normalized);
-                    }
 
-                    // 書いたが Unity が読み込めなかったファイルは AssetDatabase からは消せないので、ディスクから消す
-                    // （残すと、そのパスでのやり直しが「既にある」で断られ続ける）
-                    if (File.Exists(normalized))
-                    {
-                        File.Delete(normalized);
-                    }
-                }, Debug.LogException);
+                        // 書いたが Unity が読み込んでいないファイルは AssetDatabase からは消せないので、ディスクから消す
+                        // （残すと、そのパスでのやり直しが「既にある」で断られ続ける）
+                        if (File.Exists(normalized))
+                        {
+                            File.Delete(normalized);
+                        }
+                    }, Debug.LogException);
+                }
 
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
                 {

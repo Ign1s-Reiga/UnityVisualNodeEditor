@@ -265,6 +265,8 @@ namespace Reiga.VisualNodeEditor.Tests
             }));
 
             Assert.That(AssetDatabase.LoadMainAssetAtPath(path), Is.Null);
+            Assert.That(System.IO.File.Exists(path), Is.False);
+            Assert.That(System.IO.File.Exists(path + ".meta"), Is.False, "no orphan .meta is left");
         }
 
         [TestCase("NaN")]
