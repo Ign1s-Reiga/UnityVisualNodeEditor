@@ -69,6 +69,12 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
             catch
             {
+                // 作る前には何も無かった（上で確かめた）ので、今そこにあるのはこの呼び出しが書いたアセット。既にあったフォルダの中でも消す
+                if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
+                {
+                    AssetDatabase.DeleteAsset(normalized);
+                }
+
                 for (var i = createdFolders.Count - 1; i >= 0; i--)
                 {
                     AssetDatabase.DeleteAsset(createdFolders[i]);
