@@ -446,14 +446,26 @@ namespace Reiga.VisualNodeEditor.Tests
         {
             // 書いたが Unity が読み込めなかったファイルも消す。残すと、そのパスでのやり直しが「既にある」で断られ続ける
             var path = McpTempGraphs.Folder + "/HalfWritten.asset";
-            Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(path, (_, assetPath) =>
+            try
             {
-                System.IO.File.WriteAllText(assetPath, "half written");
-                throw new InvalidOperationException("disk full");
-            }));
+                Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(path, (_, assetPath) =>
+                {
+                    System.IO.File.WriteAllText(assetPath, "half written");
+                    throw new InvalidOperationException("disk full");
+                }));
 
-            Assert.That(System.IO.File.Exists(path), Is.False);
-            Assert.That(GraphEdits.CreateGraph(path), Is.Not.Null, "the same path can be used again");
+                Assert.That(System.IO.File.Exists(path), Is.False);
+                Assert.That(GraphEdits.CreateGraph(path), Is.Not.Null, "the same path can be used again");
+            }
+            finally
+            {
+                // 後片付けが壊れて書きかけのファイルが残っても、.asset として読み込まれて Unity がエラーを出す（別のテストの失敗になる）前に消す。
+                // 作り直せたグラフ（Unity が知っているアセット）は一時フォルダごと消える
+                if (System.IO.File.Exists(path) && AssetDatabase.LoadMainAssetAtPath(path) == null)
+                {
+                    System.IO.File.Delete(path);
+                }
+            }
         }
 
         private string AddNode(params (string Key, object Value)[] fields)
