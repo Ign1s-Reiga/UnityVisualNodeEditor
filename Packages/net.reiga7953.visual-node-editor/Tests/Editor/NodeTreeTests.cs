@@ -179,5 +179,26 @@ namespace Reiga.VisualNodeEditor.Tests
             panel.Show(g.Asset);
             Assert.That(panel.SelectedNodeId, Is.EqualTo(g.Play.Id), "the selection survives a rebuild");
         }
+
+        // ---- 閉じたコンテナの中の選択 ----
+
+        [Test]
+        public void Panel_ReselectsTheNodeWhenItsContainerOpens()
+        {
+            // 閉じたコンテナの中の選択中のノードは、作り直しで項目の選択が外れても、コンテナを開くと選ばれた状態に戻る
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+            panel.Show(g.Asset);
+            panel.Select(g.Play.Id);
+            panel.SetExpanded(g.Stage.Id, false);
+            g.Result.Title = "Score";
+            panel.Show(g.Asset);
+            Assert.That(panel.IsSelectionShown, Is.False, "hidden inside the collapsed container");
+
+            panel.SetExpanded(g.Stage.Id, true);
+
+            Assert.That(panel.IsSelectionShown, Is.True);
+            Assert.That(panel.SelectedNodeId, Is.EqualTo(g.Play.Id));
+        }
     }
 }

@@ -58,6 +58,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             _tree.AddToClassList("vne-node-tree__list");
             _tree.selectionChanged += _ => OnSelectionChanged();
             _tree.itemsChosen += _ => OnItemsChosen();
+            _tree.itemExpandedChanged += _ => OnItemExpandedChanged();
             Add(_tree);
         }
 
@@ -293,6 +294,35 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             else
             {
                 _tree.CollapseItem(id);
+            }
+        }
+
+        // 閉じたコンテナの中のノードは、項目を選ばずに覚えておくだけにしている。コンテナが開いて見えるようになったら選び直す
+        private void OnItemExpandedChanged()
+        {
+            if (_syncing || IsSelectionShown)
+            {
+                return;
+            }
+
+            _syncing = true;
+            try
+            {
+                ApplySelection(reveal: false);
+            }
+            finally
+            {
+                _syncing = false;
+            }
+        }
+
+        /// <summary>選んでいるノードが、ツリーの項目としても選ばれているか（テスト用。閉じたコンテナの中なら選ばれていない）。</summary>
+        internal bool IsSelectionShown
+        {
+            get
+            {
+                var index = _tree.selectedIndex;
+                return _selectedNodeId != null && index >= 0 && _tree.GetItemDataForIndex<NodeTreeEntry>(index)?.NodeId == _selectedNodeId;
             }
         }
 
