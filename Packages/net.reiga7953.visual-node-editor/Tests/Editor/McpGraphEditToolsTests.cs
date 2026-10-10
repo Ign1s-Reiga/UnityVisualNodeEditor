@@ -180,6 +180,20 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.IsValidFolder(McpTempGraphs.Folder), Is.True, "folders that already existed stay");
         }
 
+        [Test]
+        public void CreateGraph_ThatFailsAfterWriting_RemovesTheAsset()
+        {
+            // アセットを書いた後で失敗しても（既にあったフォルダの中でも）、書いたアセットを残さない
+            var path = McpTempGraphs.Folder + "/Half.asset";
+            Assert.Throws<InvalidOperationException>(() => GraphEdits.CreateGraph(path, (asset, assetPath) =>
+            {
+                AssetDatabase.CreateAsset(asset, assetPath);
+                throw new InvalidOperationException("save failed");
+            }));
+
+            Assert.That(AssetDatabase.LoadMainAssetAtPath(path), Is.Null);
+        }
+
         [TestCase("NaN")]
         [TestCase("Infinity")]
         public void Positions_MustBeFinite(string value)
