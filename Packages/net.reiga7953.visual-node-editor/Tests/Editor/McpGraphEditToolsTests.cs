@@ -52,13 +52,21 @@ namespace Reiga.VisualNodeEditor.Tests
         {
             // 自動更新が切れているときなど、ディスクにはあるが読み込まれていないファイル。後片付けで消してしまわないよう、作る前に断る
             var path = McpTempGraphs.Folder + "/NotImported.asset";
-            System.IO.File.WriteAllText(path, "not imported");
+            try
+            {
+                System.IO.File.WriteAllText(path, "not imported");
 
-            var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
+                var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
 
-            Assert.That(isError, Is.True, text);
-            Assert.That(text, Does.Contain("already exists"));
-            Assert.That(System.IO.File.ReadAllText(path), Is.EqualTo("not imported"), "the file is left alone");
+                Assert.That(isError, Is.True, text);
+                Assert.That(text, Does.Contain("already exists"));
+                Assert.That(System.IO.File.ReadAllText(path), Is.EqualTo("not imported"), "the file is left alone");
+            }
+            finally
+            {
+                // .asset として読み込まれると Unity が読めずにエラーを出す（別のテストの失敗になる）ので、読み込まれる前に消す
+                System.IO.File.Delete(path);
+            }
         }
 
         [Test]
