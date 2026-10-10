@@ -70,20 +70,37 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        [TestCase("Docs~")]
-        [TestCase(".hidden")]
-        public void CreateGraph_ExplainsFoldersUnityIgnores(string name)
+        [TestCase("Docs~/Main.asset", "Docs~")]
+        [TestCase(".hidden/Sub/Main.asset", ".hidden")]
+        [TestCase("cvs/Main.asset", "cvs")]
+        [TestCase("CVS/Main.asset", "CVS")]
+        [TestCase("Build.tmp/Main.asset", "Build.tmp")]
+        [TestCase(".Main.asset", ".Main.asset")]
+        public void CreateGraph_RefusesNamesUnityIgnores(string relativePath, string ignoredName)
         {
-            // Unity が読み込まない名前のフォルダは、更新しても読み込まれない。更新を促さず、その理由を返す
-            var folder = McpTempGraphs.Folder + "/" + name;
+            // Unity が読み込まない名前は、何かを作る前に断る（更新しても読み込まれず、作ったフォルダは Unity が知らないので消せない）
+            var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", McpTempGraphs.Folder + "/" + relativePath)));
+
+            Assert.That(isError, Is.True, text);
+            Assert.That(text, Does.Contain("Unity ignores").And.Contain($"'{ignoredName}'"));
+            Assert.That(text, Does.Not.Contain("Refresh"));
+            Assert.That(System.IO.Directory.GetFileSystemEntries(McpTempGraphs.Folder).Select(System.IO.Path.GetFileName),
+                Has.None.EqualTo(ignoredName), "nothing is created on disk");
+        }
+
+        [Test]
+        public void CreateGraph_RefusesFoldersUnderAnIgnoredFolder()
+        {
+            // 無視される名前のフォルダの中のフォルダも、ディスクにあっても読み込まれない。一番下の名前だけでなく、途中の名前も見る
+            var folder = McpTempGraphs.Folder + "/.hidden";
             try
             {
-                System.IO.Directory.CreateDirectory(folder);
+                System.IO.Directory.CreateDirectory(folder + "/Sub");
 
-                var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", folder + "/Main.asset")));
+                var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", folder + "/Sub/Main.asset")));
 
                 Assert.That(isError, Is.True, text);
-                Assert.That(text, Does.Contain("Unity ignores"));
+                Assert.That(text, Does.Contain("Unity ignores").And.Contain("'.hidden'"));
                 Assert.That(text, Does.Not.Contain("Refresh"));
             }
             finally
