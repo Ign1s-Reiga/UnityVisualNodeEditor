@@ -104,6 +104,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             try
             {
                 _tree.SetRootItems(ToItems(roots, 0));
+                ForgetRemovedNodes();
                 _tree.Rebuild();
                 if (assetChanged)
                 {
@@ -231,6 +232,19 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
             return items;
         }
+
+        // ツリーから消えたノードの ID を忘れる（覚えたままだと、Undo などで戻ったコンテナが「新しい」とみなされず、前の開閉の状態で出てしまう）
+        private void ForgetRemovedNodes()
+        {
+            var present = new HashSet<string>(_entries.Values.Select(entry => entry.NodeId));
+            foreach (var nodeId in _ids.Keys.Where(nodeId => !present.Contains(nodeId)).ToList())
+            {
+                _ids.Remove(nodeId);
+            }
+        }
+
+        /// <summary>覚えている項目の ID の数（テスト用。消えたノードの分は残さない）。</summary>
+        internal int KnownIdCount => _ids.Count;
 
         private IEnumerable<int> GetAncestors(int id)
         {
