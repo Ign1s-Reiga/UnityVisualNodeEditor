@@ -27,6 +27,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         private readonly Dictionary<string, int> _ids = new();
         private readonly Dictionary<int, NodeTreeEntry> _entries = new();
         private readonly Dictionary<int, int> _parents = new();
+
+        // 今回の作り直しで初めて出たコンテナの項目（開いた状態で出す）
+        private readonly List<int> _newContainerIds = new();
         private int _nextId = 1;
 
         private NodeGraphAsset _asset;
@@ -96,6 +99,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             _signature = signature;
             _entries.Clear();
             _parents.Clear();
+            _newContainerIds.Clear();
             _syncing = true;
             try
             {
@@ -105,8 +109,17 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 {
                     _tree.ExpandAll();
                 }
+                else
+                {
+                    // 後から足したコンテナは開いた状態で出す（閉じたものは、ユーザーが閉じたままにしている）
+                    foreach (var id in _newContainerIds)
+                    {
+                        _tree.ExpandItem(id);
+                    }
+                }
 
-                ApplySelection();
+                // 作り直しでは選び直すだけで、閉じたコンテナを開き直さない
+                ApplySelection(reveal: false);
             }
             finally
             {
@@ -120,11 +133,15 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// </summary>
         public void Select(string nodeId)
         {
-            _selectedNodeId = nodeId != null && _ids.ContainsKey(nodeId) ? nodeId : null;
+            var next = nodeId != null && _ids.ContainsKey(nodeId) ? nodeId : null;
+
+            // 選択が変わったときだけ、入っているコンテナを開いて見せる（同じノードの選び直しで、ユーザーが閉じたコンテナを開かない）
+            var changed = next != _selectedNodeId;
+            _selectedNodeId = next;
             _syncing = true;
             try
             {
-                ApplySelection();
+                ApplySelection(reveal: changed);
             }
             finally
             {
@@ -201,6 +218,10 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 {
                     id = _nextId++;
                     _ids[entry.NodeId] = id;
+                    if (entry.IsContainer)
+                    {
+                        _newContainerIds.Add(id);
+                    }
                 }
 
                 _entries[id] = entry;
@@ -221,8 +242,8 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
-        // 選んでいるノードを、入っているコンテナを開いてから選ぶ（_syncing の中で呼ぶ）
-        private void ApplySelection()
+        // 選んでいるノードを選ぶ（_syncing の中で呼ぶ）。reveal なら、入っているコンテナを開いて見える所まで送る
+        private void ApplySelection(bool reveal)
         {
             if (_selectedNodeId == null || !_ids.TryGetValue(_selectedNodeId, out var id) || !_entries.ContainsKey(id))
             {
@@ -231,15 +252,48 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 return;
             }
 
-            foreach (var ancestor in GetAncestors(id).Reverse())
+            if (reveal)
             {
-                _tree.ExpandItem(ancestor);
+                foreach (var ancestor in GetAncestors(id).Reverse())
+                {
+                    _tree.ExpandItem(ancestor);
+                }
+            }
+            else if (GetAncestors(id).Any(ancestor => !_tree.IsExpanded(ancestor)))
+            {
+                // TreeView は選んだ項目の親を開いてしまうので、閉じたコンテナの中なら項目は選ばない（選んでいるノードは覚えておく）
+                _tree.ClearSelection();
+                return;
             }
 
             _tree.SetSelectionById(id);
 
-            // レイアウトが済んでから送る（パネルに付く前は何もしない）
-            _tree.schedule.Execute(() => _tree.ScrollToItemById(id));
+            if (reveal)
+            {
+                // レイアウトが済んでから送る（パネルに付く前は何もしない）
+                _tree.schedule.Execute(() => _tree.ScrollToItemById(id));
+            }
+        }
+
+        /// <summary>そのノードの項目が開いているか（テスト用）。</summary>
+        internal bool IsExpanded(string nodeId) => nodeId != null && _ids.TryGetValue(nodeId, out var id) && _tree.IsExpanded(id);
+
+        /// <summary>そのノードの項目を開く・閉じる（テスト用。ユーザーの ▶ の操作と同じ）。</summary>
+        internal void SetExpanded(string nodeId, bool expanded)
+        {
+            if (nodeId == null || !_ids.TryGetValue(nodeId, out var id))
+            {
+                return;
+            }
+
+            if (expanded)
+            {
+                _tree.ExpandItem(id);
+            }
+            else
+            {
+                _tree.CollapseItem(id);
+            }
         }
 
         private void OnSelectionChanged()

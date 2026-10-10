@@ -132,6 +132,24 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(McpJson.Parse(allowed), Is.InstanceOf<List<object>>());
         }
 
+        [Test]
+        public void ErrorsForUnhandledRequests_KeepTheirIds()
+        {
+            // 時間切れなどで処理できなかったとき、クライアントがどの要求の失敗か分かるよう同じ id で返す
+            var single = (Dictionary<string, object>)McpJson.Parse(McpProtocol.ErrorForRequests(
+                "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/call\"}", -32603, "busy"));
+            Assert.That(single["id"], Is.EqualTo(7L));
+            Assert.That(((Dictionary<string, object>)single["error"])["message"], Is.EqualTo("busy"));
+
+            var batch = ((List<object>)McpJson.Parse(McpProtocol.ErrorForRequests(
+                "[{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"},{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"ping\"}]",
+                -32603, "busy"))).Cast<Dictionary<string, object>>().ToList();
+            Assert.That(batch.Select(r => r["id"]), Is.EqualTo(new[] { "a" }), "notifications get no reply");
+
+            Assert.That(McpProtocol.ErrorForRequests("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}", -32603, "busy"), Is.Null);
+            Assert.That(((Dictionary<string, object>)McpJson.Parse(McpProtocol.ErrorForRequests("{broken", -32603, "busy")))["id"], Is.Null);
+        }
+
         private static long ErrorCode(string reply)
         {
             var error = (Dictionary<string, object>)((Dictionary<string, object>)McpJson.Parse(reply))["error"];

@@ -57,6 +57,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             {
                 if (Interlocked.CompareExchange(ref state, Cancelled, Pending) == Pending)
                 {
+                    // 取り消した処理は done に触れないので、ここで放してよい
+                    done.Dispose();
                     throw new TimeoutException("Unity did not run the request in time (it may be compiling, importing or showing a dialog). Nothing was changed.");
                 }
 

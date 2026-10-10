@@ -168,7 +168,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 }
                 catch (TimeoutException exception)
                 {
-                    Send(response, 503, McpProtocol.Error(null, McpProtocol.InternalError, exception.Message));
+                    // 要求と同じ id のエラーとして返す（HTTP のエラーにすると、クライアントは本文を読まずに理由が伝わらない）
+                    var timeoutReply = McpProtocol.ErrorForRequests(body, McpProtocol.InternalError, exception.Message);
+                    Send(response, timeoutReply == null ? 202 : 200, timeoutReply);
                     return;
                 }
 

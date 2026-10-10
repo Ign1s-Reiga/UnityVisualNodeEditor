@@ -137,6 +137,34 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Panel_LeavesCollapsedContainersAlone_AndOpensNewOnes()
+        {
+            using var g = new ContainerTestGraph();
+            var panel = new NodeTreePanel();
+            panel.Show(g.Asset);
+            panel.Select(g.Play.Id);
+            panel.SetExpanded(g.Stage.Id, false);
+
+            // 別のノードの改名で作り直しても、同じノードを選び直しても、閉じたコンテナは閉じたまま
+            g.Result.Title = "Score";
+            panel.Show(g.Asset);
+            panel.Select(g.Play.Id);
+            Assert.That(panel.IsExpanded(g.Stage.Id), Is.False);
+
+            // 別のノードを選んだときは、見えるようにコンテナを開く
+            panel.Select(g.Boss.Id);
+            Assert.That(panel.IsExpanded(g.Stage.Id), Is.True);
+            Assert.That(panel.IsExpanded(g.Inner.Id), Is.True);
+
+            // 後から足したコンテナは開いた状態で出す
+            var added = new ContainerNode { Title = "Bonus", Position = new Vector2(600f, 0f) };
+            g.Asset.AddNode(added);
+            g.Asset.AddNode(new StateNode { Title = "Extra", ParentId = added.Id });
+            panel.Show(g.Asset);
+            Assert.That(panel.IsExpanded(added.Id), Is.True);
+        }
+
+        [Test]
         public void Panel_KeepsTheSameItemsWhenNothingChanged()
         {
             using var g = new ContainerTestGraph();

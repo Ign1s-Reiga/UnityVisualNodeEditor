@@ -31,6 +31,14 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException($"The path must be inside Assets and end with .asset, e.g. 'Assets/Flows/Main.asset' (got '{path}').");
             }
 
+            var badSegment = normalized.Split('/').FirstOrDefault(segment =>
+                segment.Length == 0 || segment == "." || segment == ".." || segment.Any(c => c < 0x20 || InvalidPathCharacters.Contains(c)));
+            if (badSegment != null)
+            {
+                throw new McpToolException($"'{normalized}' is not a usable asset path: each folder and file name must be non-empty, " +
+                                           $"must not be '.' or '..', and must not contain any of {InvalidPathCharacters}.");
+            }
+
             if (AssetDatabase.LoadMainAssetAtPath(normalized) != null)
             {
                 throw new McpToolException($"Something already exists at '{normalized}'. Pick another path.");
@@ -40,7 +48,27 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             var graph = NodeGraphFactory.CreateNew();
             AssetDatabase.CreateAsset(graph, normalized);
             AssetDatabase.SaveAssets();
+
+            // Unity は作れなかったとき例外ではなくログだけ出すことがあるので、本当にアセットになったかを確かめる
+            if (string.IsNullOrEmpty(AssetDatabase.GetAssetPath(graph)))
+            {
+                UnityEngine.Object.DestroyImmediate(graph);
+                throw new McpToolException($"Unity could not create an asset at '{normalized}' (see the Console). Pick another path.");
+            }
+
             return graph;
+        }
+
+        // アセットのパスに使えない文字（どの OS でも使えるパスにする）
+        private const string InvalidPathCharacters = ":*?\"<>|";
+
+        // ツール 1 回の変更を、それだけで 1 つの Undo にする（Unity はマウスやキーの入力でしか Undo を区切らないので、
+        // 区切らないと、エージェントの続けての変更やユーザーの直前の操作と 1 回の Ctrl+Z にまとまってしまう）
+        private static void RecordUndo(NodeGraphAsset asset, string name)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(name);
+            Undo.RecordObject(asset, name);
         }
 
         /// <summary>
@@ -72,7 +100,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             // 値の誤りはここで分かる（まだグラフに入れていないので、失敗しても何も変わらない）
             configure?.Invoke(node);
-            Undo.RecordObject(asset, "MCP: Add Node");
+            RecordUndo(asset, "MCP: Add Node");
             asset.AddNode(node);
             if (node is ContainerNode container)
             {
@@ -91,7 +119,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         {
             var node = FindNode(asset, nodeId);
             var apply = prepare(node);
-            Undo.RecordObject(asset, "MCP: Update Node");
+            RecordUndo(asset, "MCP: Update Node");
             apply();
             Commit(asset);
             return node;
@@ -106,7 +134,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException("A container's Entry is created and removed with its container. Remove the container instead.");
             }
 
-            Undo.RecordObject(asset, "MCP: Remove Node");
+            RecordUndo(asset, "MCP: Remove Node");
             asset.RemoveNode(node);
             Commit(asset);
         }
@@ -139,7 +167,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
 
             var edge = new EdgeData(from.Id, outputId, to.Id, inputId);
-            Undo.RecordObject(asset, "MCP: Connect");
+            RecordUndo(asset, "MCP: Connect");
             asset.AddEdge(edge);
             Commit(asset);
             return edge;
@@ -161,7 +189,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException($"There is no edge from '{NodeDisplay.GetNodeLabel(from)}' to '{NodeDisplay.GetNodeLabel(to)}' to remove.");
             }
 
-            Undo.RecordObject(asset, "MCP: Disconnect");
+            RecordUndo(asset, "MCP: Disconnect");
             foreach (var edge in edges)
             {
                 asset.RemoveEdge(edge);
@@ -186,7 +214,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 throw new McpToolException(problem);
             }
 
-            Undo.RecordObject(asset, "MCP: Group into Container");
+            RecordUndo(asset, "MCP: Group into Container");
             var container = ContainerGrouping.Apply(asset, nodeIds, level, out _);
             if (!string.IsNullOrWhiteSpace(title))
             {
@@ -298,7 +326,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             var parent = Path.GetDirectoryName(folder)?.Replace('\\', '/');
             EnsureFolder(parent);
-            AssetDatabase.CreateFolder(parent, Path.GetFileName(folder));
+            if (string.IsNullOrEmpty(AssetDatabase.CreateFolder(parent, Path.GetFileName(folder))) || !AssetDatabase.IsValidFolder(folder))
+            {
+                throw new McpToolException($"Unity could not create the folder '{folder}' (see the Console). Pick another path.");
+            }
         }
 
         // 変更を確定する: 未保存の印を付け、アセットなら保存し（エージェントの変更が保存し忘れで消えないように）、開いているウィンドウに知らせる

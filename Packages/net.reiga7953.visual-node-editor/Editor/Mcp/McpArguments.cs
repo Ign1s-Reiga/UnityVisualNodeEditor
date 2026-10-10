@@ -42,7 +42,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             return value as string ?? throw new McpToolException($"The argument '{name}' must be a string.");
         }
 
-        /// <summary>任意の数。無ければ null。</summary>
+        /// <summary>任意の数（有限のものだけ。NaN・無限大は不可）。無ければ null。</summary>
         public float? GetOptionalFloat(string name)
         {
             if (!_values.TryGetValue(name, out var value) || value == null)
@@ -50,13 +50,21 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 return null;
             }
 
-            return value switch
+            float result = value switch
             {
                 long integer => integer,
                 double number => (float)number,
                 string text when float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) => parsed,
                 _ => throw new McpToolException($"The argument '{name}' must be a number."),
             };
+
+            // NaN や無限大を位置に入れると、ノードがキャンバスから消えてしまう
+            if (float.IsNaN(result) || float.IsInfinity(result))
+            {
+                throw new McpToolException($"The argument '{name}' must be a finite number.");
+            }
+
+            return result;
         }
 
         /// <summary>任意の真偽値。無ければ <paramref name="defaultValue"/>。</summary>

@@ -203,6 +203,36 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             ["error"] = new Dictionary<string, object> { ["code"] = code, ["message"] = message },
         };
 
+        /// <summary>
+        /// 本文の要求（配列ならその 1 つずつ）に、同じ <c>id</c> でエラーを返す応答（処理できなかったとき。例: 時間切れ）。
+        /// 応答の要る要求が無ければ null。本文が読めなければ <c>id</c> の無いエラー。<c>id</c> が合っていないと、クライアントはどの要求の失敗か分からない。
+        /// </summary>
+        public static string ErrorForRequests(string body, int code, string message)
+        {
+            object parsed;
+            try
+            {
+                parsed = McpJson.Parse(body);
+            }
+            catch (FormatException)
+            {
+                return Error(null, code, message);
+            }
+
+            var requests = parsed is List<object> batch ? batch : new List<object> { parsed };
+            var replies = requests
+                .OfType<Dictionary<string, object>>()
+                .Where(request => request.ContainsKey("id") && request.ContainsKey("method"))
+                .Select(request => ErrorReply(request["id"], code, message))
+                .ToList();
+            if (replies.Count == 0)
+            {
+                return null;
+            }
+
+            return parsed is List<object> ? McpJson.Serialize(replies) : McpJson.Serialize(replies[0]);
+        }
+
         /// <summary>JSON-RPC のエラー応答（JSON の文字列）。</summary>
         internal static string Error(object id, int code, string message) => McpJson.Serialize(ErrorReply(id, code, message));
     }

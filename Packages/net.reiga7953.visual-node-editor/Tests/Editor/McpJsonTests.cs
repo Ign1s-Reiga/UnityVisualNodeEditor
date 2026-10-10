@@ -61,6 +61,9 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(parsed["items"], Is.EqualTo(new List<object> { "a", "b" }));
             Assert.That(parsed["kind"], Is.EqualTo("MissingEntry"), "enums are written by name");
             Assert.That(McpJson.Serialize(double.NaN), Is.EqualTo("null"));
+            Assert.That(McpJson.Serialize(float.PositiveInfinity), Is.EqualTo("null"));
+            Assert.That(McpJson.Serialize(0.1f), Is.EqualTo("0.1"), "floats are written as floats, not widened to double");
+            Assert.That(McpJson.Serialize(10.1f), Is.EqualTo("10.1"));
         }
     }
 }

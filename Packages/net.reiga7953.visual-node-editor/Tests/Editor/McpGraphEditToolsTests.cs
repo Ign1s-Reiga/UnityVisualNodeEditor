@@ -131,6 +131,52 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void EachToolCall_IsItsOwnUndoStep()
+        {
+            // Unity はマウスやキーの入力でしか Undo を区切らない。ツールの呼び出しごとに区切らないと、1 回の Ctrl+Z でまとめて戻ってしまう
+            var state = AddNode(("type", "State"), ("title", "Title"));
+            Undo.IncrementCurrentGroup(); // ユーザーのクリックで区切られる
+            Undo.RecordObject(_graph, "User edit");
+            _graph.FindNode(state).Title = "Edited by the user";
+
+            var first = AddNode(("type", "State"));
+            var second = AddNode(("type", "State"));
+
+            Undo.PerformUndo();
+            Assert.That(_graph.FindNode(second), Is.Null);
+            Assert.That(_graph.FindNode(first), Is.Not.Null, "only the last tool call is undone");
+
+            Undo.PerformUndo();
+            Assert.That(_graph.FindNode(first), Is.Null);
+            Assert.That(_graph.FindNode(state).Title, Is.EqualTo("Edited by the user"), "the user's own edit is a separate step");
+        }
+
+        [TestCase("Assets/__VneMcpTestTemp/Ma:in.asset")]
+        [TestCase("Assets/__VneMcpTestTemp/a|b/X.asset")]
+        [TestCase("Assets/../X.asset")]
+        [TestCase("Assets//X.asset")]
+        public void CreateGraph_RefusesUnusablePaths(string path)
+        {
+            var (text, isError) = McpTestClient.CallTool(_protocol, "create_graph", Args(("path", path)));
+
+            Assert.That(isError, Is.True, text);
+            Assert.That(text, Does.Contain("not a usable asset path"));
+        }
+
+        [TestCase("NaN")]
+        [TestCase("Infinity")]
+        public void Positions_MustBeFinite(string value)
+        {
+            var state = AddNode(("type", "State"), ("x", 10));
+
+            var (text, isError) = McpTestClient.CallTool(_protocol, "update_node", Args(("graph", _path), ("node", state), ("x", value)));
+            Assert.That(isError, Is.True, text);
+            Assert.That(McpTestClient.CallTool(_protocol, "update_node", Args(("graph", _path), ("node", state), ("y", 1e300))).IsError, Is.True,
+                "too large for a float");
+            Assert.That(_graph.FindNode(state).Position.x, Is.EqualTo(10f));
+        }
+
+        [Test]
         public void RefusedUpdate_ChangesNothing()
         {
             // title は正しいが eventName は State に無い: 何も変えずに理由を返す（一部だけ変わったまま残さない）

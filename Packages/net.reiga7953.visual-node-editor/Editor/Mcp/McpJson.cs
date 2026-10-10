@@ -61,7 +61,16 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                     WriteString(builder, enumValue.ToString());
                     break;
                 case float single:
-                    WriteNumber(builder, single);
+                    // float のまま書く（double に広げると 0.1f が 0.10000000149011612 になる）
+                    if (float.IsNaN(single) || float.IsInfinity(single))
+                    {
+                        builder.Append("null");
+                    }
+                    else
+                    {
+                        builder.Append(single.ToString("R", CultureInfo.InvariantCulture));
+                    }
+
                     break;
                 case double number:
                     WriteNumber(builder, number);
