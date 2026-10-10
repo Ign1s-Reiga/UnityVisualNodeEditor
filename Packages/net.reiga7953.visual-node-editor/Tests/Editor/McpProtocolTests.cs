@@ -150,6 +150,35 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(((Dictionary<string, object>)McpJson.Parse(McpProtocol.ErrorForRequests("{broken", -32603, "busy")))["id"], Is.Null);
         }
 
+        [TestCase("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}")]
+        [TestCase("{\"jsonrpc\":\"2.0\",\"id\":2}")]
+        [TestCase("{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":5}")]
+        [TestCase("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}")]
+        [TestCase("{\"jsonrpc\":\"2.0\",\"id\":4,\"result\":{}}")]
+        [TestCase("[{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"ping\"},7,{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}]")]
+        [TestCase("[]")]
+        [TestCase("42")]
+        [TestCase("\"text\"")]
+        public void TimeoutReplies_AnswerExactlyWhatHandleAnswers(string body)
+        {
+            // 時間切れでも、ふだん応答するものには同じ id で必ず答える（答えないとクライアントが待ち続ける）
+            var handled = _protocol.Handle(body);
+            var timedOut = McpProtocol.ErrorForRequests(body, -32603, "busy");
+
+            Assert.That(timedOut == null, Is.EqualTo(handled == null));
+            if (handled != null)
+            {
+                Assert.That(Ids(timedOut), Is.EqualTo(Ids(handled)));
+            }
+        }
+
+        private static List<object> Ids(string reply)
+        {
+            var parsed = McpJson.Parse(reply);
+            var replies = parsed is List<object> list ? list : new List<object> { parsed };
+            return replies.Cast<Dictionary<string, object>>().Select(r => r["id"]).ToList();
+        }
+
         private static long ErrorCode(string reply)
         {
             var error = (Dictionary<string, object>)((Dictionary<string, object>)McpJson.Parse(reply))["error"];
