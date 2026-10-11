@@ -20,10 +20,28 @@ namespace Reiga.VisualNodeEditor
         /// <summary>スロットを置くフォルダ。</summary>
         public static string Root => RootOverride ?? Path.Combine(Application.persistentDataPath, "VisualNodeEditor");
 
-        /// <summary>スロット名に使えるか（空でなく、英数字・空白・'-'・'_' だけで、前後に空白が無く、64 文字まで）。</summary>
+        /// <summary>
+        /// スロット名に使えるか（空でなく、英数字・空白・'-'・'_' だけで、前後に空白が無く、64 文字まで。
+        /// Windows がファイル名に使わせない CON・NUL・COM1 などは不可）。
+        /// </summary>
         public static bool IsValidSlotName(string slot) =>
             !string.IsNullOrWhiteSpace(slot) && slot.Length <= MaxSlotLength && slot.Trim() == slot
-            && slot.All(c => char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_');
+            && slot.All(c => char.IsLetterOrDigit(c) || c == ' ' || c == '-' || c == '_')
+            && !IsReservedName(slot);
+
+        // Windows が装置の名前として予約している名前（拡張子 .json を付けても使えない。大文字小文字は問わない）。
+        // 英数字以外の文字を含む予約名（CONIN$・COM¹ など）は、上の文字の決まりで既に断っている
+        private static bool IsReservedName(string slot)
+        {
+            var upper = slot.ToUpperInvariant();
+            if (upper == "CON" || upper == "PRN" || upper == "AUX" || upper == "NUL")
+            {
+                return true;
+            }
+
+            return upper.Length == 4 && (upper.StartsWith("COM", StringComparison.Ordinal) || upper.StartsWith("LPT", StringComparison.Ordinal))
+                                     && upper[3] >= '0' && upper[3] <= '9';
+        }
 
         /// <summary>そのグラフのスロットのファイルのパス。</summary>
         /// <exception cref="ArgumentException">スロット名が使えない。</exception>
