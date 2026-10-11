@@ -16,6 +16,19 @@ namespace Reiga.VisualNodeEditor
         [SerializeField] private List<StickyNoteData> _stickyNotes = new();
         [SerializeField] private List<GraphParameter> _parameters = new();
 
+        // セーブの置き場の名前（エディタがアセットの GUID を入れる。GraphSaveKeySync）
+        [SerializeField, HideInInspector] private string _saveKey;
+
+        /// <summary>
+        /// グラフごとに一意なセーブの置き場の名前（<see cref="GraphSaveSlots"/> のフォルダに付ける）。エディタがアセットの GUID を入れるので、
+        /// 同じ名前の別のグラフとスロットが混ざらない。空（このキーを持つ前のアセット）ならグラフ名だけで置き場を決める。
+        /// </summary>
+        public string SaveKey
+        {
+            get => _saveKey ?? string.Empty;
+            internal set => _saveKey = value;
+        }
+
         /// <summary>グラフに含まれる全ノード。型を読み込めなかった要素は null になりうる。</summary>
         public IReadOnlyList<NodeData> Nodes => _nodes;
 

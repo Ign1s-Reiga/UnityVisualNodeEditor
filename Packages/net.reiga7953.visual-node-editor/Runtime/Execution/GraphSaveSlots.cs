@@ -7,7 +7,7 @@ namespace Reiga.VisualNodeEditor
 {
     /// <summary>
     /// セーブのスロット。名前を付けてファイルに保存し、そこから再開する
-    /// （<c>Application.persistentDataPath/VisualNodeEditor/グラフ名/スロット.json</c>）。
+    /// （<c>Application.persistentDataPath/VisualNodeEditor/グラフ名-セーブキー/スロット.json</c>）。
     /// 別の場所に保存したいときは <see cref="GraphRunner.CaptureState"/> と <see cref="GraphRunnerState.ToJson"/> を直接使う。
     /// </summary>
     public static class GraphSaveSlots
@@ -57,7 +57,7 @@ namespace Reiga.VisualNodeEditor
                 throw new ArgumentException($"'{slot}' is not a usable slot name. Use letters, digits, spaces, '-' and '_'.", nameof(slot));
             }
 
-            return Path.Combine(Root, ToFolderName(graph.name), slot + ".json");
+            return Path.Combine(Root, ToFolderName(graph), slot + ".json");
         }
 
         /// <summary>そのスロットにセーブがあるか。</summary>
@@ -123,12 +123,18 @@ namespace Reiga.VisualNodeEditor
             return true;
         }
 
-        // グラフ名をフォルダ名に使える形にする（使えない文字は '_'）
-        private static string ToFolderName(string graphName)
+        // グラフの置き場のフォルダ名: グラフ名（使えない文字は '_'）とセーブキー（同じ名前の別のグラフと混ざらないように。空ならグラフ名だけ）
+        private static string ToFolderName(NodeGraphAsset graph)
         {
             var invalid = Path.GetInvalidFileNameChars();
-            var name = new string((graphName ?? string.Empty).Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
-            return name.Length > 0 ? name : "Graph";
+            var name = new string((graph.name ?? string.Empty).Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
+            if (name.Length == 0)
+            {
+                name = "Graph";
+            }
+
+            var key = new string(graph.SaveKey.Where(c => !invalid.Contains(c)).ToArray());
+            return key.Length > 0 ? $"{name}-{key}" : name;
         }
     }
 }
