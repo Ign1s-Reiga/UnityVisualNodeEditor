@@ -433,7 +433,7 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 | `GraphExtras` | Runner の `Extras`。パラメータ（Blackboard）に無い値の置き場（キー → Bool / Int / Float / String）。Yarn Spinner の変数などアドオンが使う。`Start()` で空になり、セーブに含まれる |
 | `IRestartOnLoad` | ロードするとノードの最初からやり直すノード（Dialogue ノード）の印。このノードにいる間に保存すると、ノードに入る前の値で保存する |
 | `GraphSaveSlots` | スロット名でファイルに読み書きする（`Application.persistentDataPath/VisualNodeEditor/<グラフ名>-<グラフのセーブキー>/<スロット>.json`）。`Save` / `Load` / `Exists` / `Delete`。スロット名はファイル名に使える文字だけ |
-| `NodeGraphAsset.SaveKey` | グラフごとに一意なセーブの置き場の名前。エディタがアセットの GUID を入れる（`GraphSaveKeySync`。アセットを作った・複製した・読み込み直したときに、GUID と違えば入れ直して保存する。未保存の変更があるグラフは保存せず、未保存状態にするだけ）。同じ名前の別のグラフとスロットが混ざらない。空（古いアセット）ならグラフ名だけのフォルダ |
+| `NodeGraphAsset.SaveKey` | グラフごとに一意なセーブの置き場の名前。新しく作るグラフ（`NodeGraphFactory.CreateNew`。Create メニュー・MCP の `create_graph`・ADV Starter）に新しい ID を入れる。アセットを複製すると同じキーを持つので、読み込まれたグラフのキーが別のグラフと同じなら、`GraphSaveKeySync` が新しい ID に入れ直して保存する（未保存の変更があるグラフは保存せず、未保存状態にするだけ）。キーを持たないグラフ（0.13.0 までに作ったもの）は書き換えず、グラフ名だけのフォルダを使う（クローン・再インポート・CI でアセットが変わらないように）。キーを持つグラフのスロットが無ければ、グラフ名だけのフォルダ（キーを持つ前のセーブ）も探す |
 
 ### 実行（GraphRunner）
 

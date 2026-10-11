@@ -12,11 +12,12 @@ namespace Reiga.VisualNodeEditor.Editor
         /// <summary>新しいグラフのファイル名の初期値。</summary>
         public const string DefaultFileName = "NewNodeGraph.asset";
 
-        /// <summary>Entry だけがある新しいグラフ（まだアセットとして保存していない）。</summary>
+        /// <summary>Entry だけがある新しいグラフ（まだアセットとして保存していない）。セーブの置き場を分けるキーも持つ。</summary>
         public static NodeGraphAsset CreateNew()
         {
             var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
             graph.AddNode(new EntryNode { Position = Vector2.zero });
+            graph.SaveKey = GraphSaveKeySync.NewKey();
             return graph;
         }
 
