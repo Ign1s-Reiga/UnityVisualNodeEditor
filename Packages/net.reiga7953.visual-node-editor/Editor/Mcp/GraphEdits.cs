@@ -258,27 +258,25 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             }
 
             var parameter = new GraphParameter(trimmed, type);
-            switch (defaultValue)
+            if (defaultValue != null)
             {
-                case null:
-                    break;
-                case bool flag when type == GraphParameterType.Bool:
-                    parameter.BoolValue = flag;
-                    break;
-                case long whole when type == GraphParameterType.Int && whole >= int.MinValue && whole <= int.MaxValue:
-                    parameter.IntValue = (int)whole;
-                    break;
-                case long whole when type == GraphParameterType.Float:
-                    parameter.FloatValue = whole;
-                    break;
-                case double real when type == GraphParameterType.Float && !double.IsNaN(real) && !double.IsInfinity(real):
-                    parameter.FloatValue = (float)real;
-                    break;
-                case string text when type == GraphParameterType.String:
-                    parameter.StringValue = text;
-                    break;
-                default:
-                    throw new McpToolException($"The default value does not fit a {type} parameter.");
+                switch (McpValues.ToParameterValue(defaultValue, type))
+                {
+                    case bool flag:
+                        parameter.BoolValue = flag;
+                        break;
+                    case int whole:
+                        parameter.IntValue = whole;
+                        break;
+                    case float real:
+                        parameter.FloatValue = real;
+                        break;
+                    case string text:
+                        parameter.StringValue = text;
+                        break;
+                    default:
+                        throw new McpToolException($"The default value does not fit a {type} parameter: it must be {McpValues.Describe(type)}.");
+                }
             }
 
             RecordUndo(asset, "MCP: Add Parameter");

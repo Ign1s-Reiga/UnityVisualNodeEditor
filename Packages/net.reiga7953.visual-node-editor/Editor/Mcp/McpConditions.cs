@@ -45,24 +45,30 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             var op = ParseOperator(item.GetString("op"), parameter);
             var condition = new TransitionCondition(parameter.Id, op);
-            switch (parameter.Type)
+            if (parameter.Type == GraphParameterType.Bool)
             {
-                case GraphParameterType.Int:
-                    var number = RequireNumber(item, parameter);
-                    if (number != Math.Floor(number))
-                    {
-                        throw new McpToolException($"'{parameter.Name}' is an Int, so 'value' must be a whole number (got {number}).");
-                    }
+                // Bool は比較（is true / is false）だけで表す
+                return condition;
+            }
 
-                    condition.IntValue = (int)number;
+            if (!item.Has("value"))
+            {
+                throw new McpToolException($"'{parameter.Name}' is a {parameter.Type}, so the condition needs a 'value'.");
+            }
+
+            switch (McpValues.ToParameterValue(item.GetRaw("value"), parameter.Type))
+            {
+                case int whole:
+                    condition.IntValue = whole;
                     break;
-                case GraphParameterType.Float:
-                    condition.FloatValue = RequireNumber(item, parameter);
+                case float real:
+                    condition.FloatValue = real;
                     break;
-                case GraphParameterType.String:
-                    condition.StringValue = item.GetRaw("value") as string
-                                            ?? throw new McpToolException($"'{parameter.Name}' is a String, so 'value' must be a string.");
+                case string text:
+                    condition.StringValue = text;
                     break;
+                default:
+                    throw new McpToolException($"'{parameter.Name}' is a {parameter.Type}, so 'value' must be {McpValues.Describe(parameter.Type)}.");
             }
 
             return condition;
@@ -115,16 +121,6 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             throw new McpToolException($"'{text}' cannot compare the {parameter.Type} parameter '{parameter.Name}'. " +
                                        $"Use one of: {string.Join(", ", allowed.Select(o => "'" + TransitionCondition.GetSymbol(o) + "'"))}.");
-        }
-
-        private static float RequireNumber(McpArguments item, GraphParameter parameter)
-        {
-            if (!item.Has("value"))
-            {
-                throw new McpToolException($"'{parameter.Name}' is a {parameter.Type}, so the condition needs a 'value'.");
-            }
-
-            return item.GetOptionalFloat("value") ?? 0f;
         }
     }
 }
