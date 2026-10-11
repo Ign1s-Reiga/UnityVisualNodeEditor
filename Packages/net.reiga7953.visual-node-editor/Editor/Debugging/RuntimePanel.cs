@@ -61,11 +61,18 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
         private readonly Button _saveButton;
         private readonly Button _loadButton;
 
+        // スロット debug にセーブがあるか（表示し直すたびにディスクを見ないよう、Runner を変えたとき・セーブしたときだけ確かめる）
+        private bool _debugSlotExists;
+
+        // 値の変化での表示し直しを、次の更新まで 1 回にまとめているか
+        private bool _refreshQueued;
+
         private void SaveDebugSlot()
         {
             if (_runner != null && _runner.IsRunning)
             {
                 GraphSaveSlots.Save(_runner, DebugSlot);
+                _debugSlotExists = true;
                 Refresh();
             }
         }
@@ -78,6 +85,12 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
                 Refresh();
             }
         }
+
+        /// <summary>表示し直した回数（テスト用）。</summary>
+        internal int RefreshCount { get; private set; }
+
+        /// <summary>値の変化での表示し直しを待っているか（テスト用）。</summary>
+        internal bool IsRefreshQueued => _refreshQueued;
 
         /// <summary>表示中の Runner。表示していなければ null。</summary>
         public GraphRunner Runner => _runner;
@@ -103,14 +116,30 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
                 _runner.ParameterChanged += OnParameterChanged;
             }
 
+            _debugSlotExists = _runner != null && GraphSaveSlots.Exists(_runner.Graph, DebugSlot);
             Refresh();
         }
 
-        private void OnParameterChanged(string name) => Refresh();
+        // 値は毎フレーム変わることもあるので、表示し直すのは次の更新で 1 回だけにする
+        private void OnParameterChanged(string name)
+        {
+            if (_refreshQueued)
+            {
+                return;
+            }
+
+            _refreshQueued = true;
+            schedule.Execute(() =>
+            {
+                _refreshQueued = false;
+                Refresh();
+            });
+        }
 
         /// <summary>今の Runner の状態で表示し直す（ノードを移ったときなど）。止まっていれば隠す。</summary>
         public void Refresh()
         {
+            RefreshCount++;
             var running = _runner != null && _runner.IsRunning && _runner.Current != null;
             EnableInClassList(HiddenClassName, !running);
             _actions.Clear();
@@ -121,7 +150,7 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             }
 
             _location.text = GetLocation(_runner);
-            _loadButton.SetEnabled(GraphSaveSlots.Exists(_runner.Graph, DebugSlot));
+            _loadButton.SetEnabled(_debugSlotExists);
             var actions = RuntimeActions.For(_runner.Query, _runner.Current);
             foreach (var action in actions)
             {
