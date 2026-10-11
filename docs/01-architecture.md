@@ -435,6 +435,9 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 | `GraphSaveSlots` | スロット名でファイルに読み書きする（`Application.persistentDataPath/VisualNodeEditor/<グラフ名>-<グラフのセーブキー>/<スロット>.json`）。`Save` / `Load` / `Exists` / `Delete`。スロット名はファイル名に使える文字だけ |
 | `NodeGraphAsset.SaveKey` | グラフごとに一意なセーブの置き場の名前。エディタがアセットの GUID を入れる（`GraphSaveKeySync`。アセットを作った・複製した・読み込み直したときに、GUID と違えば入れ直して保存する。未保存の変更があるグラフは保存せず、未保存状態にするだけ）。同じ名前の別のグラフとスロットが混ざらない。空（古いアセット）ならグラフ名だけのフォルダ |
 
+`GraphSaveSlots.Save` は一時ファイル（`<スロット>.json.tmp`）に書いてから、`File.Replace` で 1 回で置き換える（書きかけのファイルも、スロットが無い瞬間も作らない）。
+`File.Replace` が使えないとき（対応しないファイルシステム・プラットフォーム）は、古いセーブを消してから一時ファイルを移す。
+
 ### 実行（GraphRunner）
 
 - `CaptureState()`: 今の状態を返す（実行中でなければ例外）。今のノードが `IRestartOnLoad` なら、そのノードに入る直前（振る舞いの `OnEnter` より前）に写した値を使う
