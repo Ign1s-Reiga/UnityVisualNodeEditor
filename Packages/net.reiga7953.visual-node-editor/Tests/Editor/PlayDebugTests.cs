@@ -114,6 +114,24 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(RuntimePanel.GetLocation(runner), Is.EqualTo("Stage › Play"));
         }
 
+        [Test]
+        public void Panel_GroupsRedrawsForParameterChanges()
+        {
+            // 値が毎フレーム変わっても、表示し直すのは次の更新で 1 回だけ（その都度ボタンを作り直さない）
+            var runner = new GraphRunner(_graph);
+            runner.Start();
+            var panel = new RuntimePanel();
+            panel.Show(runner);
+            var before = panel.RefreshCount;
+
+            runner.SetInt("Lives", 2);
+            runner.SetInt("Lives", 1);
+            runner.SetInt("Lives", 0);
+
+            Assert.That(panel.RefreshCount, Is.EqualTo(before), "not redrawn right away");
+            Assert.That(panel.IsRefreshQueued, Is.True, "one redraw waits for the next update");
+        }
+
         // ---- Blackboard の実行中の値 ----
 
         [Test]
