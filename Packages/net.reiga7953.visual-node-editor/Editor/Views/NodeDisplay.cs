@@ -67,6 +67,10 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 // 名前の無い自動の Event（条件はサマリー行に出す）
                 case EventNode eventNode when eventNode.IsAutomatic:
                     return AutomaticEventLabel;
+
+                // 内容から決まる名前を持つノード（アドオンのノード型など。例: Dialogue ノードの Yarn のノード名）
+                case { ContentTitle: { } contentTitle } when !string.IsNullOrWhiteSpace(contentTitle):
+                    return contentTitle.Trim();
                 default:
                     return GetTypeDisplayName(node.GetType());
             }

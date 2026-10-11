@@ -98,6 +98,9 @@ namespace Reiga.VisualNodeEditor
                     issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
                         $"'{node.Title}' has a behaviour that could not be loaded. Its script may have been renamed or deleted.", node.Id));
                 }
+
+                // ノード自身の検証（アドオンのノード型など）
+                issues.AddRange(node.GetIssues() ?? Enumerable.Empty<GraphIssue>());
             }
 
             issues.AddRange(ValidateEventNames(nodes));

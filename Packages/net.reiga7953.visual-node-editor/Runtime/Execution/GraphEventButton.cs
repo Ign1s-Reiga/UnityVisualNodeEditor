@@ -137,8 +137,7 @@ namespace Reiga.VisualNodeEditor
         }
 
         /// <summary><paramref name="graph"/> を実行中の Runner（null なら実行中のどれか）。無ければ null。</summary>
-        internal static GraphRunner FindRunner(NodeGraphAsset graph) =>
-            GraphRunner.Running.FirstOrDefault(runner => runner.IsRunning && (graph == null || runner.Graph == graph));
+        internal static GraphRunner FindRunner(NodeGraphAsset graph) => GraphRunner.FindRunning(graph);
 
         /// <summary>
         /// <paramref name="gameObject"/> にある、public な <c>onClick</c> プロパティかフィールド（<see cref="UnityEvent"/>）。無ければ null。

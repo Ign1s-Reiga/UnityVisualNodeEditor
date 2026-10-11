@@ -215,6 +215,17 @@ namespace Reiga.VisualNodeEditor
         /// <summary>実行中のすべての Runner（エディタの強調表示などが使う）。</summary>
         public static IReadOnlyList<GraphRunner> Running => _running;
 
+        /// <summary><paramref name="graph"/> を実行中の Runner（null なら実行中のどれか）。無ければ null。</summary>
+        public static GraphRunner FindRunning(NodeGraphAsset graph = null) =>
+            _running.FirstOrDefault(runner => runner.IsRunning && (graph == null || runner.Graph == graph));
+
+        /// <summary>その名前のパラメータの今の値（bool / int / float / string）。無ければ false。</summary>
+        public bool TryGetParameter(string name, out object value)
+        {
+            value = null;
+            return name != null && _parameterValues.TryGetValue(name, out value);
+        }
+
         /// <summary>いずれかの Runner が開始したとき。</summary>
         public static event Action<GraphRunner> Started;
 
