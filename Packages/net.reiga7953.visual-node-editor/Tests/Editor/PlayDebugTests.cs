@@ -135,8 +135,11 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void Panel_NoticesDebugSavesMadeElsewhere_WhenTheNodeChanges()
+        public void Panel_NoticesDebugSavesMadeElsewhere()
         {
+            var again = Add(new EventNode { EventName = "Again" });
+            Connect(_title, again);
+            Connect(again, _title);
             var root = Path.Combine(Path.GetTempPath(), "VnePanelSlot_" + Guid.NewGuid().ToString("N"));
             GraphSaveSlots.RootOverride = root;
             try
@@ -147,15 +150,24 @@ namespace Reiga.VisualNodeEditor.Tests
                 panel.Show(runner);
                 Assert.That(panel.CanLoadDebugSlot, Is.False);
 
-                // ゲーム側（オートセーブなど）がスロット debug に保存した
+                // ゲーム側（オートセーブなど）がスロット debug に保存した。ノードに入ると確かめ直す
                 GraphSaveSlots.Save(runner, RuntimePanel.DebugSlot);
                 runner.Raise("StartGame");
-                panel.Refresh();
                 Assert.That(panel.CanLoadDebugSlot, Is.True);
 
                 GraphSaveSlots.Delete(_graph, RuntimePanel.DebugSlot);
                 runner.Raise("Back");
-                panel.Refresh();
+                Assert.That(panel.CanLoadDebugSlot, Is.False);
+
+                // 同じノードへ入り直したときも
+                GraphSaveSlots.Save(runner, RuntimePanel.DebugSlot);
+                runner.Raise("Again");
+                Assert.That(runner.Current, Is.SameAs(_title));
+                Assert.That(panel.CanLoadDebugSlot, Is.True);
+
+                // ノードを移らないまま消えたものは、パネルにマウスが入ったときに確かめ直す（CheckDebugSlot）
+                GraphSaveSlots.Delete(_graph, RuntimePanel.DebugSlot);
+                panel.CheckDebugSlot();
                 Assert.That(panel.CanLoadDebugSlot, Is.False);
             }
             finally
