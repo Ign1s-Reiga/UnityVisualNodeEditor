@@ -90,6 +90,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
         /// Runner から外し、流している会話をすぐ止める（<see cref="YarnGraphBridge"/> が無効になるとき）。
         /// 止まった知らせ（<see cref="OnDialogueCompleted"/>）が来るまでは、また繋いでも次の会話を始めない
         /// （Yarn は止めた会話の後片付けが終わってから知らせるので、その前に始めると、遅れて来た知らせを新しい会話の終わりと取り違える）。
+        /// 知らせが来ないまま会話がもう流れていなければ（<see cref="IDialoguePlayer.IsRunning"/>）、待つのをやめる。
         /// </summary>
         public void Shutdown()
         {
@@ -166,9 +167,18 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
                 {
                     _stopping = true;
                     _player.Stop();
+                    return;
                 }
 
-                return;
+                if (_player.IsRunning)
+                {
+                    return;
+                }
+
+                // 止めた会話はもう流れていないのに、止まった知らせを聞けなかった（DialogueRunner を壊した・知らせが届かなかったなど）。
+                // 待ち続けると次の会話を始められなくなるので、待つのをやめる
+                _stopping = false;
+                _runningToken = 0;
             }
 
             if (_wantedToken != 0 && _wantedToken != _finishedToken)
