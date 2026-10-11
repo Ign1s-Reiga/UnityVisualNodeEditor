@@ -35,7 +35,7 @@
 - [x] ランタイムの進み方（コンテナへ入る・Exit から出る、`GraphQuery` の遷移 API、`GraphRunner` 対応）
 - [x] エディタ: 階層の切り替え（ダブルクリックで入る・パンくずで戻る）、階層をまたぐエッジの禁止、コンテナ作成時の Entry / Exit 自動作成、コピー・貼り付け
 - [x] エディタ: 出口の編集（コンテナのインスペクタの一覧、Exit ノードのドロップダウン、削除時の確認）
-- [ ] ゲームのテンプレート（ADV / アクション）とテンプレート専用のコンテナのサブクラス（今回は対象外）
+- [ ] ゲームのテンプレート（アクション）とテンプレート専用のコンテナのサブクラス（今回は対象外。ADV は「ADV（Yarn Spinner）」の ADV Starter で用意する）
 
 ## ノードの振る舞い（Update / FixedUpdate）
 - [x] ランタイム: `NodeBehaviour`（`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit`）、State・Scene への付与、`GraphRunner.Update` / `FixedUpdate` と `GraphRunnerBehaviour` からの呼び出し、Runner ごとの複製、読めない振る舞いの検証
@@ -61,7 +61,7 @@
 
 改善後の見込み: シナリオ A は 93 手 + コード → 約 47 手・コード無し（うち 18 手はボタン 3 つへのコンポーネント設定）、シナリオ B は 93 手 + コード → 約 53 手・コード無し（うち 18 手はボタン 3 つ）。残りの多くはボタンをシーンに置く作業で、これはシーン側の作業なのでツールでは減らせない。
 
-提案のみ（実装しない。未決事項に記載）: 条件付き遷移、イベント名の定数クラス生成。
+提案のみ（実装しない。未決事項に記載）: イベント名の定数クラス生成。条件付き遷移は「ADV（Yarn Spinner）」で実装する（Event ノードに条件を持たせる案で決定）。
 
 ### フェーズ（リリース単位。1 項目 1 コミット）
 
@@ -93,6 +93,33 @@
 - [x] Play 中のツール（`get_runtime_state` / `send_event`）
 - [x] スキル: Computer Use（`editor-visual-check` / `ux-scenario-run`）と MCP（`build-flow-with-mcp` / `debug-flow-with-mcp`）
 
+## ADV（Yarn Spinner）
+
+ADV（ノベル・アドベンチャー）を作れるようにする。会話は Yarn Spinner に書き、チャプター・ルート・フラグ・セーブはグラフで扱う。
+設計は `docs/01-architecture.md` の「条件付き遷移」「セーブ・ロード」「Yarn Spinner 連携（任意）」「ADV Starter」。
+
+決めたこと（ユーザーの回答）: 条件付き遷移・セーブ / ロード・ADV Starter をすべて作る。Yarn の変数と Blackboard は名前で共有する。
+条件は Event ノードに持たせる。Yarn 連携はこのパッケージの中の任意のアセンブリ（Yarn Spinner 3.x が入っているときだけコンパイル）。
+
+フェーズ 1: 条件付き遷移
+- [ ] データ・実行（Raise の条件、自動遷移）・検証
+- [ ] エディタ（インスペクタ、ノードの表示、Now running）
+- [ ] MCP（`get_graph` / `add_node` / `update_node` のトリガーと条件）
+
+フェーズ 2: セーブ・ロード
+- [ ] `GraphRunnerState`・`Extras`・`CaptureState` / `RestoreState`・`IRestartOnLoad`
+- [ ] `GraphSaveSlots`、`GraphRunnerBehaviour` / `GraphEventButton` の Save / Load、Now running の Save / Load
+
+フェーズ 3: Yarn Spinner 連携
+- [ ] 開発用プロジェクトに Yarn Spinner 3.2.8 を入れ、任意のアセンブリを作る。コアの拡張点（`NodeData.GetIssues`、`IGraphIssueCheck`）
+- [ ] Dialogue ノード、`YarnGraphBridge`（会話の開始・終了・コマンド・オートセーブ）、`GraphVariableStorage`
+- [ ] エディタ（View・インスペクタ・検証）
+
+フェーズ 4: ADV Starter と仕上げ
+- [ ] ADV Starter（グラフ・Yarn スクリプト・Yarn プロジェクト）
+- [ ] CI で Yarn 連携をコンパイル
+- [ ] README・スキル（`build-flow-with-mcp` に ADV の組み方）
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
@@ -111,13 +138,13 @@
 - コンテナ: コンテナの中身を、外の階層でもプレビュー表示するか
 - ノードの振る舞い: `OnLateUpdate` や物理・入力のコールバック（`OnTriggerEnter` 相当）まで持たせるか（当面は Enter / Update / FixedUpdate / Exit のみ）
 - ノードの振る舞い: コンテナにも付けるか（コンテナの中にいる間ずっと動く、サブステートマシン相当。当面は State・Scene のみ）
-- UX: **条件付き遷移**（提案のみ。承認まで実装しない）。Animator の遷移のように、Blackboard の値で遷移する（例: `Lives <= 0` → GameOver）。
-  ロジックのグラフにはせず、宣言的な設定にとどめる。素描:
-  - Event ノードに「条件」の一覧（パラメータ・比較演算子・値。すべて満たすとき有効）と、モード（Raise されたときだけ／自動）を足す。
-    自動モードは名前の無い遷移で、現在のノードにいる間に条件が満たされたら進む（`ParameterChanged` と、ノードに入った直後に判定）
-  - 演算子はパラメータの型で絞る（Bool: is true / is false、Int / Float: `==` `!=` `<` `<=` `>` `>=`、String: `==` `!=`）。パラメータは Blackboard から選ぶ（名前を打たない）
-  - 検証: 存在しないパラメータ・型の合わない比較を Error、同じノードから同時に満たされうる自動遷移を Warning
-  - 未決: 条件を Event ノードに持たせるか、エッジに持たせるか。自動遷移の判定を毎フレーム行うか、値の変化時だけにするか
+- UX: 条件付き遷移は**決定**（ADV の要望で実装する）: 条件は Event ノードに持たせ、自動遷移の判定はノードに入った直後と値の変化時だけ（毎フレームは行わない）。
+  「同じノードから同時に満たされうる自動遷移」の Warning は、静的に判定できる「条件の無い自動 Event の後ろ」だけにする。設計は `docs/01-architecture.md` の「条件付き遷移」
+- 条件付き遷移: 時間による遷移（N 秒後に進む）は持たない（振る舞いで書く）。条件の OR・式は持たない（Event を並べて表す）
+- ADV: Yarn のノードの途中からの再開（Yarn Spinner が対応しない限り、ロードすると Dialogue ノードの最初から。値はそのノードに入る前のもの）
+- ADV: Yarn Spinner 2.x には対応しない（3.x の API だけ）
+- ADV: 既読管理・バックログ・オート / スキップ・立ち絵・背景は Yarn Spinner の Presenter とゲーム側で行う（このツールでは持たない）
+- ADV: Yarn Spinner 連携を CI でコンパイルする方法（Yarn のソースを固定のタグで取得してコンパイルする予定。できなければ開発用プロジェクトでのテストだけにする）
 - UX: イベント名の定数クラスを生成するか（骨組みコード生成の一部。`GraphEvents.StartGame` のように書けて打ち間違いが無くなるが、生成物の置き場所と更新のタイミングを決める必要がある）
 - UX: シナリオの所要時間は実機で計測する（`docs/04-ux-audit.md` の現状は机上の通しによる手数と見積もり）
 - MCP: 認証を持つか（当面は 127.0.0.1 だけで待ち受け、`Origin` を確かめ、既定で止めておく。同じ PC の他のプロセスからは書き換えられる）

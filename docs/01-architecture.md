@@ -146,7 +146,7 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 ## コンテナ（サブグラフ）
 
 ゲームのテンプレート（ADV・アクションなど）の下地として、入れ子の構造を表すノード。例: 「Stage」ノードの中に Playing / Paused / GameOver / Clear があり、Clear か GameOver で外へ出る。
-テンプレート自体と、テンプレート専用のコンテナのサブクラスはまだ作らない。
+ADV は、ひな形のグラフを作る ADV Starter で用意する（「ADV Starter」参照）。テンプレート専用のコンテナのサブクラスはまだ作らない。
 
 ### データモデル（Runtime）
 
@@ -248,7 +248,9 @@ GraphView 標準のショートカット（Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+D、�
 | Warning | 同じポート対を結ぶ重複エッジ |
 | Warning | シーン未設定の Scene ノード |
 | Warning | 読み込めなかったノード（型の改名・削除で `SerializeReference` が null になったもの） |
-| Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない） |
+| Warning | イベント名が空の Event ノード（`GraphRunner.Raise` で指定できない）。トリガーが自動の Event は名前が無くてよいので対象外 |
+| Error | 条件付き遷移: 条件のパラメータが無い / 比較がパラメータの型に合わない。Warning: 選ばれることの無い自動の Event、使われない条件（「条件付き遷移」参照） |
+| （ノードによる） | ノード自身の検証（`NodeData.GetIssues()`。例: Yarn のノード名が空の Dialogue ノード） |
 | Warning | 読み込めなかった振る舞い（`NodeBehaviour` の型の改名・削除で null になったもの。実行時は飛ばす） |
 | Warning | イベント名の表記ゆれ: 大文字小文字・前後の空白だけが、先に出てきた別のイベント名と違う（`Raise` は完全一致なので、どちらかに揃える） |
 | Warning | 前後に空白があるイベント名（`Raise` でその空白まで打たないと一致しない） |
@@ -281,9 +283,11 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
   - 通過ノード: Entry・Event。入ったら止まらずに次へ進む
 - `Start()`: Entry に入る。Entry から Event 以外のノードへ繋がっていれば、そこへ進む（Event へしか繋がっていなければ Entry で待つ）
 - `Raise(eventName)`: 現在のノードから出ているエッジのうち、`EventName` が一致する Event ノードへ進み、その Event から出ている最初のエッジの先へ進む
+  - Event に条件があれば、満たすものだけを選ぶ（同じ名前の Event を条件違いで並べて行き先を分けられる）。トリガーが自動の Event は選ばない（「条件付き遷移」参照）
   - Event に出力エッジが無ければ、通知だけ行い現在のノードは変わらない（純粋な通知用のイベント）。
     Event → Event と連鎖した先が出力の無い Event でも同じで、その Event には入らず、直前の待機ノードに留まる
   - 一致する遷移が無ければ何もせず false を返す
+- 待機ノードに入り終えたときと、パラメータの値が変わったときに、そのノードから出ている自動の Event の条件を調べ、満たせば進む（「条件付き遷移」参照）
 - `Advance()`: 現在のノードから Event 以外のノードへ出ている最初のエッジの先へ進む（イベントを介さない「次へ」）
 - 遷移先が複数ある場合は、アセット内のエッジの順で最初のものを使う
 - コンテナ・コンテナの Entry / Exit は通過ノード。コンテナに入って中の Entry から続け、Exit で出て親の階層の対応する出力ポートから続ける（「コンテナ」の「ランタイムの進み方」参照）
@@ -364,6 +368,171 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 - Create Script…: 保存先を選ぶと、ファイル名からクラス名を作り、`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit` の空の骨組みを書き出して IDE で開く。同じ名前のファイルや、同じ名前のクラス（`NodeBehaviour` 以外も含む。骨組みは名前空間の無いクラスなので衝突する）が既にあれば作らない。
   コンパイル（ドメインリロード）後に、そのクラスを元のノードへ自動で追加する（追加待ちは `SessionState` に覚えておく）
 - ノードには、付いている振る舞いのクラス名を 1 行で出す（USS クラス `vne-node__behaviours`）
+
+## 条件付き遷移（Event の条件と自動遷移）
+
+ADV のルート分岐（`Affection >= 5` なら Alice ルート）や、フラグによる遷移（`Lives <= 0` → GameOver）を、コードを書かずにグラフで表す。
+Event ノードに宣言的な条件を持たせるだけにし、ロジックのグラフにはしない（非目的を守る。条件は「パラメータ・比較・値」の並びで、式や計算は書けない）。
+
+### データ（Runtime）
+
+| 型 | 役割 |
+|---|---|
+| `EventNode` | トリガー `_trigger`（`EventTriggerMode`）と条件の一覧 `_conditions`（`List<TransitionCondition>`）を持つ |
+| `EventTriggerMode` | `Raise`（既定。名前で起こされたときに進む）/ `Automatic`（待機中に条件を満たしたら自分で進む） |
+| `TransitionCondition` | 条件 1 つ。パラメータの ID（`GraphParameter.Id`。改名しても壊れない）、比較（`ConditionOperator`）、比べる値（型ごとの欄 `_intValue` / `_floatValue` / `_stringValue`。Bool は比較だけで表す） |
+| `ConditionOperator` | `IsTrue` / `IsFalse`（Bool）、`Equal` / `NotEqual`（Int・Float・String）、`Less` / `LessOrEqual` / `Greater` / `GreaterOrEqual`（Int・Float） |
+
+- 条件はすべて満たすとき（AND）に有効。条件が無ければ常に有効。OR は同じ行き先への Event を 2 つ置いて表す
+- 比べ方: Int・Float は数値、String は大文字小文字を区別する完全一致。Float の `Equal` も丸めない完全一致
+- 判定は純粋な関数（`TransitionCondition.IsMet`。パラメータの型と値を受け取る）にし、EditMode テストの対象にする
+
+### 実行（GraphRunner）
+
+- `Raise(name)`: 今のノードから出ているエッジの順に、トリガーが `Raise` で、名前が一致し、条件を満たす最初の Event へ進む。
+  同じ名前の Event を条件違いで並べれば行き先を分けられ、最後に条件の無いものを置けば「それ以外」になる。満たすものが無ければ何もせず false
+- 自動遷移: 待機ノードにいる間、そのノードから出ているトリガーが `Automatic` の Event をエッジの順に調べ、条件を満たす最初のものへ進む（進み方は `Raise` と同じ）。
+  調べるのは次のときだけ（毎フレームは調べない）:
+  1. 待機ノードに入り終えた直後（振る舞いの `OnEnter`・`NodeEntered`・シーンの読み込み開始の後）。Entry で待つ場合も同じ
+  2. パラメータの値が変わったとき（`ParameterChanged` の後）。遷移の途中で変わった場合は、その遷移が終わってから調べる
+- 自動の Event は `Raise` では選ばない（起こし方を 1 つに決める）。名前は無くてよい。名前があれば、通過時に `EventTriggered` / `On(name)` へ通知する
+- 自動遷移が続く（A に入ると B へ、B に入ると A へ…）とき、1 回の操作の中で 100 回を超えたら警告を出し、その時点のノードに留まる
+- 条件とトリガーを見るのは、待機ノードから直接繋がった Event だけ。Event から Event へ繋いだ先の Event の条件・トリガーは使わない（検証で Warning）
+- パラメータが見つからない・型の合わない条件は満たさない扱い（検証で Error）
+
+### 検証
+
+| 重要度 | ルール |
+|---|---|
+| Error | 条件のパラメータが無い（削除された） |
+| Error | 比較がパラメータの型に合わない（Bool に `>` など） |
+| Warning | 条件の無い自動の Event より後ろ（同じノードからのエッジの順）にある自動の Event（選ばれることが無い） |
+| Warning | 別の Event から繋がっている Event の条件・自動（使われない） |
+
+### エディタ
+
+- Event のインスペクタ: Trigger（Raise / Automatic）と Conditions の一覧。行ごとに、パラメータ（Blackboard から選ぶドロップダウン。名前は打たない）、
+  比較（パラメータの型で使えるものだけ）、値（型に合った欄。Bool は無し）、削除ボタン。「+」で追加する（最初のパラメータと、その型の最初の比較）。すべて Undo 対応
+- 条件は ID でパラメータを指すので、改名には追従する。削除されたパラメータを指す条件は「(missing)」と出す（検証で Error）
+- ノードの表示: 条件をサマリー行に出す（例: `Affection >= 5 and Met`）。自動の Event は札に印を付ける（USS クラス `vne-node--automatic`）。
+  名前の無い自動の Event は、タイトルに条件を出す（条件も無ければ `Auto`）
+- Now running: Raise のボタンは、その名前で条件を満たす Event が無ければ押せない表示にし、ツールチップに満たしていない条件を出す。自動の Event はボタンに出さない
+- MCP: `get_graph` の Event にトリガーと条件を出し、`add_node` / `update_node` で `trigger` と `conditions`（パラメータ名・比較・値）を指定できる
+
+## セーブ・ロード
+
+ADV のセーブスロット（「続きから」）のために、Runner の状態を文字列にして保存し、そこから再開できるようにする。
+
+### データ（Runtime）
+
+| 型 | 役割 |
+|---|---|
+| `GraphRunnerState` | 保存する状態（`[Serializable]`。`ToJson` / `FromJson` は `JsonUtility`）。形式の版、グラフ名（確認用）、今いるノードの ID、最後に読み込みを頼んだシーン、パラメータの値（名前・型・値）、Extras |
+| `GraphExtras` | Runner の `Extras`。パラメータ（Blackboard）に無い値の置き場（キー → Bool / Int / Float / String）。Yarn Spinner の変数などアドオンが使う。`Start()` で空になり、セーブに含まれる |
+| `IRestartOnLoad` | ロードするとノードの最初からやり直すノード（Dialogue ノード）の印。このノードにいる間に保存すると、ノードに入る前の値で保存する |
+| `GraphSaveSlots` | スロット名でファイルに読み書きする（`Application.persistentDataPath/VisualNodeEditor/<グラフ名>/<スロット>.json`）。`Save` / `Load` / `Exists` / `Delete`。スロット名はファイル名に使える文字だけ |
+
+### 実行（GraphRunner）
+
+- `CaptureState()`: 今の状態を返す（実行中でなければ例外）。今のノードが `IRestartOnLoad` なら、そのノードに入る直前（振る舞いの `OnEnter` より前）に写した値を使う
+  （Yarn の会話の途中で保存しても、ロードすると会話を最初からやり直すので、会話の中の `<<set $Affection += 1>>` が二重にかからないように）
+- `RestoreState(state)`: 保存したノードから再開する。ノードが見つからなければ（グラフが変わってノードが消えた）、何も変えずに false
+  1. 実行中なら今のノードから出る（`OnExit`・`NodeExited`）。止まっていれば実行中にする（`Started`）。振る舞いは `Start()` と同じく複製し直す
+  2. パラメータを既定値に戻してから、保存した値のうち同じ名前・型のものを入れる（変わったものは `ParameterChanged`）。Extras を入れ替える
+  3. 入るノードが Scene ノードでなく、保存したシーンが今のシーン（読み込み中ならそのシーン）と違えば、そのシーンを読み込む
+  4. 保存したノードに入る（`OnEnter`・`NodeEntered`。Scene ノードならシーンを読み込み、そのあと自動遷移を調べる）
+  - 遷移の通知の中から呼ばれたら、その遷移の後に行う（`Raise` と同じ）
+- Runner は最後に読み込みを頼んだシーン（`LastScene`）を覚える（シーンを持たない待機ノードで保存しても、ロードで同じシーンに戻れるように）
+
+### コンポーネントとエディタ
+
+- `GraphRunnerBehaviour`: `SaveSlot(string)` / `LoadSlot(string)`（UnityEvent から呼べる）。止まっていてもロードできる（保存したノードから始まる）
+- `GraphEventButton`: 操作に `Save` / `Load` を足す（スロット名の欄。既定 `slot1`）。タイトル画面の「続きから」、ゲーム中の「セーブ」をコード無しで置ける
+- Now running パネルに Save / Load のボタン（スロット `debug`）を出し、Play 中にセーブ・ロードを試せるようにする
+
+## Yarn Spinner 連携（任意）
+
+ADV（ノベル・アドベンチャー）では、会話の中身を Yarn Spinner に書き、グラフはチャプター・ルート・シーン・フラグ・セーブを受け持つ（構成図としてのグラフ）。
+
+- 対象: Yarn Spinner for Unity 3.x（パッケージ `dev.yarnspinner.unity`。開発用プロジェクトでは 3.2.8 を使う）。2.x は API が違う（`StartDialogue` が同期、Dialogue View）ので対象外
+- 置き場: パッケージの `Integrations/YarnSpinner/`（`Runtime` / `Editor` / `Tests`）。Yarn Spinner が入っていないプロジェクトではコンパイルされず、Yarn を使わないゲームに影響しない。
+  asmdef の `versionDefines` で `dev.yarnspinner.unity` 3.0.0 以上があれば `VNE_YARN_SPINNER` を定義し、`defineConstraints` でそれを要求する。
+  Yarn のランタイム（`YarnSpinner.Unity`）と、自動で参照される `YarnSpinner.dll`（`Yarn.IVariableStorage` など）を使う
+
+| asmdef | 名前空間 | 中身 |
+|---|---|---|
+| `Reiga.VisualNodeEditor.YarnSpinner` | `Reiga.VisualNodeEditor.YarnSpinner` | `DialogueNode`、`YarnGraphBridge`、`GraphVariableStorage` |
+| `Reiga.VisualNodeEditor.YarnSpinner.Editor` | `Reiga.VisualNodeEditor.YarnSpinner.Editor` | Dialogue ノードの View・インスペクタ・検証、ADV Starter |
+| `Reiga.VisualNodeEditor.YarnSpinner.Tests` | `Reiga.VisualNodeEditor.YarnSpinner.Tests` | EditMode テスト |
+
+### Dialogue ノード（`DialogueNode`、`[NodeMenu("ADV/Dialogue")]`）
+
+- 待機ノード。Yarn のノード名 `_yarnNode` と、会話が終わったときに起こすイベント名 `_completeEvent`（既定 `Done`）を持つ。振る舞い（`IBehaviourHost`）も付けられる。`IRestartOnLoad`
+- ポートは `in` / `out`（State と同じ）。カテゴリ色は `dialogue`。タイトル未入力なら Yarn のノード名をタイトルに出す
+- ノード自身の検証: Yarn のノード名が空なら Warning
+
+### 会話の進め方（`YarnGraphBridge`）
+
+DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Component > Visual Node Editor > Yarn Graph Bridge`）。グラフの Runner と Yarn の DialogueRunner を繋ぐ。
+
+- 繋ぐ Runner: 指定したグラフ（空なら実行中のどれか）を実行中のものを `GraphRunner.Running` から探す。後から始まったものには `GraphRunner.Started` で付く
+- Dialogue ノードに入ったら、そのノードの Yarn ノードで会話を始める（`StartDialogue`）。会話中なら先に止める
+- Bridge が有効になった時点で Runner がすでに Dialogue ノードにいれば、その会話を始める（シーンの読み込みが終わる前に、自動遷移で Dialogue ノードへ進んでいた場合）
+- 会話が終わったら（`onDialogueComplete`）、次のフレームで次の順に試す（会話の終わりの通知の中では次の会話を始められないため）:
+  1. 会話の中で `<<graph_next 名前>>` があれば、その名前で Raise
+  2. なければ Dialogue ノードの完了イベント（既定 `Done`）で Raise（条件付きの Event で分岐できる）
+  3. どちらも無ければ Advance（Dialogue → Dialogue と直接繋いだ一本道）
+  4. どれもできなければ警告を出して留まる
+  - そのときの Runner のノードが、その会話を始めた Dialogue ノードでなければ何もしない
+- Dialogue ノードから出たとき、まだ会話中なら止める（`Stop()`。`<<graph_event>>`・自動遷移・外からの Raise でノードを離れた場合）
+- Yarn のコマンド（Bridge が DialogueRunner に登録する）:
+  - `<<graph_event 名前>>`: すぐ Raise する（演出の合図など。それで Dialogue ノードを離れれば会話は止まる）
+  - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）
+- オートセーブ: `Auto Save Slot`（空なら無効）を指定すると、Dialogue ノードに入るたびにそのスロットへ保存する（「続きから」用）
+- エディタで追加したとき（`Reset`）、同じ GameObject に `GraphVariableStorage` が無ければ足し、DialogueRunner の Variable Storage に設定する
+
+### 変数の共有（`GraphVariableStorage`）
+
+Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設定する。
+
+- Yarn の `$Name` は、Blackboard のパラメータ `Name` と同じもの。読み書きは Runner のパラメータに対して行う
+  （`ParameterChanged` も出るので、条件付き遷移・Play 中の Blackboard・セーブがすべて同じ値を見る）
+- 型の対応: Bool ↔ Yarn の bool、Int ↔ 数（書くときは四捨五入し、整数でなければ警告）、Float ↔ 数、String ↔ 文字列。型の合わない書き込みはエラーを出して無視する
+- Blackboard に無い変数（Yarn だけで使う変数や、Yarn が使う訪問回数 `$Yarn.Internal.*`）は Runner の `Extras` に置く（セーブに含まれ、`Start()` で消える）
+- Runner が見つからない間は、自分の中の一時的な置き場を使い、警告を 1 回出す（会話は続けられる）
+- 値が変わったら Yarn の変更リスナー（`AddChangeListener`）にも知らせる
+
+### エディタ
+
+- Dialogue ノードのインスペクタ: Yarn Node は、プロジェクトの YarnProject（`AssetDatabase.FindAssets("t:YarnProject")`）のノード名から選ぶドロップダウン
+  （プロジェクトごとにまとめる。一覧に無い名前も入力できる）。Complete Event は Event 名の入力欄（`EventNameField` と同じ候補）
+- エディタでの検証（Warning）: どの YarnProject にも無い Yarn のノード名 / Blackboard のパラメータと、同じ名前の Yarn の変数（YarnProject の初期値から型が分かる）の型が合わない
+- 拡張点（コアに足す）: Runtime の `NodeData.GetIssues()`（仮想メソッド。ノード自身の検証。`GraphValidator` が呼ぶ）と、
+  Editor の `IGraphIssueCheck`（`TypeCache` で集め、`GraphIssues.Collect` が呼ぶ。AssetDatabase を見る検証用）
+
+### 中断と再開
+
+- Yarn はノードの途中から再開できないので、Dialogue ノードにいるときのセーブをロードすると、その会話の最初から始まる。値はその Dialogue ノードに入る前のもの（`IRestartOnLoad`）
+
+### CI
+
+- コンパイル確認に Yarn 連携のジョブを足す。Yarn Spinner for Unity の固定のタグ（v3.2.8）を取得し、その Runtime（ソースと DLL）と一緒に `Integrations/YarnSpinner` をコンパイルする
+
+## ADV Starter（ADV のひな形）
+
+`Assets > Create > Visual Node Editor > ADV Starter`（Yarn 連携のエディタ）。選んでいるフォルダに次を作り、グラフを開く（同じ名前があれば番号を付ける）:
+
+- グラフ（`ADV.asset`）。Scene ノードのシーンは未設定（自分のシーンを入れる。検証の Warning と「次の一手」のボタンで案内される）
+
+  ```
+  Entry → [Scene: Title] ─(NewGame)→ [Scene: Story] ─(自動)→ [Container: Story] ─(Ending)→ [Scene: Title]
+  Story の中: Entry → [Dialogue: Chapter1] → [Dialogue: Chapter2] ─(Done, Affection >= 3)→ [Dialogue: GoodEnd] → Exit (Ending)
+                                                                  └(Done)→ [Dialogue: NormalEnd] → Exit (Ending)
+  Blackboard: Affection（Int、0）
+  ```
+
+- Yarn スクリプト（`ADV.yarn`）: 上の 4 つのノード。Chapter1 の選択肢で `$Affection` を増やす
+- Yarn プロジェクト（`ADV.yarnproject`）: そのフォルダ（と親のフォルダ）に Yarn プロジェクトが無ければ作る
 
 ## Build Settings 連携
 

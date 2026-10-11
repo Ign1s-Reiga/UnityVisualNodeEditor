@@ -33,7 +33,8 @@ Unity 上で「ゲームの大まかな構成」をノードグラフとして�
 │       ├── Runtime/             # ランタイムで参照されるデータ型・実行器（Editor 依存禁止）
 │       ├── Editor/              # GraphView ウィンドウ・ノード UI・インスペクタ・MCP サーバー（Editor/Mcp）
 │       ├── Tests/Editor/        # EditMode テスト
-│       └── Tests/Runtime/       # PlayMode テスト
+│       ├── Tests/Runtime/       # PlayMode テスト
+│       └── Integrations/YarnSpinner/   # Yarn Spinner 3.x 連携（Runtime / Editor / Tests。Yarn が入っているときだけコンパイル）
 ├── ProjectSettings/
 └── docs/                        # 番号付き設計ドキュメント（00-overview, 01-architecture, ...）
 ```
@@ -45,6 +46,11 @@ Unity 上で「ゲームの大まかな構成」をノードグラフとして�
 | `Reiga.VisualNodeEditor` (Runtime) | `Reiga.VisualNodeEditor` | UnityEngine のみ |
 | `Reiga.VisualNodeEditor.Editor` | `Reiga.VisualNodeEditor.Editor` | Runtime + UnityEditor |
 | `Reiga.VisualNodeEditor.Tests.Editor` | `Reiga.VisualNodeEditor.Tests` | 上記 + NUnit |
+| `Reiga.VisualNodeEditor.YarnSpinner` | `Reiga.VisualNodeEditor.YarnSpinner` | Runtime + `YarnSpinner.Unity`（`VNE_YARN_SPINNER` のときだけ） |
+| `Reiga.VisualNodeEditor.YarnSpinner.Editor` | `Reiga.VisualNodeEditor.YarnSpinner.Editor` | 上記 + Editor + UnityEditor |
+| `Reiga.VisualNodeEditor.YarnSpinner.Tests` | `Reiga.VisualNodeEditor.YarnSpinner.Tests` | 上記 + NUnit |
+
+- Yarn Spinner 連携のアセンブリは、asmdef の `versionDefines`（`dev.yarnspinner.unity` 3.0.0 以上で `VNE_YARN_SPINNER`）と `defineConstraints` で、Yarn が無ければコンパイルしない。コアのアセンブリから Yarn を参照しない。
 
 - Runtime 側に `UnityEditor` / `#if UNITY_EDITOR` を持ち込まない。エディタ専用の情報（ノード座標など）は Runtime の型に持たせてよいが、UnityEditor API は呼ばない。
 - 新しいノード種別は Runtime に `NodeData` のサブクラス（`[Serializable]` 必須）、Editor に対応する `NodeView` を追加し、`[NodeMenu("Category/Name")]` 属性で検索メニューに登録する。
