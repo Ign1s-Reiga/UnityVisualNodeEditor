@@ -77,6 +77,7 @@ namespace Reiga.VisualNodeEditor
         /// <paramref name="runner"/> の今の状態を保存する（同じスロットは上書き）。一時ファイルに書いてから 1 回で置き換える（書きかけのファイルも、スロットが無い瞬間も作らない）。
         /// </summary>
         /// <exception cref="InvalidOperationException">Runner が実行中でない。</exception>
+        /// <exception cref="IOException">ほかのプロセスがスロットを開いているなどで置き換えられない（古いセーブはそのまま残る）。</exception>
         public static void Save(GraphRunner runner, string slot)
         {
             if (runner == null)
@@ -101,10 +102,16 @@ namespace Reiga.VisualNodeEditor
             {
                 ReplaceFile(temporary, path);
             }
-            catch (Exception exception) when (exception is IOException or PlatformNotSupportedException or UnauthorizedAccessException)
+            catch (NotSupportedException)
             {
-                // File.Replace が使えない（対応しないファイルシステム・プラットフォーム）。消してから移す
+                // File.Replace に対応しないプラットフォーム。ほかに置き換える手が無いので、消してから移す
                 File.Delete(path);
+                File.Move(temporary, path);
+            }
+            catch (IOException) when (!File.Exists(path))
+            {
+                // 置き換えの途中で失敗し、古いセーブが別の名前に退けられた（Windows の ReplaceFile）。スロットを空けないよう、新しいセーブを移す。
+                // ほかのプロセスが開いているなど、古いセーブが残っているときは、そのまま例外にする（一時的なロックでも消してから移すと、その間に落ちたときにスロットが無くなる）
                 File.Move(temporary, path);
             }
         }
