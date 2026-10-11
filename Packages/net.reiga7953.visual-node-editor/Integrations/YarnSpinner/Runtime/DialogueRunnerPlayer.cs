@@ -36,7 +36,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
             try
             {
-                return project.Program.Nodes.ContainsKey(yarnNode);
+                return Array.IndexOf(project.NodeNames, yarnNode) >= 0;
             }
             catch (Exception)
             {
