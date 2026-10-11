@@ -191,5 +191,16 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(hints, Has.Some.Contains("Name the slot"));
             Assert.That(GraphEventButtonHints.Get(null, string.Empty, GraphEventButtonAction.Save, false, false, slot: "slot1"), Is.Empty);
         }
+
+        [Test]
+        public void UnusableSlotNames_AreExplained_IncludingReservedNames()
+        {
+            // 文字は使えても Windows が予約している名前は断るので、そのことも伝える
+            var error = Assert.Throws<ArgumentException>(() => GraphSaveSlots.GetPath(_graph, "CON"));
+            Assert.That(error.Message, Does.Contain("CON, NUL or COM1"));
+
+            var hints = GraphEventButtonHints.Get(null, string.Empty, GraphEventButtonAction.Save, false, false, slot: "nul");
+            Assert.That(hints, Has.Some.Contains("Windows reserves"));
+        }
     }
 }

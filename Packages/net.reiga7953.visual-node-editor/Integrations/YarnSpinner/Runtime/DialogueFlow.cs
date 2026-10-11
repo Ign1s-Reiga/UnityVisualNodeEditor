@@ -259,7 +259,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
             if (!GraphSaveSlots.IsValidSlotName(AutoSaveSlot))
             {
-                Warn($"'{AutoSaveSlot}' is not a usable slot name, so nothing was auto-saved. Use letters, digits, spaces, '-' and '_'.");
+                Warn($"'{AutoSaveSlot}' is not a usable slot name, so nothing was auto-saved. {GraphSaveSlots.SlotNameRule}");
                 return;
             }
 

@@ -14,6 +14,10 @@ namespace Reiga.VisualNodeEditor
     {
         private const int MaxSlotLength = 64;
 
+        /// <summary>スロット名の決まり（エラー・警告・インスペクタのヒントの文に使う。<see cref="IsValidSlotName"/> と同じ決まり）。</summary>
+        public static readonly string SlotNameRule =
+            $"Use up to {MaxSlotLength} letters, digits, spaces, '-' and '_' (no space at either end), and not a name Windows reserves such as CON, NUL or COM1.";
+
         /// <summary>保存先のフォルダ（テストで差し替える）。null なら persistentDataPath の下。</summary>
         internal static string RootOverride;
 
@@ -57,7 +61,7 @@ namespace Reiga.VisualNodeEditor
 
             if (!IsValidSlotName(slot))
             {
-                throw new ArgumentException($"'{slot}' is not a usable slot name. Use letters, digits, spaces, '-' and '_'.", nameof(slot));
+                throw new ArgumentException($"'{slot}' is not a usable slot name. {SlotNameRule}", nameof(slot));
             }
 
             return Path.Combine(Root, ToFolderName(graph), slot + ".json");

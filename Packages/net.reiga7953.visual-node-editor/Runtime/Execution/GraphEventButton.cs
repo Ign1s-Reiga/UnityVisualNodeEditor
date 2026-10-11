@@ -117,7 +117,7 @@ namespace Reiga.VisualNodeEditor
         {
             if (!GraphSaveSlots.IsValidSlotName(_slot))
             {
-                Warn($"'{name}': '{_slot}' is not a usable slot name. Use letters, digits, spaces, '-' and '_'.");
+                Warn($"'{name}': '{_slot}' is not a usable slot name. {GraphSaveSlots.SlotNameRule}");
                 return false;
             }
 
