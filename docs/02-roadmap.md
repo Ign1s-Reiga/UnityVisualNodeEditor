@@ -102,13 +102,13 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 条件は Event ノードに持たせる。Yarn 連携はこのパッケージの中の任意のアセンブリ（Yarn Spinner 3.x が入っているときだけコンパイル）。
 
 フェーズ 1: 条件付き遷移
-- [ ] データ・実行（Raise の条件、自動遷移）・検証
-- [ ] エディタ（インスペクタ、ノードの表示、Now running）
-- [ ] MCP（`get_graph` / `add_node` / `update_node` のトリガーと条件）
+- [x] データ・実行（Raise の条件、自動遷移）・検証
+- [x] エディタ（インスペクタ、ノードの表示、Now running）
+- [x] MCP（`get_graph` / `add_node` / `update_node` のトリガーと条件）
 
 フェーズ 2: セーブ・ロード
-- [ ] `GraphRunnerState`・`Extras`・`CaptureState` / `RestoreState`・`IRestartOnLoad`
-- [ ] `GraphSaveSlots`、`GraphRunnerBehaviour` / `GraphEventButton` の Save / Load、Now running の Save / Load
+- [x] `GraphRunnerState`・`Extras`・`CaptureState` / `RestoreState`・`IRestartOnLoad`
+- [x] `GraphSaveSlots`、`GraphRunnerBehaviour` / `GraphEventButton` の Save / Load、Now running の Save / Load
 
 フェーズ 3: Yarn Spinner 連携
 - [ ] 開発用プロジェクトに Yarn Spinner 3.2.8 を入れ、任意のアセンブリを作る。コアの拡張点（`NodeData.GetIssues`、`IGraphIssueCheck`）

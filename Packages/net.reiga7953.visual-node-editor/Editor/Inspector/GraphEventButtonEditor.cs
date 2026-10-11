@@ -19,6 +19,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         internal const string ActionPropertyName = "_action";
         internal const string EventNamePropertyName = "_eventName";
         internal const string SendOnClickPropertyName = "_sendOnClick";
+        internal const string SlotPropertyName = "_slot";
 
         private const string StyleSheetPath = "VisualNodeEditor/GraphEventButtonInspector";
 
@@ -64,6 +65,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             _eventField.Clear();
             var eventName = serializedObject.FindProperty(EventNamePropertyName);
             var action = (GraphEventButtonAction)serializedObject.FindProperty(ActionPropertyName).enumValueIndex;
+            if (action == GraphEventButtonAction.Save || action == GraphEventButtonAction.Load)
+            {
+                var slot = new PropertyField(serializedObject.FindProperty(SlotPropertyName), "Slot");
+                slot.Bind(serializedObject);
+                _eventField.Add(slot);
+                return;
+            }
+
             if (action != GraphEventButtonAction.Raise)
             {
                 return;
@@ -115,7 +124,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 (GraphEventButtonAction)serializedObject.FindProperty(ActionPropertyName).enumValueIndex,
                 serializedObject.FindProperty(SendOnClickPropertyName).boolValue,
                 clickEvent != null,
-                GraphEventButton.CallsSend(clickEvent, button));
+                GraphEventButton.CallsSend(clickEvent, button),
+                serializedObject.FindProperty(SlotPropertyName).stringValue);
 
             _hints.Clear();
             foreach (var hint in hints)

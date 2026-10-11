@@ -16,11 +16,17 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         /// <param name="sendOnClick">同じ GameObject のボタンのクリックで送るか。</param>
         /// <param name="hasClickSource">同じ GameObject に onClick を持つコンポーネントがあるか。</param>
         /// <param name="clickAlreadyCallsSend">その onClick が、インスペクタで既にこのコンポーネントの Send を呼んでいるか。</param>
+        /// <param name="slot">Save / Load のスロット名。</param>
         public static List<string> Get(
             IReadOnlyList<string> graphEvents, string eventName, GraphEventButtonAction action, bool sendOnClick, bool hasClickSource,
-            bool clickAlreadyCallsSend = false)
+            bool clickAlreadyCallsSend = false, string slot = GraphEventButton.DefaultSlot)
         {
             var hints = new List<string>();
+            if ((action == GraphEventButtonAction.Save || action == GraphEventButtonAction.Load) && !GraphSaveSlots.IsValidSlotName(slot))
+            {
+                hints.Add("Name the slot with letters, digits, spaces, '-' and '_' (for example 'slot1').");
+            }
+
             if (action == GraphEventButtonAction.Raise)
             {
                 if (graphEvents == null)

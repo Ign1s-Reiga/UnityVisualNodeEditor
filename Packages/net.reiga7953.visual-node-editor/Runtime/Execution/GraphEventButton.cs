@@ -31,6 +31,9 @@ namespace Reiga.VisualNodeEditor
         [Tooltip("Raise するイベント名（グラフの Event ノードの名前）。")]
         [SerializeField] private string _eventName = string.Empty;
 
+        [Tooltip("Save / Load のスロット名（英数字・空白・'-'・'_'）。")]
+        [SerializeField] private string _slot = DefaultSlot;
+
         [Tooltip("同じ GameObject のボタン（onClick を持つコンポーネント）が押されたら送る。")]
         [SerializeField] private bool _sendOnClick = true;
 
@@ -57,6 +60,16 @@ namespace Reiga.VisualNodeEditor
             set => _eventName = value ?? string.Empty;
         }
 
+        /// <summary>Save / Load の既定のスロット名。</summary>
+        public const string DefaultSlot = "slot1";
+
+        /// <summary>Save / Load のスロット名。</summary>
+        public string Slot
+        {
+            get => _slot;
+            set => _slot = value ?? string.Empty;
+        }
+
         /// <summary>同じ GameObject のボタンのクリックで送るか。</summary>
         public bool SendOnClick
         {
@@ -68,8 +81,8 @@ namespace Reiga.VisualNodeEditor
         public void Send() => TrySend();
 
         /// <summary>
-        /// 実行中の Runner へ送る。遷移した（または通知の後で遷移する）なら true。
-        /// Runner が見つからない・その名前の遷移が今のノードから無ければ false を返し、開発ビルドでは警告を出す。
+        /// 実行中の Runner へ送る。遷移した（または通知の後で遷移する）、保存した、ロードしたなら true。
+        /// Runner が見つからない・その名前の遷移が今のノードから無い・スロットが無ければ false を返し、開発ビルドでは警告を出す。
         /// </summary>
         public bool TrySend()
         {
@@ -80,6 +93,11 @@ namespace Reiga.VisualNodeEditor
                     ? $"No Graph Runner is running '{_graph.name}', so '{name}' did nothing."
                     : $"No Graph Runner is running, so '{name}' did nothing.");
                 return false;
+            }
+
+            if (_action == GraphEventButtonAction.Save || _action == GraphEventButtonAction.Load)
+            {
+                return SendSlot(runner);
             }
 
             var moved = _action == GraphEventButtonAction.Advance ? runner.Advance() : runner.Raise(_eventName);
@@ -93,6 +111,29 @@ namespace Reiga.VisualNodeEditor
             }
 
             return moved;
+        }
+
+        private bool SendSlot(GraphRunner runner)
+        {
+            if (!GraphSaveSlots.IsValidSlotName(_slot))
+            {
+                Warn($"'{name}': '{_slot}' is not a usable slot name. Use letters, digits, spaces, '-' and '_'.");
+                return false;
+            }
+
+            if (_action == GraphEventButtonAction.Save)
+            {
+                GraphSaveSlots.Save(runner, _slot);
+                return true;
+            }
+
+            if (!GraphSaveSlots.Load(runner, _slot))
+            {
+                Warn($"'{name}': there is no save in slot '{_slot}' for '{runner.Graph.name}' (or its node is gone).");
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary><paramref name="graph"/> を実行中の Runner（null なら実行中のどれか）。無ければ null。</summary>

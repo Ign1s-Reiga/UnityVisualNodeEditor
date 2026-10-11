@@ -409,6 +409,16 @@
   opacity: 0.45;
 }
 
+.vne-runtime-panel__save-row {
+  flex-direction: row;
+  margin-top: 6px;
+}
+
+.vne-runtime-panel__save {
+  margin-left: 0;
+  margin-right: 4px;
+}
+
 .vne-runtime-panel__empty {
   color: #a0a0a0;
   white-space: normal;

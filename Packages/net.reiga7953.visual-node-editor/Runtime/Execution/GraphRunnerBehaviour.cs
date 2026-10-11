@@ -54,12 +54,50 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
+            CreateRunner();
+            Runner.Start();
+        }
+
+        /// <summary>
+        /// 今の状態をスロットに保存する（<see cref="GraphSaveSlots.Save"/>）。UnityEvent から呼べる。実行中でなければ警告を出して何もしない。
+        /// </summary>
+        public void SaveSlot(string slot)
+        {
+            if (Runner == null || !Runner.IsRunning)
+            {
+                Debug.LogWarning($"[VisualNodeEditor] '{name}' is not running its graph, so slot '{slot}' was not saved.", this);
+                return;
+            }
+
+            GraphSaveSlots.Save(Runner, slot);
+        }
+
+        /// <summary>スロットから再開する（UnityEvent から呼べる）。止まっていても始められる。</summary>
+        public void LoadSlot(string slot) => TryLoadSlot(slot);
+
+        /// <summary>スロットから再開する。止まっていても始められる。スロットが無い・保存したノードがグラフに無ければ false。</summary>
+        public bool TryLoadSlot(string slot)
+        {
+            if (_graph == null)
+            {
+                return false;
+            }
+
+            if (Runner == null)
+            {
+                CreateRunner();
+            }
+
+            return GraphSaveSlots.Load(Runner, slot);
+        }
+
+        private void CreateRunner()
+        {
             Runner = new GraphRunner(_graph, _loadScenes ? new SceneManagerSceneLoader() : null) { Host = this };
 
             // 開始時の Entry / 最初のノードの通知にも間に合うよう、Start より前に購読する
             Runner.NodeEntered += node => _onNodeEntered.Invoke(node.Title);
             Runner.EventTriggered += eventName => GraphEventBinding.Dispatch(_eventBindings, eventName);
-            Runner.Start();
         }
 
         /// <summary>グラフの実行を止める。</summary>

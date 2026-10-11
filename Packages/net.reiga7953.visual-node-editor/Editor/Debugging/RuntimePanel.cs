@@ -42,6 +42,41 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             _noActions = new Label("Nothing leads on from here (no Event or next node).");
             _noActions.AddToClassList("vne-runtime-panel__empty");
             Add(_noActions);
+
+            // セーブ・ロードを Play 中に試す（スロット debug）
+            var saveRow = new VisualElement();
+            saveRow.AddToClassList("vne-runtime-panel__save-row");
+            _saveButton = new Button(SaveDebugSlot) { text = "Save", tooltip = $"Save the running graph to slot '{DebugSlot}'" };
+            _loadButton = new Button(LoadDebugSlot) { text = "Load", tooltip = $"Resume the running graph from slot '{DebugSlot}'" };
+            _saveButton.AddToClassList("vne-runtime-panel__save");
+            _loadButton.AddToClassList("vne-runtime-panel__save");
+            saveRow.Add(_saveButton);
+            saveRow.Add(_loadButton);
+            Add(saveRow);
+        }
+
+        /// <summary>Play 中に試すセーブのスロット名。</summary>
+        internal const string DebugSlot = "debug";
+
+        private readonly Button _saveButton;
+        private readonly Button _loadButton;
+
+        private void SaveDebugSlot()
+        {
+            if (_runner != null && _runner.IsRunning)
+            {
+                GraphSaveSlots.Save(_runner, DebugSlot);
+                Refresh();
+            }
+        }
+
+        private void LoadDebugSlot()
+        {
+            if (_runner != null)
+            {
+                GraphSaveSlots.Load(_runner, DebugSlot);
+                Refresh();
+            }
         }
 
         /// <summary>表示中の Runner。表示していなければ null。</summary>
@@ -86,6 +121,7 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             }
 
             _location.text = GetLocation(_runner);
+            _loadButton.SetEnabled(GraphSaveSlots.Exists(_runner.Graph, DebugSlot));
             var actions = RuntimeActions.For(_runner.Query, _runner.Current);
             foreach (var action in actions)
             {
