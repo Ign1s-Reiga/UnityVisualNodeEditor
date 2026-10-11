@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using UnityEngine;
@@ -95,6 +96,20 @@ namespace Reiga.VisualNodeEditor.Tests
 
             Assert.That(GraphSaveSlots.Delete(_graph, "slot1"), Is.True);
             Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.False);
+        }
+
+        [Test]
+        public void SavingAgain_ReplacesTheSlot_AndLeavesNoTemporaryFile()
+        {
+            GraphSaveSlots.Save(_runner, "slot1");
+            _runner.Raise("Start");
+            _runner.SetInt("Score", 7);
+
+            GraphSaveSlots.Save(_runner, "slot1");
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
+            var folder = Path.GetDirectoryName(GraphSaveSlots.GetPath(_graph, "slot1"));
+            Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
         }
 
         [TestCase("slot1", true)]
