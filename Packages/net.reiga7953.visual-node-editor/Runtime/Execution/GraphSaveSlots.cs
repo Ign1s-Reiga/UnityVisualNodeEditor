@@ -46,7 +46,7 @@ namespace Reiga.VisualNodeEditor
         public static bool Exists(NodeGraphAsset graph, string slot) => IsValidSlotName(slot) && graph != null && File.Exists(GetPath(graph, slot));
 
         /// <summary>
-        /// <paramref name="runner"/> の今の状態を保存する（同じスロットは上書き）。書きかけのファイルが残らないよう、一時ファイルに書いてから置き換える。
+        /// <paramref name="runner"/> の今の状態を保存する（同じスロットは上書き）。一時ファイルに書いてから 1 回で置き換える（書きかけのファイルも、スロットが無い瞬間も作らない）。
         /// </summary>
         /// <exception cref="InvalidOperationException">Runner が実行中でない。</exception>
         public static void Save(GraphRunner runner, string slot)
@@ -61,12 +61,16 @@ namespace Reiga.VisualNodeEditor
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var temporary = path + ".tmp";
             File.WriteAllText(temporary, json);
+
+            // 古いセーブを消してから移すと、その間に落ちた・移すのに失敗したときにスロットが無くなるので、1 回で置き換える
             if (File.Exists(path))
             {
-                File.Delete(path);
+                File.Replace(temporary, path, null);
             }
-
-            File.Move(temporary, path);
+            else
+            {
+                File.Move(temporary, path);
+            }
         }
 
         /// <summary>そのスロットのセーブ。無ければ null。</summary>
