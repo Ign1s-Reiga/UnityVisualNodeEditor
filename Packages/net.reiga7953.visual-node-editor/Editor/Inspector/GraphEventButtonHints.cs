@@ -24,7 +24,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             var hints = new List<string>();
             if ((action == GraphEventButtonAction.Save || action == GraphEventButtonAction.Load) && !GraphSaveSlots.IsValidSlotName(slot))
             {
-                hints.Add("Name the slot with letters, digits, spaces, '-' and '_' (for example 'slot1').");
+                hints.Add("Name the slot like 'slot1'. " + GraphSaveSlots.SlotNameRule);
             }
 
             if (action == GraphEventButtonAction.Raise)
