@@ -497,6 +497,10 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
 - Bridge が無効になったとき（GameObject を消した・ポーズで止めたなど）も会話を止める。止まった知らせ（`onDialogueComplete`）は無効の間も聞き続け（外すのは Bridge を壊したとき）、
   また有効になっても、その知らせが来るまでは次の会話を始めない（`DialogueFlow.Shutdown`。Yarn は止めた会話の後片付けが終わってから知らせるので、
   その前に始めると、遅れて来た知らせを新しい会話の終わりと取り違えて次へ進んでしまう）。コマンドは無効の間は外す
+  - 止まった知らせを聞けないまま会話がもう流れていなければ（DialogueRunner を壊した・知らせが届かなかったなど）、待つのをやめて次の会話を始める。
+    「流れている」は、Yarn の `IsDialogueRunning` か、`DialogueTask` がまだ終わっていないこと（`IsDialogueRunning` は止めた時点で false になり、
+    知らせはその後の後片付けが済んでから来る。`DialogueTask` はその知らせの直前に終わる）
+  - 無効の間に Dialogue Runner の欄を別のものに替えたら、また有効になったときに会話の状態を作り直す（替える前の Runner の知らせは聞かない）
 - Yarn のコマンド（Bridge が DialogueRunner に登録する）:
   - `<<graph_event 名前>>`: すぐ Raise する（演出の合図など。それで Dialogue ノードを離れれば会話は止まる）
   - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）

@@ -12,6 +12,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
 
         public int StopCount { get; private set; }
 
+        /// <summary>会話を始めると true になる（テストで、知らせの無いまま終わったことにするには false にする）。</summary>
+        public bool IsRunning { get; set; }
+
         public bool Start(string yarnNode)
         {
             if (Missing.Contains(yarnNode))
@@ -20,6 +23,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
             }
 
             Started.Add(yarnNode);
+            IsRunning = true;
             return true;
         }
 

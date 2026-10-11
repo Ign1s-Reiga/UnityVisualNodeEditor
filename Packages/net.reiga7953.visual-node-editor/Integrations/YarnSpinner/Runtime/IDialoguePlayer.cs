@@ -14,5 +14,11 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
         /// <summary>流している会話を止める。</summary>
         void Stop();
+
+        /// <summary>
+        /// 始めた会話の終わりの知らせがまだ来ていない（流している・止めている途中）か。
+        /// 知らせを出し終えた、またはもう出せない（DialogueRunner が壊された）なら false。
+        /// </summary>
+        bool IsRunning { get; }
     }
 }

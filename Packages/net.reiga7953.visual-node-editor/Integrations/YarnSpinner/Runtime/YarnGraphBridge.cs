@@ -37,6 +37,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
         private DialogueFlow _flow;
 
+        // _flow が会話を流す DialogueRunner
+        private DialogueRunner _flowRunner;
+
         // onDialogueComplete を聞いている DialogueRunner（無効の間も聞き続ける）と、コマンドを登録している DialogueRunner（有効の間だけ）
         private DialogueRunner _listening;
         private DialogueRunner _commands;
@@ -81,7 +84,13 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
                 return;
             }
 
-            _flow ??= new DialogueFlow(new DialogueRunnerPlayer(_dialogueRunner));
+            // 無効の間に Dialogue Runner の欄を替えたら、会話の状態を作り直す（替える前の Runner の知らせはもう聞かないので、前の状態のままだと待ち続ける）
+            if (_flow == null || _flowRunner != _dialogueRunner)
+            {
+                _flow = new DialogueFlow(new DialogueRunnerPlayer(_dialogueRunner));
+                _flowRunner = _dialogueRunner;
+            }
+
             _flow.AutoSaveSlot = _autoSaveSlot;
             Listen(_dialogueRunner);
             AddCommands(_dialogueRunner);

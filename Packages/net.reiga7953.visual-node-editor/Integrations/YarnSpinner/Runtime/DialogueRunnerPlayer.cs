@@ -27,6 +27,10 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
         public void Stop() => _runner.Stop().Forget();
 
+        // IsDialogueRunning は止めた時点で false になるが、終わりの知らせはその後の後片付けが済んでから来る。
+        // DialogueTask はその知らせの直前に終わるので、両方を見る（壊された DialogueRunner はもう知らせを出さない）
+        public bool IsRunning => _runner != null && (_runner.IsDialogueRunning || !_runner.DialogueTask.IsCompleted());
+
         private static bool HasNode(YarnProject project, string yarnNode)
         {
             if (project == null)

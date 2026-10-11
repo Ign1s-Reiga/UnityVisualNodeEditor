@@ -223,6 +223,23 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         }
 
         [Test]
+        public void Shutdown_StopsWaiting_WhenTheStoppedDialogueEndsWithoutTellingUs()
+        {
+            // 止まった知らせを聞けなくても（DialogueRunner を壊した・知らせが届かなかったなど）、会話がもう流れていなければ次を始める
+            AtChapter();
+            _flow.Shutdown();
+            _flow.Attach(_runner);
+            _flow.Tick();
+            Assert.That(_player.Started, Is.EqualTo(new[] { "Chapter1" }), "still running, so it waits");
+
+            _player.IsRunning = false;
+            _flow.Tick();
+
+            Assert.That(_player.Started, Is.EqualTo(new[] { "Chapter1", "Chapter1" }));
+            Assert.That(_runner.Current, Is.SameAs(_chapter), "giving up the wait does not move the graph");
+        }
+
+        [Test]
         public void GraphEvent_RaisesRightAway()
         {
             var shake = Event("Shake");
