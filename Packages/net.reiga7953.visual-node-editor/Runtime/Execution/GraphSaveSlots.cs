@@ -60,8 +60,8 @@ namespace Reiga.VisualNodeEditor
             return Path.Combine(Root, ToFolderName(graph), slot + ".json");
         }
 
-        /// <summary>そのスロットにセーブがあるか。</summary>
-        public static bool Exists(NodeGraphAsset graph, string slot) => IsValidSlotName(slot) && graph != null && File.Exists(GetPath(graph, slot));
+        /// <summary>そのスロットにセーブがあるか（キーを持つ前のグラフ名だけのフォルダのものも含む）。</summary>
+        public static bool Exists(NodeGraphAsset graph, string slot) => FindFile(graph, slot) != null;
 
         /// <summary>
         /// <paramref name="runner"/> の今の状態を保存する（同じスロットは上書き）。一時ファイルに書いてから 1 回で置き換える（書きかけのファイルも、スロットが無い瞬間も作らない）。
@@ -93,8 +93,11 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>そのスロットのセーブ。無ければ null。</summary>
         /// <exception cref="ArgumentException">ファイルがセーブとして読めない。</exception>
-        public static GraphRunnerState Read(NodeGraphAsset graph, string slot) =>
-            Exists(graph, slot) ? GraphRunnerState.FromJson(File.ReadAllText(GetPath(graph, slot))) : null;
+        public static GraphRunnerState Read(NodeGraphAsset graph, string slot)
+        {
+            var file = FindFile(graph, slot);
+            return file != null ? GraphRunnerState.FromJson(File.ReadAllText(file)) : null;
+        }
 
         /// <summary>
         /// スロットから再開する（<see cref="GraphRunner.RestoreState"/>。止まっていても始められる）。
@@ -114,17 +117,41 @@ namespace Reiga.VisualNodeEditor
         /// <summary>スロットを消す。無ければ false。</summary>
         public static bool Delete(NodeGraphAsset graph, string slot)
         {
-            if (!Exists(graph, slot))
+            var file = FindFile(graph, slot);
+            if (file == null)
             {
                 return false;
             }
 
-            File.Delete(GetPath(graph, slot));
+            File.Delete(file);
             return true;
         }
 
+        // そのスロットのファイル。キーを持つグラフでそのフォルダに無ければ、グラフ名だけのフォルダ（キーを持つ前に保存したもの）も探す。無ければ null
+        private static string FindFile(NodeGraphAsset graph, string slot)
+        {
+            if (graph == null || !IsValidSlotName(slot))
+            {
+                return null;
+            }
+
+            var path = GetPath(graph, slot);
+            if (File.Exists(path))
+            {
+                return path;
+            }
+
+            if (graph.SaveKey.Length == 0)
+            {
+                return null;
+            }
+
+            var legacy = Path.Combine(Root, ToFolderName(graph, false), slot + ".json");
+            return File.Exists(legacy) ? legacy : null;
+        }
+
         // グラフの置き場のフォルダ名: グラフ名（使えない文字は '_'）とセーブキー（同じ名前の別のグラフと混ざらないように。空ならグラフ名だけ）
-        private static string ToFolderName(NodeGraphAsset graph)
+        private static string ToFolderName(NodeGraphAsset graph, bool withKey = true)
         {
             var invalid = Path.GetInvalidFileNameChars();
             var name = new string((graph.name ?? string.Empty).Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
@@ -133,7 +160,7 @@ namespace Reiga.VisualNodeEditor
                 name = "Graph";
             }
 
-            var key = new string(graph.SaveKey.Where(c => !invalid.Contains(c)).ToArray());
+            var key = withKey ? new string(graph.SaveKey.Where(c => !invalid.Contains(c)).ToArray()) : string.Empty;
             return key.Length > 0 ? $"{name}-{key}" : name;
         }
     }
