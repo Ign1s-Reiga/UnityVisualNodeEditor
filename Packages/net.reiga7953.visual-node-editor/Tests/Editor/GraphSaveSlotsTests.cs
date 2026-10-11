@@ -118,6 +118,12 @@ namespace Reiga.VisualNodeEditor.Tests
         [TestCase(" slot", false)]
         [TestCase("../escape", false)]
         [TestCase("a/b", false)]
+        [TestCase("CON", false)]
+        [TestCase("nul", false)]
+        [TestCase("Com1", false)]
+        [TestCase("LPT9", false)]
+        [TestCase("Console", true)]
+        [TestCase("COM10", true)]
         public void SlotNames_AreFileNameSafe(string slot, bool valid)
         {
             Assert.That(GraphSaveSlots.IsValidSlotName(slot), Is.EqualTo(valid));

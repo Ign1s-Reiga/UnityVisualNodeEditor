@@ -450,6 +450,7 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 
 - `GraphRunnerBehaviour`: `SaveSlot(string)` / `LoadSlot(string)`（UnityEvent から呼べる）。止まっていてもロードできる（保存したノードから始まる）
 - `GraphEventButton`: 操作に `Save` / `Load` を足す（スロット名の欄。既定 `slot1`）。タイトル画面の「続きから」、ゲーム中の「セーブ」をコード無しで置ける
+- スロット名は英数字・空白・'-'・'_' だけで、Windows が装置の名前として予約している CON・PRN・AUX・NUL・COM0〜9・LPT0〜9 は使えない（`.json` を付けても作れないため。インスペクタで注意を出す）
 - Now running パネルに Save / Load のボタン（スロット `debug`）を出し、Play 中にセーブ・ロードを試せるようにする
 
 ## Yarn Spinner 連携（任意）
