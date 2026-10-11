@@ -133,6 +133,49 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
         }
 
+        [Test]
+        public void SavingAgain_WhileTheSlotIsLocked_FailsAndKeepsTheOldSave()
+        {
+            // 一時的なロック（ウイルス対策ソフトなど）で消してから移すと、その間に落ちたときにスロットが無くなるので、失敗にする
+            GraphSaveSlots.Save(_runner, "slot1");
+            _runner.Raise("Start");
+
+            WithReplaceFile((_, _) => throw new IOException("The file is in use."), () =>
+                Assert.Throws<IOException>(() => GraphSaveSlots.Save(_runner, "slot1")));
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_title.Id));
+        }
+
+        [Test]
+        public void SavingAgain_WhenReplacingFailsHalfway_StillFillsTheSlot()
+        {
+            // Windows の ReplaceFile は、古いファイルを別の名前に退けた後で失敗することがある
+            GraphSaveSlots.Save(_runner, "slot1");
+            _runner.Raise("Start");
+
+            WithReplaceFile((_, destination) =>
+            {
+                File.Delete(destination);
+                throw new IOException("Unable to move the replacement file.");
+            }, () => GraphSaveSlots.Save(_runner, "slot1"));
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
+        }
+
+        private static void WithReplaceFile(Action<string, string> replace, Action action)
+        {
+            var original = GraphSaveSlots.ReplaceFile;
+            GraphSaveSlots.ReplaceFile = replace;
+            try
+            {
+                action();
+            }
+            finally
+            {
+                GraphSaveSlots.ReplaceFile = original;
+            }
+        }
+
         [TestCase("slot1", true)]
         [TestCase("Chapter 2-b_x", true)]
         [TestCase("", false)]
