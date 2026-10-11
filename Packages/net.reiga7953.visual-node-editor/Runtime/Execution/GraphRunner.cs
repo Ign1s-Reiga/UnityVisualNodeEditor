@@ -23,7 +23,17 @@ namespace Reiga.VisualNodeEditor
         private readonly Dictionary<string, Action> _eventHandlers = new(StringComparer.Ordinal);
         private readonly Dictionary<string, GraphParameterType> _parameterTypes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, object> _parameterValues = new(StringComparer.Ordinal);
+
+        // パラメータの ID → 名前（Event の条件は ID でパラメータを指す）
+        private readonly Dictionary<string, string> _parameterNamesById = new(StringComparer.Ordinal);
         private bool _isMoving;
+
+        // 1 回の操作の中で続けて行える自動遷移の数（A → B → A … と輪になったときに止める）
+        private const int MaxAutomaticSteps = 100;
+        private int _automaticSteps;
+
+        // 自動の Event を調べる処理を、遷移の後に積んであるか（何度値が変わっても 1 回だけ積む）
+        private bool _automaticCheckQueued;
 
         // Start / Stop のたびに進める。通知の中で止めたり再開したりされたら、古い遷移はこれを見て打ち切る
         private int _generation;
@@ -87,12 +97,17 @@ namespace Reiga.VisualNodeEditor
             var previous = new Dictionary<string, object>(_parameterValues, StringComparer.Ordinal);
             _parameterTypes.Clear();
             _parameterValues.Clear();
+            _parameterNamesById.Clear();
             foreach (var parameter in Graph.Parameters)
             {
                 if (parameter != null && !string.IsNullOrEmpty(parameter.Name) && !_parameterTypes.ContainsKey(parameter.Name))
                 {
                     _parameterTypes.Add(parameter.Name, parameter.Type);
                     _parameterValues.Add(parameter.Name, parameter.DefaultValue);
+                    if (!string.IsNullOrEmpty(parameter.Id))
+                    {
+                        _parameterNamesById.TryAdd(parameter.Id, parameter.Name);
+                    }
                 }
             }
 
@@ -105,7 +120,46 @@ namespace Reiga.VisualNodeEditor
             {
                 ParameterChanged?.Invoke(name);
             }
+
+            if (changed.Count > 0)
+            {
+                RequestAutomaticCheck();
+            }
         }
+
+        /// <summary>
+        /// その Event の条件をすべて満たしているか（条件が無ければ true）。パラメータが無い・型の合わない条件は満たさない。
+        /// </summary>
+        public bool AreConditionsMet(EventNode eventNode)
+        {
+            if (eventNode == null)
+            {
+                return false;
+            }
+
+            foreach (var condition in eventNode.Conditions)
+            {
+                if (!IsConditionMet(condition))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>条件 1 つを今の値で満たしているか。パラメータが無い・型の合わない条件は満たさない。</summary>
+        public bool IsConditionMet(TransitionCondition condition) =>
+            condition != null
+            && condition.ParameterId != null
+            && _parameterNamesById.TryGetValue(condition.ParameterId, out var name)
+            && condition.IsMet(_parameterTypes[name], _parameterValues[name]);
+
+        /// <summary>
+        /// 今のノードで <see cref="Raise"/> したときに選ばれる Event（名前が一致し、トリガーが Raise で、条件を満たす最初のもの）。無ければ null。
+        /// </summary>
+        public EventNode FindRaiseTarget(string eventName) =>
+            Current != null ? Query.FindEventTransition(Current.Id, eventName, AreConditionsMet) : null;
 
         private object GetParameter(string name, GraphParameterType requested)
         {
@@ -123,6 +177,7 @@ namespace Reiga.VisualNodeEditor
 
             _parameterValues[name] = value;
             ParameterChanged?.Invoke(name);
+            RequestAutomaticCheck();
         }
 
         private void CheckParameter(string name, GraphParameterType requested)
@@ -366,6 +421,7 @@ namespace Reiga.VisualNodeEditor
             // 通知より先に停止状態にする。NodeExited の中で Raise / Advance されても積まずに false を返し、
             // 次の Start() の後に古い操作が実行されないようにする
             _pending.Clear();
+            _automaticCheckQueued = false;
             _generation++;
             IsRunning = false;
             _running.Remove(this);
@@ -427,7 +483,7 @@ namespace Reiga.VisualNodeEditor
 
         private bool RaiseNow(string eventName)
         {
-            var eventNode = Current != null ? Query.FindEventTransition(Current.Id, eventName) : null;
+            var eventNode = FindRaiseTarget(eventName);
             if (eventNode == null)
             {
                 return false;
@@ -450,12 +506,72 @@ namespace Reiga.VisualNodeEditor
             return true;
         }
 
+        /// <summary>
+        /// 今のノードから出ている自動の Event を調べるよう頼む（待機ノードに入り終えたとき・パラメータが変わったとき）。
+        /// 遷移の途中なら、その遷移が終わってから調べる。
+        /// </summary>
+        private void RequestAutomaticCheck()
+        {
+            if (!IsRunning || Current == null)
+            {
+                return;
+            }
+
+            if (_isMoving)
+            {
+                if (!_automaticCheckQueued)
+                {
+                    _automaticCheckQueued = true;
+                    _pending.Enqueue(CheckAutomaticNow);
+                }
+
+                return;
+            }
+
+            Run(CheckAutomaticNow);
+        }
+
+        /// <summary>今のノードから出ている自動の Event を、エッジの順に調べ、条件を満たす最初のものへ進む。</summary>
+        private void CheckAutomaticNow()
+        {
+            _automaticCheckQueued = false;
+            if (!IsRunning || Current == null)
+            {
+                return;
+            }
+
+            var target = Query.GetAutomaticTransitions(Current.Id).FirstOrDefault(AreConditionsMet);
+            if (target == null)
+            {
+                return;
+            }
+
+            // A に入ると B へ、B に入ると A へ… と続く自動遷移は、1 回の操作の中で上限を超えたら止める
+            _automaticSteps++;
+            if (_automaticSteps > MaxAutomaticSteps)
+            {
+                if (_automaticSteps == MaxAutomaticSteps + 1)
+                {
+                    Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': automatic Events moved more than {MaxAutomaticSteps} times in a row. Stopped at '{Current.Title}'.");
+                }
+
+                return;
+            }
+
+            MoveTo(target);
+        }
+
         /// <summary>通知中に Raise / Advance が呼ばれても、いま進めている遷移を壊さないよう順番に実行する。</summary>
         private void Run(Action action)
         {
             // 入れ子で呼ばれても、外側の Run が終わるまでは「遷移中」のままにする
             var wasMoving = _isMoving;
             _isMoving = true;
+            if (!wasMoving)
+            {
+                _automaticSteps = 0;
+            }
+
             try
             {
                 action();
@@ -471,6 +587,7 @@ namespace Reiga.VisualNodeEditor
                 if (!wasMoving)
                 {
                     _pending.Clear();
+                    _automaticCheckQueued = false;
                 }
 
                 throw;
@@ -502,9 +619,9 @@ namespace Reiga.VisualNodeEditor
                 }
 
                 // 開始直後（まだどこにもいない）なら、Entry に入ってそこに留まる（Entry の先が無いときと同じ）
-                if (Current == null && path.Count > 0 && IsCurrentGeneration(generation))
+                if (Current == null && path.Count > 0 && IsCurrentGeneration(generation) && Enter(path[0], generation))
                 {
-                    Enter(path[0], generation);
+                    RequestAutomaticCheck();
                 }
 
                 return;
@@ -517,6 +634,9 @@ namespace Reiga.VisualNodeEditor
                     return;
                 }
             }
+
+            // 待機ノードに入り終えたら、そこから出ている自動の Event を調べる（この遷移の後に）
+            RequestAutomaticCheck();
         }
 
         /// <summary>

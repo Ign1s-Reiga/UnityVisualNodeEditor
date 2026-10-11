@@ -11,6 +11,7 @@ namespace Reiga.VisualNodeEditor
         {
             var issues = Validate(graph.Nodes, graph.Edges);
             issues.AddRange(ValidateParameters(graph.Parameters));
+            issues.AddRange(ConditionValidator.Validate(graph.Nodes, graph.Edges, graph.Parameters));
             return issues;
         }
 
@@ -84,7 +85,8 @@ namespace Reiga.VisualNodeEditor
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
                             $"'{node.Title}' has no scene assigned.", node.Id, GraphIssueKind.SceneNotSet));
                         break;
-                    case EventNode eventNode when string.IsNullOrEmpty(eventNode.EventName):
+                    // 自動の Event は名前で起こさないので、名前が無くてよい
+                    case EventNode eventNode when string.IsNullOrEmpty(eventNode.EventName) && !eventNode.IsAutomatic:
                         issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
                             $"'{node.Title}' has no event name, so it cannot be raised.", node.Id));
                         break;
