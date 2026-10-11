@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -123,8 +125,17 @@ namespace Reiga.VisualNodeEditor
 
             if (_action == GraphEventButtonAction.Save)
             {
-                GraphSaveSlots.Save(runner, _slot);
-                return true;
+                try
+                {
+                    GraphSaveSlots.Save(runner, _slot);
+                    return true;
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // ほかのプロセスがスロットを開いているなど（古いセーブはそのまま残る）。クリックの処理で例外にせず、ビルドでも伝える
+                    Debug.LogWarning($"[VisualNodeEditor] '{name}': could not save to slot '{_slot}': {exception.Message}", this);
+                    return false;
+                }
             }
 
             if (!GraphSaveSlots.Load(runner, _slot))
