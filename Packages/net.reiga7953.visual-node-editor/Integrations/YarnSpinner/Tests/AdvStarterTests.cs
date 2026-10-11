@@ -14,6 +14,17 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         private const string Folder = "Assets/__VneAdvStarterTemp";
 
         [Test]
+        public void Prefix_SkipsNamesThatAreAlreadyTaken()
+        {
+            // 別のフォルダのひな形も同じファイル名（ADV）になりうるので、頭に付けた名前も使われていれば番号を足す
+            var taken = new HashSet<string> { "Chapter1", "ADV_Chapter1", "ADV2_GoodEnd" };
+
+            Assert.That(AdvStarter.ChoosePrefix("ADV", taken.Contains), Is.EqualTo("ADV3_"));
+            Assert.That(AdvStarter.ChoosePrefix("ADV", new HashSet<string> { "Chapter2" }.Contains), Is.EqualTo("ADV_"));
+            Assert.That(AdvStarter.ChoosePrefix("ADV", _ => false), Is.Empty, "no prefix while the names are free");
+        }
+
+        [Test]
         public void Graph_HasNoErrors()
         {
             var graph = AdvStarter.BuildGraph();
