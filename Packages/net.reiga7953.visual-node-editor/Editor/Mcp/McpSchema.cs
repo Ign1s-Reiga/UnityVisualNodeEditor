@@ -46,6 +46,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         public static Dictionary<string, object> ObjectArray(string description, IDictionary<string, object> itemProperties, params string[] required) =>
             new() { ["type"] = "array", ["items"] = Object(itemProperties, required), ["description"] = description };
 
+        /// <summary>中の欄を決めないオブジェクトの引数（名前 → 値）。</summary>
+        public static Dictionary<string, object> FreeObject(string description) =>
+            new() { ["type"] = "object", ["description"] = description };
+
         /// <summary>型を決めない値の引数（数・文字列・真偽値のどれでもよい）。</summary>
         public static Dictionary<string, object> Any(string description) =>
             new() { ["description"] = description };

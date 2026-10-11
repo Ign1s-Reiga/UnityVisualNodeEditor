@@ -32,6 +32,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             ["exit"] = McpSchema.String("Exit nodes (inside a container): the name of the container exit this Exit node leaves through."),
             ["x"] = McpSchema.Number("Position on the canvas (pixels, grows to the right). Optional; by default the node goes right of the rightmost node."),
             ["y"] = McpSchema.Number("Position on the canvas (pixels, grows downwards)."),
+            ["fields"] = McpSchema.FreeObject(
+                "Other node types (for example Dialogue from the Yarn Spinner integration): values for their own fields by name, " +
+                "as get_graph lists them under 'fields', e.g. {\"YarnNode\": \"Chapter1\", \"CompleteEvent\": \"Done\"}."),
         };
 
         /// <summary>このクラスのツール（<c>tools/list</c> に出す順）。</summary>
@@ -187,7 +190,30 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                     var container = GraphEdits.Group(asset, args.GetStringList("nodes"), args.GetOptionalString("title"));
                     return GraphDescription.DescribeNode(asset, container);
                 });
+
+            yield return new McpTool(
+                "add_parameter",
+                "Add a Blackboard parameter (a flag or value the game and the Event conditions read, e.g. Affection). " +
+                "With the Yarn Spinner integration, the Yarn variable $Name is the parameter Name.",
+                McpSchema.Object(new Dictionary<string, object>
+                {
+                    [GraphArgument] = McpSchema.String(GraphReadTools.GraphArgumentDescription),
+                    ["name"] = McpSchema.String("Name of the parameter, unique in the graph, e.g. 'Affection'."),
+                    ["type"] = McpSchema.String("Bool, Int, Float or String."),
+                    ["default"] = McpSchema.Any("Starting value: true/false for Bool, a whole number for Int, a number for Float, a string for String. Optional."),
+                }, GraphArgument, "name", "type"),
+                args =>
+                {
+                    var asset = GraphAssets.Load(args.GetString(GraphArgument));
+                    var parameter = GraphEdits.AddParameter(asset, args.GetString("name"), ParseParameterType(args.GetString("type")), args.GetRaw("default"));
+                    return GraphDescription.DescribeParameter(parameter);
+                });
         }
+
+        private static GraphParameterType ParseParameterType(string text) =>
+            Enum.TryParse<GraphParameterType>(text.Trim(), true, out var type) && Enum.IsDefined(typeof(GraphParameterType), type)
+                ? type
+                : throw new McpToolException($"'{text}' is not a parameter type. Use Bool, Int, Float or String.");
 
         // 欄の値をすべて確かめ（型に合わない欄・無いシーン・無い出口などはここで例外）、変更を行う処理を返す。
         // 確かめる途中では何も変えないので、失敗してもノードは元のまま
@@ -252,6 +278,13 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 var exitNode = As<ContainerExitNode>(node, "exit");
                 var exit = GraphEdits.FindExit(asset.FindNode(exitNode.ParentId) as ContainerNode, args.GetOptionalString("exit"));
                 changes.Add(() => exitNode.ExitId = exit.Id);
+            }
+
+            if (args.Has("fields"))
+            {
+                var values = args.GetRaw("fields") as IDictionary<string, object>
+                             ?? throw new McpToolException("The argument 'fields' must be an object of field names and values.");
+                changes.Add(McpNodeFields.Prepare(node, values));
             }
 
             var x = args.GetOptionalFloat("x");
