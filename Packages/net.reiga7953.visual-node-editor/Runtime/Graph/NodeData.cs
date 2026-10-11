@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Reiga.VisualNodeEditor
@@ -57,6 +58,18 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>タイトル未設定時に表示される既定名。</summary>
         protected abstract string DefaultTitle { get; }
+
+        /// <summary>
+        /// タイトル未入力のときに、型の表示名の代わりに出す、内容から決まる名前（例: Dialogue ノードの Yarn のノード名）。
+        /// null なら型の表示名を出す。
+        /// </summary>
+        public virtual string ContentTitle => null;
+
+        /// <summary>
+        /// ノード自身の検証（設定の抜けなど）。<see cref="GraphValidator"/> が呼ぶ。既定は問題なし。
+        /// グラフ全体を見る検証（エッジ・コンテナなど）は <see cref="GraphValidator"/> が行う。
+        /// </summary>
+        public virtual IEnumerable<GraphIssue> GetIssues() => Array.Empty<GraphIssue>();
 
         /// <summary>新しい ID を振り直す（貼り付け・複製でコピーを作るときに使う）。</summary>
         internal void AssignNewId() => _id = Guid.NewGuid().ToString("N");

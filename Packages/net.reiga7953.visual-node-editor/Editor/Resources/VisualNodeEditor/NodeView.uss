@@ -36,6 +36,11 @@
   border-top-color: var(--vne-category-container);
 }
 
+/* ADV nodes (the Yarn Spinner Dialogue node) */
+.vne-node--adv #title {
+  border-top-color: var(--vne-category-adv);
+}
+
 /* One-line summary directly below the title */
 
 .vne-node__summary {
@@ -98,6 +103,15 @@
   font-size: 11px;
   -unity-font-style: bold;
   -unity-text-align: middle-center;
+}
+
+/* An automatic Event moves on by itself when its conditions hold */
+.vne-node--automatic #node-border {
+  border-color: #5fb3b3;
+}
+
+.vne-node--automatic #title-label {
+  -unity-font-style: bold-and-italic;
 }
 
 /* Nothing to collapse on a node with one input and one output */

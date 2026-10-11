@@ -11,6 +11,9 @@ ShaderGraph のような見た目で、以下のような粒度のものを配�
 - Event（ステート遷移や演出のトリガー）
 - Note（メモ）
 
+ADV（ノベル・アドベンチャー）向けには、Yarn Spinner の会話を流れの中に置く Dialogue ノード、フラグによる分岐（条件付きの Event）、
+セーブ・ロードを持つ（Yarn Spinner 連携は任意。会話の中身は Yarn に書き、グラフはチャプター・ルート・フラグを受け持つ）。
+
 将来的には Entity / System / Data などの「登場要素」ノードを追加し、
 グラフから C# の骨組みコード（空の MonoBehaviour / ScriptableObject）を生成することも視野に入れる。
 

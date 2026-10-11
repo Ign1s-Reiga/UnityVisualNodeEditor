@@ -23,7 +23,21 @@ namespace Reiga.VisualNodeEditor
         private readonly Dictionary<string, Action> _eventHandlers = new(StringComparer.Ordinal);
         private readonly Dictionary<string, GraphParameterType> _parameterTypes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, object> _parameterValues = new(StringComparer.Ordinal);
+
+        // パラメータの ID → 名前（Event の条件は ID でパラメータを指す）
+        private readonly Dictionary<string, string> _parameterNamesById = new(StringComparer.Ordinal);
         private bool _isMoving;
+
+        // 1 回の操作の中で続けて行える自動遷移の数（A → B → A … と輪になったときに止める）
+        private const int MaxAutomaticSteps = 100;
+        private int _automaticSteps;
+
+        // 自動の Event を調べる処理を、遷移の後に積んであるか（何度値が変わっても 1 回だけ積む）
+        private bool _automaticCheckQueued;
+
+        // IRestartOnLoad のノードに入る直前の状態と、そのときの入った回数（そのノードにいる間の CaptureState はこれを返す）
+        private GraphRunnerState _restartState;
+        private int _restartStateEntry = -1;
 
         // Start / Stop のたびに進める。通知の中で止めたり再開したりされたら、古い遷移はこれを見て打ち切る
         private int _generation;
@@ -82,17 +96,37 @@ namespace Reiga.VisualNodeEditor
         /// 値が変わったパラメータは <see cref="ParameterChanged"/> で通知する（表示などが古い値のまま残らないように）。
         /// 名前が空・重複するパラメータは、検証で Error になる状態なので最初のものだけを使う。
         /// </summary>
-        public void ResetParameters()
+        public void ResetParameters() => SetParameterValues(null);
+
+        /// <summary>
+        /// パラメータを既定値にし、<paramref name="saved"/> があれば、そのうち同じ名前・型のものの値を入れる（セーブからの再開）。
+        /// 値が変わったパラメータは、すべて入れ終えてから通知する。
+        /// </summary>
+        private void SetParameterValues(IReadOnlyList<GraphStateValue> saved)
         {
             var previous = new Dictionary<string, object>(_parameterValues, StringComparer.Ordinal);
             _parameterTypes.Clear();
             _parameterValues.Clear();
+            _parameterNamesById.Clear();
             foreach (var parameter in Graph.Parameters)
             {
                 if (parameter != null && !string.IsNullOrEmpty(parameter.Name) && !_parameterTypes.ContainsKey(parameter.Name))
                 {
                     _parameterTypes.Add(parameter.Name, parameter.Type);
                     _parameterValues.Add(parameter.Name, parameter.DefaultValue);
+                    if (!string.IsNullOrEmpty(parameter.Id))
+                    {
+                        _parameterNamesById.TryAdd(parameter.Id, parameter.Name);
+                    }
+                }
+            }
+
+            // セーブの後にパラメータを消したり型を変えたりしていたら、そのパラメータは既定値のまま
+            foreach (var value in saved ?? Array.Empty<GraphStateValue>())
+            {
+                if (value != null && value.Key != null && _parameterTypes.TryGetValue(value.Key, out var type) && type == value.Type)
+                {
+                    _parameterValues[value.Key] = value.Value;
                 }
             }
 
@@ -105,7 +139,46 @@ namespace Reiga.VisualNodeEditor
             {
                 ParameterChanged?.Invoke(name);
             }
+
+            if (changed.Count > 0)
+            {
+                RequestAutomaticCheck();
+            }
         }
+
+        /// <summary>
+        /// その Event の条件をすべて満たしているか（条件が無ければ true）。パラメータが無い・型の合わない条件は満たさない。
+        /// </summary>
+        public bool AreConditionsMet(EventNode eventNode)
+        {
+            if (eventNode == null)
+            {
+                return false;
+            }
+
+            foreach (var condition in eventNode.Conditions)
+            {
+                if (!IsConditionMet(condition))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>条件 1 つを今の値で満たしているか。パラメータが無い・型の合わない条件は満たさない。</summary>
+        public bool IsConditionMet(TransitionCondition condition) =>
+            condition != null
+            && condition.ParameterId != null
+            && _parameterNamesById.TryGetValue(condition.ParameterId, out var name)
+            && condition.IsMet(_parameterTypes[name], _parameterValues[name]);
+
+        /// <summary>
+        /// 今のノードで <see cref="Raise"/> したときに選ばれる Event（名前が一致し、トリガーが Raise で、条件を満たす最初のもの）。無ければ null。
+        /// </summary>
+        public EventNode FindRaiseTarget(string eventName) =>
+            Current != null ? Query.FindEventTransition(Current.Id, eventName, AreConditionsMet) : null;
 
         private object GetParameter(string name, GraphParameterType requested)
         {
@@ -123,6 +196,7 @@ namespace Reiga.VisualNodeEditor
 
             _parameterValues[name] = value;
             ParameterChanged?.Invoke(name);
+            RequestAutomaticCheck();
         }
 
         private void CheckParameter(string name, GraphParameterType requested)
@@ -140,6 +214,17 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>実行中のすべての Runner（エディタの強調表示などが使う）。</summary>
         public static IReadOnlyList<GraphRunner> Running => _running;
+
+        /// <summary><paramref name="graph"/> を実行中の Runner（null なら実行中のどれか）。無ければ null。</summary>
+        public static GraphRunner FindRunning(NodeGraphAsset graph = null) =>
+            _running.FirstOrDefault(runner => runner.IsRunning && (graph == null || runner.Graph == graph));
+
+        /// <summary>その名前のパラメータの今の値（bool / int / float / string）。無ければ false。</summary>
+        public bool TryGetParameter(string name, out object value)
+        {
+            value = null;
+            return name != null && _parameterValues.TryGetValue(name, out value);
+        }
 
         /// <summary>いずれかの Runner が開始したとき。</summary>
         public static event Action<GraphRunner> Started;
@@ -199,6 +284,18 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>実行中か。</summary>
         public bool IsRunning { get; private set; }
+
+        /// <summary>
+        /// パラメータ（Blackboard）に無い値の置き場（Yarn Spinner の変数など、アドオンが使う）。
+        /// <see cref="Start"/> で空になり、セーブ（<see cref="CaptureState"/>）に含まれる。
+        /// </summary>
+        public GraphExtras Extras { get; } = new GraphExtras();
+
+        /// <summary>
+        /// 最後に読み込みを頼んだシーン（Scene ノードに入ったとき、またはセーブから再開したとき）。無ければ空の参照。
+        /// シーンを持たない待機ノードで保存しても、ロードで同じシーンに戻れるようにセーブに含める。
+        /// </summary>
+        public SceneReference LastScene { get; private set; } = new SceneReference();
 
         /// <summary>この Runner を動かしているコンポーネント。<see cref="GraphRunner"/> を直接使っている場合は null。</summary>
         public GraphRunnerBehaviour Host { get; internal set; }
@@ -337,6 +434,9 @@ namespace Reiga.VisualNodeEditor
 
             // 毎回の実行をアセットの既定値から始める（振る舞いも、入るときにアセットの値から複製し直す）
             ResetParameters();
+            Extras.Clear();
+            LastScene = new SceneReference();
+            _restartState = null;
             _behaviours.Clear();
             _activeBehaviours.Clear();
             IsRunning = true;
@@ -366,6 +466,7 @@ namespace Reiga.VisualNodeEditor
             // 通知より先に停止状態にする。NodeExited の中で Raise / Advance されても積まずに false を返し、
             // 次の Start() の後に古い操作が実行されないようにする
             _pending.Clear();
+            _automaticCheckQueued = false;
             _generation++;
             IsRunning = false;
             _running.Remove(this);
@@ -425,9 +526,121 @@ namespace Reiga.VisualNodeEditor
             return advanced;
         }
 
+        /// <summary>
+        /// 今の状態（今いるノード、最後に読み込みを頼んだシーン、パラメータ、<see cref="Extras"/>）をセーブにする。
+        /// 今のノードが <see cref="IRestartOnLoad"/> なら、そのノードに入る直前の値で保存する（ロードするとノードの最初からやり直すため）。
+        /// </summary>
+        /// <exception cref="InvalidOperationException">実行中でない。</exception>
+        public GraphRunnerState CaptureState()
+        {
+            if (!IsRunning || Current == null)
+            {
+                throw new InvalidOperationException($"Graph '{Graph.name}' is not running, so there is nothing to save.");
+            }
+
+            return Current is IRestartOnLoad && _restartState != null && _restartStateEntry == _entryCount
+                ? _restartState
+                : Snapshot(Current);
+        }
+
+        /// <summary>
+        /// セーブから再開する。実行中なら今のノードから出て、止まっていれば実行を始め（<see cref="Started"/>）、
+        /// パラメータ（同じ名前・型のもの。無ければ既定値）と <see cref="Extras"/> を戻し、保存したシーンを読み込んで、保存したノードに入る。
+        /// 保存したノードがグラフに無ければ（グラフが変わった）、何も変えずに false。
+        /// ノードの出入りの通知中に呼んだ場合は、その処理の後に行い true を返す。
+        /// </summary>
+        public bool RestoreState(GraphRunnerState state)
+        {
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            var node = Query.FindNode(state.NodeId);
+            if (node == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(state.GraphName) && state.GraphName != Graph.name)
+            {
+                Debug.LogWarning($"[VisualNodeEditor] Loading a save of '{state.GraphName}' into '{Graph.name}'.");
+            }
+
+            if (_isMoving)
+            {
+                _pending.Enqueue(() => RestoreNow(state, node));
+                return true;
+            }
+
+            Run(() => RestoreNow(state, node));
+            return true;
+        }
+
+        private void RestoreNow(GraphRunnerState state, NodeData node)
+        {
+            if (!IsRunning)
+            {
+                _activeBehaviours.Clear();
+                IsRunning = true;
+                _generation++;
+                _running.Add(this);
+                Started?.Invoke(this);
+            }
+
+            var generation = _generation;
+            var previous = Current;
+            if (previous != null)
+            {
+                // 振る舞いの OnExit → NodeExited の順（遷移と同じ）。どちらの中で止められても、それ以上は進めない
+                ExitBehaviours();
+                if (!IsCurrentGeneration(generation))
+                {
+                    return;
+                }
+
+                NodeExited?.Invoke(previous);
+                if (!IsCurrentGeneration(generation))
+                {
+                    return;
+                }
+
+                Current = null;
+            }
+
+            // Start() と同じく、振る舞いはアセットの値から複製し直す
+            _behaviours.Clear();
+            _restartState = null;
+            SetParameterValues(state.Parameters);
+            Extras.ReplaceWith(state.Extras);
+            if (!IsCurrentGeneration(generation))
+            {
+                return;
+            }
+
+            // シーンを持たない待機ノードで保存していても、保存したときのシーンに戻る（Scene ノードなら Enter が読み込む）
+            LastScene = state.Scene;
+            if (!(node is SceneNode sceneNode && !sceneNode.Scene.IsEmpty) && !LastScene.IsEmpty)
+            {
+                _sceneLoader?.LoadScene(LastScene);
+            }
+
+            if (Enter(node, generation))
+            {
+                RequestAutomaticCheck();
+            }
+        }
+
+        // 今の値でセーブを作る（今いるノードを nodeId に）
+        private GraphRunnerState Snapshot(NodeData node)
+        {
+            var parameters = _parameterValues.Select(p => new GraphStateValue(p.Key, p.Value)).ToList();
+            return new GraphRunnerState(Graph.name, node.Id, LastScene, parameters, Extras.ToStateValues());
+        }
+
         private bool RaiseNow(string eventName)
         {
-            var eventNode = Current != null ? Query.FindEventTransition(Current.Id, eventName) : null;
+            var eventNode = FindRaiseTarget(eventName);
             if (eventNode == null)
             {
                 return false;
@@ -450,12 +663,72 @@ namespace Reiga.VisualNodeEditor
             return true;
         }
 
+        /// <summary>
+        /// 今のノードから出ている自動の Event を調べるよう頼む（待機ノードに入り終えたとき・パラメータが変わったとき）。
+        /// 遷移の途中なら、その遷移が終わってから調べる。
+        /// </summary>
+        private void RequestAutomaticCheck()
+        {
+            if (!IsRunning || Current == null)
+            {
+                return;
+            }
+
+            if (_isMoving)
+            {
+                if (!_automaticCheckQueued)
+                {
+                    _automaticCheckQueued = true;
+                    _pending.Enqueue(CheckAutomaticNow);
+                }
+
+                return;
+            }
+
+            Run(CheckAutomaticNow);
+        }
+
+        /// <summary>今のノードから出ている自動の Event を、エッジの順に調べ、条件を満たす最初のものへ進む。</summary>
+        private void CheckAutomaticNow()
+        {
+            _automaticCheckQueued = false;
+            if (!IsRunning || Current == null)
+            {
+                return;
+            }
+
+            var target = Query.GetAutomaticTransitions(Current.Id).FirstOrDefault(AreConditionsMet);
+            if (target == null)
+            {
+                return;
+            }
+
+            // A に入ると B へ、B に入ると A へ… と続く自動遷移は、1 回の操作の中で上限を超えたら止める
+            _automaticSteps++;
+            if (_automaticSteps > MaxAutomaticSteps)
+            {
+                if (_automaticSteps == MaxAutomaticSteps + 1)
+                {
+                    Debug.LogWarning($"[VisualNodeEditor] '{Graph.name}': automatic Events moved more than {MaxAutomaticSteps} times in a row. Stopped at '{Current.Title}'.");
+                }
+
+                return;
+            }
+
+            MoveTo(target);
+        }
+
         /// <summary>通知中に Raise / Advance が呼ばれても、いま進めている遷移を壊さないよう順番に実行する。</summary>
         private void Run(Action action)
         {
             // 入れ子で呼ばれても、外側の Run が終わるまでは「遷移中」のままにする
             var wasMoving = _isMoving;
             _isMoving = true;
+            if (!wasMoving)
+            {
+                _automaticSteps = 0;
+            }
+
             try
             {
                 action();
@@ -471,6 +744,7 @@ namespace Reiga.VisualNodeEditor
                 if (!wasMoving)
                 {
                     _pending.Clear();
+                    _automaticCheckQueued = false;
                 }
 
                 throw;
@@ -502,9 +776,9 @@ namespace Reiga.VisualNodeEditor
                 }
 
                 // 開始直後（まだどこにもいない）なら、Entry に入ってそこに留まる（Entry の先が無いときと同じ）
-                if (Current == null && path.Count > 0 && IsCurrentGeneration(generation))
+                if (Current == null && path.Count > 0 && IsCurrentGeneration(generation) && Enter(path[0], generation))
                 {
-                    Enter(path[0], generation);
+                    RequestAutomaticCheck();
                 }
 
                 return;
@@ -517,6 +791,9 @@ namespace Reiga.VisualNodeEditor
                     return;
                 }
             }
+
+            // 待機ノードに入り終えたら、そこから出ている自動の Event を調べる（この遷移の後に）
+            RequestAutomaticCheck();
         }
 
         /// <summary>
@@ -625,6 +902,13 @@ namespace Reiga.VisualNodeEditor
                 }
             }
 
+            // ロードするとノードの最初からやり直すノードでは、入る直前（OnEnter より前）の状態を覚えておき、ここにいる間のセーブに使う
+            if (node is IRestartOnLoad)
+            {
+                _restartState = Snapshot(node);
+                _restartStateEntry = _entryCount + 1;
+            }
+
             Current = node;
             _entryCount++;
             if (!EnterBehaviours(node, generation))
@@ -641,6 +925,7 @@ namespace Reiga.VisualNodeEditor
             switch (node)
             {
                 case SceneNode sceneNode when !sceneNode.Scene.IsEmpty:
+                    LastScene = sceneNode.Scene;
                     _sceneLoader?.LoadScene(sceneNode.Scene);
                     break;
                 case EventNode eventNode:

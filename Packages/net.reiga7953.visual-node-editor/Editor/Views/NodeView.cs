@@ -119,6 +119,12 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             title = GetDisplayTitle();
             UpdateSummary(GetSummary());
             UpdateBehaviours();
+            OnRebind();
+        }
+
+        /// <summary>表示をデータに合わせた後に呼ばれる（作成時とインスペクタでの編集後）。データで変わる USS クラスの付け外しに使う。</summary>
+        protected virtual void OnRebind()
+        {
         }
 
         /// <summary>ノードに出している振る舞いの一覧。振る舞いが無ければ空文字。</summary>

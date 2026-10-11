@@ -9,6 +9,7 @@
   --vne-category-entity: #2bb3a3;
   --vne-category-system: #d19a52;
   --vne-category-container: #d9668a;
+  --vne-category-adv: #e0b83c;
 }
 
 .vne-inspector-view__icon.vne-category--flow,
@@ -39,6 +40,12 @@
 .vne-inspector-view__icon.vne-category--container,
 .vne-node-tree__icon.vne-category--container {
   background-color: var(--vne-category-container);
+}
+
+/* ADV nodes (the Yarn Spinner Dialogue node) */
+.vne-inspector-view__icon.vne-category--adv,
+.vne-node-tree__icon.vne-category--adv {
+  background-color: var(--vne-category-adv);
 }
 
 /* Toolbar */
@@ -309,6 +316,61 @@
   display: flex;
 }
 
+/* Conditions of an Event node (ConditionListView) */
+
+.vne-condition-list {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top-width: 1px;
+  border-top-color: #191919;
+}
+
+.vne-condition-list__header {
+  margin-left: 3px;
+  -unity-font-style: bold;
+}
+
+.vne-condition-list__hint {
+  margin-left: 3px;
+  margin-bottom: 4px;
+  color: #9a9a9a;
+  white-space: normal;
+}
+
+.vne-condition-list__row {
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.vne-condition-list__parameter {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 60px;
+}
+
+.vne-condition-list__operator {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.vne-condition-list__value {
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.vne-condition-list__remove {
+  width: 20px;
+  margin-left: 2px;
+  margin-right: 0;
+  flex-shrink: 0;
+}
+
+.vne-condition-list__add {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 /* "Now running" panel above the inspector while playing (RuntimePanel) */
 
 .vne-runtime-panel {
@@ -347,6 +409,21 @@
   margin-left: 0;
   margin-right: 4px;
   margin-bottom: 2px;
+}
+
+/* Raise whose conditions do not hold right now (the tooltip says which) */
+.vne-runtime-panel__action--blocked {
+  opacity: 0.45;
+}
+
+.vne-runtime-panel__save-row {
+  flex-direction: row;
+  margin-top: 6px;
+}
+
+.vne-runtime-panel__save {
+  margin-left: 0;
+  margin-right: 4px;
 }
 
 .vne-runtime-panel__empty {

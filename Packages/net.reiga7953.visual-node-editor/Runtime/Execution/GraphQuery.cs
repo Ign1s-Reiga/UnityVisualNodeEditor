@@ -117,12 +117,23 @@ namespace Reiga.VisualNodeEditor
         }
 
         /// <summary>
-        /// ノードから出ている、イベント名が一致する最初の Event ノード（<see cref="GraphRunner.Raise"/> の行き先）。無ければ null。
+        /// ノードから出ている、イベント名が一致する最初の Event ノード（<see cref="GraphRunner.Raise"/> の行き先。条件は見ない）。無ければ null。
+        /// トリガーが自動の Event は選ばない。
         /// </summary>
-        public EventNode FindEventTransition(string nodeId, string eventName) =>
+        public EventNode FindEventTransition(string nodeId, string eventName) => FindEventTransition(nodeId, eventName, null);
+
+        /// <summary>
+        /// ノードから出ている、イベント名が一致し、<paramref name="isEnabled"/>（null なら常に可。条件の判定に使う）を満たす最初の Event ノード。無ければ null。
+        /// トリガーが自動の Event は選ばない。
+        /// </summary>
+        public EventNode FindEventTransition(string nodeId, string eventName, Func<EventNode, bool> isEnabled) =>
             string.IsNullOrEmpty(eventName)
                 ? null
-                : GetNext(nodeId).OfType<EventNode>().FirstOrDefault(e => string.Equals(e.EventName, eventName, StringComparison.Ordinal));
+                : GetNext(nodeId).OfType<EventNode>().FirstOrDefault(e =>
+                    !e.IsAutomatic && string.Equals(e.EventName, eventName, StringComparison.Ordinal) && (isEnabled == null || isEnabled(e)));
+
+        /// <summary>ノードから出ている、トリガーが自動の Event ノード（エッジの順）。</summary>
+        public IEnumerable<EventNode> GetAutomaticTransitions(string nodeId) => GetNext(nodeId).OfType<EventNode>().Where(e => e.IsAutomatic);
 
         /// <summary>Scene ノードが参照しているシーン（ノードの順、重複と未設定を除く）。</summary>
         public IReadOnlyList<SceneReference> GetScenes()

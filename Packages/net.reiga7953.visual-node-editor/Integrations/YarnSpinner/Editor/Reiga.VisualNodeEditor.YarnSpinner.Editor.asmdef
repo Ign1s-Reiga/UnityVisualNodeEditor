@@ -1,0 +1,26 @@
+{
+  "name": "Reiga.VisualNodeEditor.YarnSpinner.Editor",
+  "rootNamespace": "Reiga.VisualNodeEditor.YarnSpinner.Editor",
+  "references": [
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.YarnSpinner",
+    "YarnSpinner.Unity",
+    "YarnSpinner.Unity.Editor"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["VNE_YARN_SPINNER"],
+  "versionDefines": [
+    {
+      "name": "dev.yarnspinner.unity",
+      "expression": "3.0.0",
+      "define": "VNE_YARN_SPINNER"
+    }
+  ],
+  "noEngineReferences": false
+}

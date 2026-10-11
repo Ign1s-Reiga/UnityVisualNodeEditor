@@ -240,6 +240,53 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         /// ノードの値を変える。<paramref name="prepare"/> は値をすべて確かめてから、変更を行う処理を返す
         /// （確かめる途中で失敗したら何も変えない。一部だけ変わったまま残らないように）。
         /// </summary>
+        /// <summary>
+        /// Blackboard にパラメータを足す。名前が空・既にある、既定値の型が合わないときは理由を添えて例外（何も変えない）。
+        /// <paramref name="defaultValue"/> は JSON の値（bool / long / double / string）。null なら型の既定値。
+        /// </summary>
+        public static GraphParameter AddParameter(NodeGraphAsset asset, string name, GraphParameterType type, object defaultValue)
+        {
+            var trimmed = (name ?? string.Empty).Trim();
+            if (trimmed.Length == 0)
+            {
+                throw new McpToolException("The parameter needs a name.");
+            }
+
+            if (asset.FindParameterByName(trimmed) != null)
+            {
+                throw new McpToolException($"The graph already has a parameter named '{trimmed}'. Pick another name.");
+            }
+
+            var parameter = new GraphParameter(trimmed, type);
+            switch (defaultValue)
+            {
+                case null:
+                    break;
+                case bool flag when type == GraphParameterType.Bool:
+                    parameter.BoolValue = flag;
+                    break;
+                case long whole when type == GraphParameterType.Int && whole >= int.MinValue && whole <= int.MaxValue:
+                    parameter.IntValue = (int)whole;
+                    break;
+                case long whole when type == GraphParameterType.Float:
+                    parameter.FloatValue = whole;
+                    break;
+                case double real when type == GraphParameterType.Float && !double.IsNaN(real) && !double.IsInfinity(real):
+                    parameter.FloatValue = (float)real;
+                    break;
+                case string text when type == GraphParameterType.String:
+                    parameter.StringValue = text;
+                    break;
+                default:
+                    throw new McpToolException($"The default value does not fit a {type} parameter.");
+            }
+
+            RecordUndo(asset, "MCP: Add Parameter");
+            asset.AddParameter(parameter);
+            Commit(asset);
+            return parameter;
+        }
+
         public static NodeData UpdateNode(NodeGraphAsset asset, string nodeId, Func<NodeData, Action> prepare)
         {
             var node = FindNode(asset, nodeId);

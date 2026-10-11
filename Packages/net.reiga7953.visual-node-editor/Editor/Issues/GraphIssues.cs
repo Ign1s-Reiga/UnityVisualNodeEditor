@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Build;
 using Reiga.VisualNodeEditor.Editor.Play;
 using UnityEditor;
+using UnityEngine;
 
 namespace Reiga.VisualNodeEditor.Editor.Issues
 {
@@ -31,8 +33,29 @@ namespace Reiga.VisualNodeEditor.Editor.Issues
                 issues.Add(new GraphIssue(GraphIssueSeverity.Warning, NoRunnerMessage, kind: GraphIssueKind.NoGraphRunner));
             }
 
+            // アドオンの検証（IGraphIssueCheck）。1 つの不具合で問題の一覧ごと出なくならないよう、例外はログに出して次へ進む
+            foreach (var check in Checks)
+            {
+                try
+                {
+                    issues.AddRange(check.Check(graph) ?? Enumerable.Empty<GraphIssue>());
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+
             return issues;
         }
+
+        // IGraphIssueCheck の実装（抽象でなく、引数なしのコンストラクタを持つもの）。ドメインリロードのたびに集め直される
+        private static IReadOnlyList<IGraphIssueCheck> _checks;
+
+        private static IReadOnlyList<IGraphIssueCheck> Checks => _checks ??= TypeCache.GetTypesDerivedFrom<IGraphIssueCheck>()
+            .Where(type => !type.IsAbstract && !type.IsGenericTypeDefinition && type.GetConstructor(Type.EmptyTypes) != null)
+            .Select(type => (IGraphIssueCheck)Activator.CreateInstance(type))
+            .ToList();
 
         /// <summary>Build Settings のシーンにこのグラフの Graph Runner が無いときの警告。</summary>
         public const string NoRunnerMessage =

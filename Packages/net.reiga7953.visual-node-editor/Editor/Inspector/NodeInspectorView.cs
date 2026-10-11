@@ -80,7 +80,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     // イベント名はグラフにある名前から選べる欄にする
                     content.Add(new EventNameField(child.Copy(), asset));
                 }
-                else if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName)
+                else if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName
+                         && !(child.name == ConditionListView.ConditionsPropertyName && asset.Nodes[_index] is EventNode))
                 {
                     var field = new PropertyField(child.Copy(), NodeDisplay.GetFieldLabel(child.name));
                     field.AddToClassList("vne-inspector-view__field");
@@ -110,6 +111,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     var exitPicker = new ContainerExitPicker(asset, exitNode);
                     exitPicker.Changed += OnStructureChanged;
                     content.Add(exitPicker);
+                    break;
+
+                // 条件はパラメータを ID で指すので、PropertyField ではなく Blackboard から選ぶ専用の UI で編集する
+                case EventNode eventNode:
+                    var conditionList = new ConditionListView(asset, eventNode,
+                        nodeProperty.FindPropertyRelative(ConditionListView.ConditionsPropertyName));
+                    conditionList.Changed += OnStructureChanged;
+                    content.Add(conditionList);
                     break;
 
                 // 振る舞い（NodeBehaviour）は SerializeReference のリストなので、追加・削除は専用の UI で行う

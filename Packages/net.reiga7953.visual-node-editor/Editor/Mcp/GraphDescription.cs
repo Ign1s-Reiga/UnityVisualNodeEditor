@@ -45,6 +45,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                     break;
                 case EventNode eventNode:
                     description["eventName"] = eventNode.EventName ?? string.Empty;
+                    description["trigger"] = eventNode.Trigger.ToString();
+                    description["conditions"] = eventNode.Conditions.Where(c => c != null).Select(c => McpConditions.Describe(asset, c)).ToList();
                     break;
                 case StateNode state:
                     description["description"] = state.Description ?? string.Empty;
@@ -58,6 +60,16 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 case ContainerExitNode exitNode:
                     var exitName = ContainerExitNodeView.GetExitName(asset, exitNode);
                     description["exit"] = exitName == null ? null : new Dictionary<string, object> { ["id"] = exitNode.ExitId, ["name"] = exitName };
+                    break;
+
+                // 組み込み以外のノード型（アドオン）は、設定できる値を fields に出す（update_node の fields で変えられる）
+                case var other when !(other is EntryNode || other is ContainerEntryNode):
+                    var fields = McpNodeFields.Describe(other);
+                    if (fields.Count > 0)
+                    {
+                        description["fields"] = fields;
+                    }
+
                     break;
             }
 
@@ -86,7 +98,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             ["toPort"] = edge.ToPort,
         };
 
-        private static Dictionary<string, object> DescribeParameter(GraphParameter parameter)
+        /// <summary>パラメータ 1 つ（名前・型・既定値）。</summary>
+        public static Dictionary<string, object> DescribeParameter(GraphParameter parameter)
         {
             object value = parameter.Type switch
             {

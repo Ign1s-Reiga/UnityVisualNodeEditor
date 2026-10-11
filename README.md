@@ -27,6 +27,33 @@ UPM パッケージ `net.reiga7953.visual-node-editor` として開発してい�
 
 詳細は [CLAUDE.md](CLAUDE.md) と [docs/](docs/) を参照。
 
+## ADV を作る（Yarn Spinner 連携）
+
+会話の中身は [Yarn Spinner](https://yarnspinner.dev/) に書き、グラフはチャプター・ルート・フラグ・セーブを受け持つ。
+
+1. ゲームのプロジェクトに Yarn Spinner for Unity 3.x（`dev.yarnspinner.unity`）を入れる。入れると、このパッケージの Yarn Spinner 連携
+   （`Integrations/YarnSpinner`）が有効になる（入れていなければコンパイルされず、影響しない）
+2. `Assets > Create > Visual Node Editor > ADV Starter` で、ひな形（グラフ・Yarn スクリプト・Yarn プロジェクト）を作る
+3. Title と Story のシーンを作り、グラフの Scene ノードに入れる
+4. Story のシーン: `GameObject > Yarn Spinner > Dialogue System` を置き、その Dialogue Runner の Yarn Project に作ったプロジェクトを入れ、
+   同じ GameObject に `Add Component > Visual Node Editor > Yarn Graph Bridge` を足す（Yarn の変数を Blackboard と共有する
+   Graph Variable Storage も自動で設定される）。セーブ用に Auto Save Slot（例: `auto`）を入れてもよい
+5. Title のシーン: ボタンに Graph Event Button を付け、「はじめから」は Raise `NewGame`、「続きから」は Load（スロット `auto`）
+6. グラフのツールバーの Play で動かす
+
+| グラフでできること | 使うもの |
+|---|---|
+| Yarn のノードを流れの中で再生する | `ADV/Dialogue` ノード（会話が終わると完了イベント `Done` → 無ければ次のノードへ） |
+| フラグでルートを分ける | Event ノードの条件（`Affection >= 3` など。同じ名前の Event を条件違いで並べる） |
+| フラグを満たしたら自動で進む | Event ノードのトリガー Automatic |
+| Yarn からグラフを動かす | Yarn のコマンド `<<graph_event 名前>>`（すぐ）/ `<<graph_next 名前>>`（会話が終わったら） |
+| フラグを Yarn と共有する | Blackboard のパラメータ `Name` = Yarn の `$Name` |
+| セーブ・ロード | Graph Event Button の Save / Load、`GraphRunnerBehaviour.SaveSlot` / `LoadSlot`、`GraphSaveSlots` |
+
+Yarn はノードの途中から再開できないので、会話の途中でセーブすると、ロードしたときにその会話の最初から（入る前のフラグで）やり直す。
+既読管理・バックログ・オート / スキップ・立ち絵などは Yarn Spinner の Presenter とゲーム側で行う。
+詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「条件付き遷移」「セーブ・ロード」「Yarn Spinner 連携（任意）」を参照。
+
 ## AI エージェントから使う（MCP）
 
 Unity エディタの中で MCP サーバーを動かし、Claude Code などの AI エージェントがグラフを読み・組み立て・検証し、Play 中の流れを確かめられるようにできる。
@@ -43,7 +70,7 @@ Unity エディタの中で MCP サーバーを動かし、Claude Code などの
 ```
 
 ツール: `list_graphs` / `get_graph` / `create_graph` / `add_node` / `update_node` / `remove_node` / `connect` / `disconnect` /
-`group_into_container` / `validate_graph` / `open_graph` / `get_runtime_state` / `send_event`。
+`group_into_container` / `add_parameter` / `validate_graph` / `open_graph` / `get_runtime_state` / `send_event`。
 変更はエディタと同じ規則で行われ、Undo でき、保存される。サーバーは 127.0.0.1 だけで待ち受けるが、
 有効にしている間は同じ PC のどのプログラムからでもグラフを書き換えられる。
 

@@ -95,6 +95,24 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             return list;
         }
 
+        /// <summary>必須のオブジェクトの配列（空でもよい）。要素はそれぞれ <see cref="McpArguments"/> として読む。</summary>
+        public List<McpArguments> GetObjectList(string name)
+        {
+            if (!_values.TryGetValue(name, out var value) || !(value is IEnumerable<object> items) || value is string)
+            {
+                throw new McpToolException($"The argument '{name}' must be an array of objects.");
+            }
+
+            return items
+                .Select(item => item is IDictionary<string, object> fields
+                    ? new McpArguments(fields)
+                    : throw new McpToolException($"The argument '{name}' must be an array of objects."))
+                .ToList();
+        }
+
+        /// <summary>任意の値をそのまま（数は long か double、文字列、真偽値）。無ければ null。</summary>
+        public object GetRaw(string name) => _values.TryGetValue(name, out var value) ? value : null;
+
         /// <summary>引数の名前（未知の引数の確認用）。</summary>
         public IEnumerable<string> Names => _values.Keys;
 
