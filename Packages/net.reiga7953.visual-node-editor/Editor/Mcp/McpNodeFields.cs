@@ -52,24 +52,18 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         private static object Convert(PropertyInfo property, object value)
         {
             var type = property.PropertyType;
-            switch (value)
+            // プロパティの型は string / bool / int / float だけなので、パラメータの型と同じ規則で変える
+            var parameterType = type == typeof(string) ? GraphParameterType.String
+                : type == typeof(bool) ? GraphParameterType.Bool
+                : type == typeof(int) ? GraphParameterType.Int
+                : GraphParameterType.Float;
+            if (value == null && parameterType == GraphParameterType.String)
             {
-                case string text when type == typeof(string):
-                    return text;
-                case bool flag when type == typeof(bool):
-                    return flag;
-                case long whole when type == typeof(int) && whole >= int.MinValue && whole <= int.MaxValue:
-                    return (int)whole;
-                case long whole when type == typeof(float):
-                    return (float)whole;
-                case double real when type == typeof(float) && !double.IsNaN(real) && !double.IsInfinity(real):
-                    return (float)real;
-                case null when type == typeof(string):
-                    return string.Empty;
+                return string.Empty;
             }
 
-            var expected = type == typeof(string) ? "a string" : type == typeof(bool) ? "true or false" : type == typeof(int) ? "a whole number" : "a finite number";
-            throw new McpToolException($"The field '{property.Name}' must be {expected}.");
+            return McpValues.ToParameterValue(value, parameterType)
+                   ?? throw new McpToolException($"The field '{property.Name}' must be {McpValues.Describe(parameterType)}.");
         }
     }
 }

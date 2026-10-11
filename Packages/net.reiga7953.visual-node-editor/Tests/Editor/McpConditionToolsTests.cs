@@ -72,6 +72,7 @@ namespace Reiga.VisualNodeEditor.Tests
         [TestCase("Met", ">", 1L, "cannot compare the Bool parameter")]
         [TestCase("Affection", ">=", 1.5, "whole number")]
         [TestCase("Route", "==", 3L, "must be a string")]
+        [TestCase("Affection", ">=", 3000000000L, "must be a whole number")]
         public void BadConditions_AreRefusedWithAReason(string parameter, string op, object value, string reason)
         {
             var (text, isError) = McpTestClient.CallTool(_protocol, "add_node", Args(
