@@ -45,6 +45,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                     break;
                 case EventNode eventNode:
                     description["eventName"] = eventNode.EventName ?? string.Empty;
+                    description["trigger"] = eventNode.Trigger.ToString();
+                    description["conditions"] = eventNode.Conditions.Where(c => c != null).Select(c => McpConditions.Describe(asset, c)).ToList();
                     break;
                 case StateNode state:
                     description["description"] = state.Description ?? string.Empty;

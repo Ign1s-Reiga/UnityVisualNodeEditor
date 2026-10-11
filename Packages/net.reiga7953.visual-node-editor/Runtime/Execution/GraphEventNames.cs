@@ -10,7 +10,15 @@ namespace Reiga.VisualNodeEditor
     public static class GraphEventNames
     {
         /// <summary>空でないイベント名を、グラフ内のノードの順に、重複を除いて返す（大文字小文字は区別する）。</summary>
-        public static List<string> Collect(NodeGraphAsset graph)
+        public static List<string> Collect(NodeGraphAsset graph) => Collect(graph, true);
+
+        /// <summary>
+        /// <see cref="GraphRunner.Raise"/> で起こせるイベント名（自動の Event の名前を除く）を、グラフ内のノードの順に、重複を除いて返す。
+        /// ボタンなど、名前で起こす側の候補に使う。
+        /// </summary>
+        public static List<string> CollectRaisable(NodeGraphAsset graph) => Collect(graph, false);
+
+        private static List<string> Collect(NodeGraphAsset graph, bool includeAutomatic)
         {
             var names = new List<string>();
             if (graph == null)
@@ -21,7 +29,8 @@ namespace Reiga.VisualNodeEditor
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var node in graph.Nodes)
             {
-                if (node is EventNode eventNode && !string.IsNullOrEmpty(eventNode.EventName) && seen.Add(eventNode.EventName))
+                if (node is EventNode eventNode && (includeAutomatic || !eventNode.IsAutomatic)
+                    && !string.IsNullOrEmpty(eventNode.EventName) && seen.Add(eventNode.EventName))
                 {
                     names.Add(eventNode.EventName);
                 }

@@ -41,5 +41,13 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         /// <summary>文字列の配列の引数。</summary>
         public static Dictionary<string, object> StringArray(string description) =>
             new() { ["type"] = "array", ["items"] = new Dictionary<string, object> { ["type"] = "string" }, ["description"] = description };
+
+        /// <summary>オブジェクトの配列の引数。<paramref name="itemProperties"/> は 1 つのオブジェクトの欄、<paramref name="required"/> はその必須の欄。</summary>
+        public static Dictionary<string, object> ObjectArray(string description, IDictionary<string, object> itemProperties, params string[] required) =>
+            new() { ["type"] = "array", ["items"] = Object(itemProperties, required), ["description"] = description };
+
+        /// <summary>型を決めない値の引数（数・文字列・真偽値のどれでもよい）。</summary>
+        public static Dictionary<string, object> Any(string description) =>
+            new() { ["description"] = description };
     }
 }

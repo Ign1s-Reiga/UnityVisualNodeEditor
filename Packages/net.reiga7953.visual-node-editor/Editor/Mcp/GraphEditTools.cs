@@ -20,6 +20,12 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         {
             ["title"] = McpSchema.String("Title shown on the node. Leave empty to show the scene name (Scene), event name (Event) or type name."),
             ["eventName"] = McpSchema.String("Event nodes: the name GraphRunner.Raise(...) and Graph Event Button send. Reuse names exactly (case matters)."),
+            ["trigger"] = McpSchema.String("Event nodes: 'Raise' (default; taken when its name is raised and its conditions hold) or " +
+                                           "'Automatic' (taken by itself while waiting, as soon as its conditions hold; needs no name)."),
+            ["conditions"] = McpSchema.ObjectArray(
+                "Event nodes: conditions on Blackboard parameters, all of which must hold (replaces the existing ones; [] clears them). " +
+                "To branch, connect several Events with the same name from one node, most specific first and one without conditions last.",
+                McpConditions.ItemProperties(), "parameter", "op"),
             ["scene"] = McpSchema.String("Scene nodes: asset path of the scene, e.g. 'Assets/Scenes/Title.unity'. Empty string clears it."),
             ["description"] = McpSchema.String("State nodes: a description of the state."),
             ["text"] = McpSchema.String("Note nodes: the note text."),
@@ -199,6 +205,24 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 var eventNode = As<EventNode>(node, "eventName");
                 var eventName = args.GetOptionalString("eventName");
                 changes.Add(() => eventNode.EventName = eventName);
+            }
+
+            if (args.Has("trigger"))
+            {
+                var eventNode = As<EventNode>(node, "trigger");
+                var trigger = McpConditions.ParseTrigger(args.GetOptionalString("trigger"));
+                changes.Add(() => eventNode.Trigger = trigger);
+            }
+
+            if (args.Has("conditions"))
+            {
+                var eventNode = As<EventNode>(node, "conditions");
+                var conditions = args.GetObjectList("conditions").Select(item => McpConditions.Parse(asset, item)).ToList();
+                changes.Add(() =>
+                {
+                    eventNode.ClearConditions();
+                    conditions.ForEach(eventNode.AddCondition);
+                });
             }
 
             if (args.Has("scene"))

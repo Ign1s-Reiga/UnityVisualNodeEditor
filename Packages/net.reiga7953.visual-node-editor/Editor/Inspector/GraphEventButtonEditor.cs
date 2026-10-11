@@ -70,7 +70,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             }
 
             var graph = serializedObject.FindProperty(GraphPropertyName).objectReferenceValue as NodeGraphAsset;
-            var choices = graph != null ? GraphEventNames.Collect(graph) : null;
+            var choices = graph != null ? GraphEventNames.CollectRaisable(graph) : null;
             if (choices == null || choices.Count == 0)
             {
                 // 一覧が作れないときは名前を直接入力する
@@ -110,7 +110,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             var clickEvent = GraphEventButton.FindClickEvent(button.gameObject);
             var graph = serializedObject.FindProperty(GraphPropertyName).objectReferenceValue as NodeGraphAsset;
             var hints = GraphEventButtonHints.Get(
-                graph != null ? GraphEventNames.Collect(graph) : null,
+                graph != null ? GraphEventNames.CollectRaisable(graph) : null,
                 serializedObject.FindProperty(EventNamePropertyName).stringValue,
                 (GraphEventButtonAction)serializedObject.FindProperty(ActionPropertyName).enumValueIndex,
                 serializedObject.FindProperty(SendOnClickPropertyName).boolValue,

@@ -414,9 +414,11 @@ Event ノードに宣言的な条件を持たせるだけにし、ロジック�
 - Event のインスペクタ: Trigger（Raise / Automatic）と Conditions の一覧。行ごとに、パラメータ（Blackboard から選ぶドロップダウン。名前は打たない）、
   比較（パラメータの型で使えるものだけ）、値（型に合った欄。Bool は無し）、削除ボタン。「+」で追加する（最初のパラメータと、その型の最初の比較）。すべて Undo 対応
 - 条件は ID でパラメータを指すので、改名には追従する。削除されたパラメータを指す条件は「(missing)」と出す（検証で Error）
-- ノードの表示: 条件をサマリー行に出す（例: `Affection >= 5 and Met`）。自動の Event は札に印を付ける（USS クラス `vne-node--automatic`）。
-  名前の無い自動の Event は、タイトルに条件を出す（条件も無ければ `Auto`）
-- Now running: Raise のボタンは、その名前で条件を満たす Event が無ければ押せない表示にし、ツールチップに満たしていない条件を出す。自動の Event はボタンに出さない
+- ノードの表示: 条件をサマリー行に出す（例: `if Affection >= 5 and Met`。タイトルを付けていればイベント名と並べて `Done if …`）。
+  自動の Event は札に印を付ける（USS クラス `vne-node--automatic`）。名前の無い自動の Event のタイトルは `Auto`
+- Now running: Raise のボタンは、その名前で条件を満たす Event が無ければ薄く出し（USS クラス `vne-runtime-panel__action--blocked`）、
+  ツールチップに満たしていない条件を出す（無効にするとツールチップが出ないので、押せるまま。押しても進まない）。値が変わったら出し直す。自動の Event はボタンに出さない
+- Graph Event Button のイベント名の候補には、自動の Event の名前を出さない（Raise では選ばれないため）
 - MCP: `get_graph` の Event にトリガーと条件を出し、`add_node` / `update_node` で `trigger` と `conditions`（パラメータ名・比較・値）を指定できる
 
 ## セーブ・ロード

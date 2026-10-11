@@ -63,9 +63,58 @@ namespace Reiga.VisualNodeEditor.Editor.Views
                 // イベント名は Raise で比べる文字列そのものなので、前後の空白も削らずに出す（検証の警告と見比べられるように）
                 case EventNode eventNode when !string.IsNullOrWhiteSpace(eventNode.EventName):
                     return eventNode.EventName;
+
+                // 名前の無い自動の Event（条件はサマリー行に出す）
+                case EventNode eventNode when eventNode.IsAutomatic:
+                    return AutomaticEventLabel;
                 default:
                     return GetTypeDisplayName(node.GetType());
             }
+        }
+
+        /// <summary>名前の無い自動の Event のタイトル。</summary>
+        public const string AutomaticEventLabel = "Auto";
+
+        /// <summary>
+        /// Event の条件を 1 行で（例: <c>Affection &gt;= 5 and Met</c>）。パラメータ名は <paramref name="graph"/> から引く（無ければ "(missing)"）。条件が無ければ空文字。
+        /// </summary>
+        public static string GetConditionsText(EventNode eventNode, NodeGraphAsset graph)
+        {
+            if (eventNode == null || eventNode.Conditions.Count == 0)
+            {
+                return string.Empty;
+            }
+
+            var parts = new List<string>();
+            foreach (var condition in eventNode.Conditions)
+            {
+                if (condition != null)
+                {
+                    parts.Add(condition.Describe(graph != null ? graph.FindParameter(condition.ParameterId) : null));
+                }
+            }
+
+            return string.Join(" and ", parts);
+        }
+
+        /// <summary>
+        /// Event ノードのサマリー行。タイトルを付けていればイベント名、条件があれば <c>if 条件</c>（例: <c>Done if Affection &gt;= 5</c>）。
+        /// </summary>
+        public static string GetEventSummary(EventNode eventNode, NodeGraphAsset graph)
+        {
+            if (eventNode == null)
+            {
+                return string.Empty;
+            }
+
+            var name = eventNode.HasCustomTitle ? eventNode.EventName ?? string.Empty : string.Empty;
+            var conditions = GetConditionsText(eventNode, graph);
+            if (conditions.Length == 0)
+            {
+                return name;
+            }
+
+            return name.Length > 0 ? $"{name} if {conditions}" : "if " + conditions;
         }
 
         /// <summary>表示するタイトル。ユーザーの入力が空（空白のみを含む）なら型の表示名を使う。</summary>

@@ -14,6 +14,9 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
     {
         private const string HiddenClassName = "vne-runtime-panel--hidden";
 
+        /// <summary>条件を満たしていない Raise のボタンに付ける USS クラス。</summary>
+        internal const string BlockedActionClassName = "vne-runtime-panel__action--blocked";
+
         private readonly Label _location;
         private readonly VisualElement _actions;
         private readonly Label _noActions;
@@ -53,9 +56,22 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
         /// <summary><paramref name="runner"/> の状態を出す。null なら隠す。</summary>
         public void Show(GraphRunner runner)
         {
+            // 値が変わると条件付きの Raise が押せる・押せないが変わるので、表示し直す
+            if (_runner != null)
+            {
+                _runner.ParameterChanged -= OnParameterChanged;
+            }
+
             _runner = runner;
+            if (_runner != null)
+            {
+                _runner.ParameterChanged += OnParameterChanged;
+            }
+
             Refresh();
         }
+
+        private void OnParameterChanged(string name) => Refresh();
 
         /// <summary>今の Runner の状態で表示し直す（ノードを移ったときなど）。止まっていれば隠す。</summary>
         public void Refresh()
@@ -85,6 +101,16 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
                         : "Advance() on the running graph",
                 };
                 button.AddToClassList("vne-runtime-panel__action");
+
+                // 条件を満たさない Raise は薄く出し、満たしていない条件をツールチップに出す
+                // （無効にするとツールチップが出ないので、押せるまま。押しても進まない）
+                var blocked = RuntimeActions.GetBlockedReason(_runner, action);
+                if (blocked.Length > 0)
+                {
+                    button.AddToClassList(BlockedActionClassName);
+                    button.tooltip = blocked;
+                }
+
                 _actions.Add(button);
             }
 
