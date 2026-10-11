@@ -237,10 +237,6 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         }
 
         /// <summary>
-        /// ノードの値を変える。<paramref name="prepare"/> は値をすべて確かめてから、変更を行う処理を返す
-        /// （確かめる途中で失敗したら何も変えない。一部だけ変わったまま残らないように）。
-        /// </summary>
-        /// <summary>
         /// Blackboard にパラメータを足す。名前が空・既にある、既定値の型が合わないときは理由を添えて例外（何も変えない）。
         /// <paramref name="defaultValue"/> は JSON の値（bool / long / double / string）。null なら型の既定値。
         /// </summary>
@@ -285,6 +281,10 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             return parameter;
         }
 
+        /// <summary>
+        /// ノードの値を変える。<paramref name="prepare"/> は値をすべて確かめてから、変更を行う処理を返す
+        /// （確かめる途中で失敗したら何も変えない。一部だけ変わったまま残らないように）。
+        /// </summary>
         public static NodeData UpdateNode(NodeGraphAsset asset, string nodeId, Func<NodeData, Action> prepare)
         {
             var node = FindNode(asset, nodeId);
