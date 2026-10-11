@@ -26,6 +26,21 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void NumbersWrittenAsStrings_AreReadWithTheSameRules()
+        {
+            Assert.That(McpValues.ToParameterValue("5", GraphParameterType.Int), Is.EqualTo(5));
+            Assert.That(McpValues.ToParameterValue(" -3 ", GraphParameterType.Int), Is.EqualTo(-3));
+            Assert.That(McpValues.ToParameterValue("1.5", GraphParameterType.Int), Is.Null);
+            Assert.That(McpValues.ToParameterValue("3000000000", GraphParameterType.Int), Is.Null, "would wrap around as an int");
+            Assert.That(McpValues.ToParameterValue("0.5", GraphParameterType.Float), Is.EqualTo(0.5f));
+            Assert.That(McpValues.ToParameterValue("1e300", GraphParameterType.Float), Is.Null, "beyond float");
+            Assert.That(McpValues.ToParameterValue("NaN", GraphParameterType.Float), Is.Null);
+            Assert.That(McpValues.ToParameterValue("0,5", GraphParameterType.Float), Is.Null, "the decimal point is '.' whatever the system culture");
+            Assert.That(McpValues.ToParameterValue("five", GraphParameterType.Int), Is.Null);
+            Assert.That(McpValues.ToParameterValue("true", GraphParameterType.Bool), Is.Null, "only numbers are read from strings");
+        }
+
+        [Test]
         public void BoolsAndStrings_KeepTheirType()
         {
             Assert.That(McpValues.ToParameterValue(true, GraphParameterType.Bool), Is.EqualTo(true));
