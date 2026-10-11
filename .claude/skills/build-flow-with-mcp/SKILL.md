@@ -48,3 +48,26 @@ and to reload MCP servers in Claude Code (`/mcp`). The project's `.mcp.json` alr
    Event `Finish` (x 1000), Scene `Result` (x 1250), Event `BackToTitle` (x 1500).
 3. `connect` Entry → Title → StartGame → Game → Finish → Result → BackToTitle → Title.
 4. `validate_graph`, then `open_graph`. Tell the user: buttons send `StartGame`, `Finish`, `BackToTitle`.
+
+## Branching on flags
+
+- A flag is a Blackboard parameter: `add_parameter` (`name`, `type` Bool/Int/Float/String, optional `default`).
+- An Event can carry `conditions` (all must hold), e.g. `[{"parameter": "Affection", "op": ">=", "value": 3}]`.
+  To branch, connect several Events **with the same name** from one waiting node: the most specific first, one without conditions last.
+  `Raise("Done")` takes the first one whose conditions hold.
+- `trigger: "Automatic"` makes an Event fire by itself as soon as its conditions hold (checked when the node is entered and when
+  a parameter changes); it needs no name. One without conditions moves on right away (e.g. Scene "Story" → straight into a container).
+
+## ADV flows (Yarn Spinner integration)
+
+If `add_node` accepts the type `Dialogue` (`ADV/Dialogue`), the project has Yarn Spinner and the integration is on.
+
+- A Dialogue node plays a Yarn node while the flow waits there. Set it with `fields`: `{"YarnNode": "Chapter1"}`
+  (`get_graph` lists a node's fields). When the dialogue ends the flow raises its `CompleteEvent` (default `Done`),
+  or takes the plain edge to the next node if there is no such Event.
+- Route split after a chapter: Dialogue → Event `Done` with conditions → route A, Dialogue → Event `Done` → otherwise.
+- Yarn variables are the Blackboard: `$Affection` in Yarn is the parameter `Affection`. Add the parameters the conditions use.
+- Yarn scripts can move the flow: `<<graph_event Name>>` (now) and `<<graph_next Name>>` (when the dialogue ends).
+- Typical shape: Entry → Scene Title ─(NewGame)→ Scene Story ─(Automatic)→ Container Story [Entry → Dialogue … → Exit] ─→ Title.
+  For a ready-made one, tell the user about `Assets > Create > Visual Node Editor > ADV Starter`.
+- Tell the user the Story scene needs Yarn's Dialogue System with a **Yarn Graph Bridge** on it, and which buttons send `NewGame` / Load.

@@ -117,8 +117,8 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 
 フェーズ 4: ADV Starter と仕上げ
 - [x] ADV Starter（グラフ・Yarn スクリプト・Yarn プロジェクト）
-- [ ] CI で Yarn 連携をコンパイル
-- [ ] README・スキル（`build-flow-with-mcp` に ADV の組み方）
+- [x] CI で Yarn 連携をコンパイル → しない（uGUI が Unity の外でコンパイルできない）。開発用プロジェクトの EditMode テストで確かめる
+- [x] README・スキル（`build-flow-with-mcp` に ADV の組み方）。MCP に `add_parameter` と、組み込み以外のノード型の値を読み書きする `fields`
 
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
@@ -144,7 +144,8 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - ADV: Yarn のノードの途中からの再開（Yarn Spinner が対応しない限り、ロードすると Dialogue ノードの最初から。値はそのノードに入る前のもの）
 - ADV: Yarn Spinner 2.x には対応しない（3.x の API だけ）
 - ADV: 既読管理・バックログ・オート / スキップ・立ち絵・背景は Yarn Spinner の Presenter とゲーム側で行う（このツールでは持たない）
-- ADV: Yarn Spinner 連携を CI でコンパイルする方法（Yarn のソースを固定のタグで取得してコンパイルする予定。できなければ開発用プロジェクトでのテストだけにする）
+- ADV: Yarn Spinner 連携は CI でコンパイルしない（Yarn のランタイムが uGUI を要し、uGUI は Unity の外でコンパイルできないため）。開発用プロジェクトの EditMode テストで確かめる。
+  Unity をライセンス付きで CI で動かす（GameCI の test-runner）ようにするかは未決
 - UX: イベント名の定数クラスを生成するか（骨組みコード生成の一部。`GraphEvents.StartGame` のように書けて打ち間違いが無くなるが、生成物の置き場所と更新のタイミングを決める必要がある）
 - UX: シナリオの所要時間は実機で計測する（`docs/04-ux-audit.md` の現状は机上の通しによる手数と見積もり）
 - MCP: 認証を持つか（当面は 127.0.0.1 だけで待ち受け、`Origin` を確かめ、既定で止めておく。同じ PC の他のプロセスからは書き換えられる）

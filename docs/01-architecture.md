@@ -527,7 +527,10 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
 
 ### CI
 
-- コンパイル確認に Yarn 連携のジョブを足す。Yarn Spinner for Unity の固定のタグ（v3.2.8）を取得し、その Runtime（ソースと DLL）と一緒に `Integrations/YarnSpinner` をコンパイルする
+- CI（`dotnet build` のコンパイル確認）では Yarn 連携をコンパイルしない。Yarn Spinner のランタイムが uGUI（`UnityEngine.UI` / `EventSystems`）を使い、
+  uGUI はソースのパッケージで、その TextMeshPro がエンジンの内部 API に依存するため、Unity の外ではコンパイルできない。
+  Yarn 連携は、開発用プロジェクト（Yarn Spinner 3.2.8 入り）での EditMode テストで確かめる（`Integrations/YarnSpinner/Tests`）。
+  CI のコア（`Runtime` / `Editor` / `Tests`）のコンパイル確認は、Yarn が無いプロジェクトでもコアが単独でコンパイルできることの確認にもなる
 
 ## ADV Starter（ADV のひな形）
 
@@ -805,10 +808,11 @@ Claude Code などの AI エージェントが、グラフを読み・組み立�
 | `get_graph` | グラフの中身: ノード（ID・型・名前・親のコンテナ・位置・型ごとの値・ポート）、エッジ、パラメータ、コンテナの出口 |
 | `create_graph` | 新しいグラフを作る（Entry 入り。`Assets/Create` と同じ） |
 | `add_node` | ノードを作る（型は表示名 `Scene` / `State` / `Event` / `Container` / `Exit` / `Note` / `Entry`、メニューのパス、クラス名のどれでも）。親のコンテナ・位置・タイトル・イベント名・シーン・本文を指定できる。コンテナは中に Entry / Exit も作る（エディタと同じ）。置けない階層なら理由を返す |
-| `update_node` | タイトル・イベント名・シーン・説明・本文・位置を変える |
+| `update_node` | タイトル・イベント名・シーン・説明・本文・位置・トリガーと条件を変える。組み込み以外のノード型（Yarn の Dialogue ノードなど）の値は `fields`（`get_graph` の `fields` と同じ名前） |
 | `remove_node` | ノードを消す（コンテナなら中身ごと。コンテナの Entry は単独では消さない。エディタと同じ） |
 | `connect` / `disconnect` | エッジを足す・消す。ポートは省略すると `out` → `in`。コンテナの出力は出口の名前でも指せる。階層をまたぐ・無いポート・重複は理由を返す |
 | `group_into_container` | 選んだノードをコンテナにまとめる（Group into Container と同じ規則。まとめられなければ理由） |
+| `add_parameter` | Blackboard にパラメータ（名前・型・既定値）を足す（条件付き遷移のフラグ。Yarn 連携では Yarn の `$Name` と同じもの） |
 | `validate_graph` | 問題の一覧（重要度・種類・メッセージ・ノード）。エディタの問題一覧と同じ |
 | `open_graph` | グラフを Visual Node Editor のウィンドウで開く（Computer Use で画面を確かめるとき用） |
 | `get_runtime_state` | Play 中、そのグラフを動かしている Runner の今いるノード・場所（`Stage › Play`）・起こせる操作・パラメータの値。Play 中でなければそう返す |
