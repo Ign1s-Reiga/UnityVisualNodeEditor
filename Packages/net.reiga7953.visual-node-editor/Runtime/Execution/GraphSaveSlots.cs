@@ -67,7 +67,10 @@ namespace Reiga.VisualNodeEditor
             return Path.Combine(Root, ToFolderName(graph), slot + ".json");
         }
 
-        /// <summary>そのスロットにセーブがあるか（キーを持つ前のグラフ名だけのフォルダのものも含む）。</summary>
+        /// <summary>
+        /// そのスロットにセーブがあるか。キーを持つ前にグラフ名だけのフォルダへ保存した、このグラフのセーブも含む
+        /// （見つけたらキーのフォルダへ移す。<see cref="Read"/>・<see cref="Load"/>・<see cref="Delete"/> も同じ）。
+        /// </summary>
         public static bool Exists(NodeGraphAsset graph, string slot) => FindFile(graph, slot) != null;
 
         /// <summary>
@@ -142,7 +145,9 @@ namespace Reiga.VisualNodeEditor
             return true;
         }
 
-        // そのスロットのファイル。キーを持つグラフでそのフォルダに無ければ、グラフ名だけのフォルダ（キーを持つ前に保存したもの）も探す。無ければ null
+        // そのスロットのファイル。無ければ null。
+        // キーを持つグラフは、グラフ名だけのフォルダにキーを持つ前のこのグラフのセーブがあれば、先にキーのフォルダへ移す
+        // （キーのフォルダにもうあれば、古いほうは要らないので消す。残すと、消したスロットが古いセーブで戻ってくる）
         private static string FindFile(NodeGraphAsset graph, string slot)
         {
             if (graph == null || !IsValidSlotName(slot))
@@ -151,18 +156,59 @@ namespace Reiga.VisualNodeEditor
             }
 
             var path = GetPath(graph, slot);
-            if (File.Exists(path))
+            var legacy = FindLegacyFile(graph, slot);
+            if (legacy != null)
             {
-                return path;
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(legacy);
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(path));
+                        File.Move(legacy, path);
+                    }
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    // 移せなければ（ほかのプロセスが開いているなど）、今回はそのまま使う
+                    if (!File.Exists(path))
+                    {
+                        return legacy;
+                    }
+                }
             }
 
+            return File.Exists(path) ? path : null;
+        }
+
+        // キーを持つ前（グラフ名だけのフォルダ）に保存した、このグラフのセーブ。キーを持たないグラフ・セーブが無い・別のグラフのものなら null。
+        // 同じ名前の別のグラフ（キーを持たない古いグラフ）も同じフォルダを使うので、今いたノードがこのグラフにあるかで見分ける（ノードの ID はグラフごとに違う）
+        private static string FindLegacyFile(NodeGraphAsset graph, string slot)
+        {
             if (graph.SaveKey.Length == 0)
             {
                 return null;
             }
 
             var legacy = Path.Combine(Root, ToFolderName(graph, false), slot + ".json");
-            return File.Exists(legacy) ? legacy : null;
+            return File.Exists(legacy) && IsSaveOf(legacy, graph) ? legacy : null;
+        }
+
+        // セーブの今いたノードがこのグラフにあるか。読めなければ false
+        private static bool IsSaveOf(string file, NodeGraphAsset graph)
+        {
+            try
+            {
+                var state = GraphRunnerState.FromJson(File.ReadAllText(file));
+                return state != null && graph.FindNode(state.NodeId) != null;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return false;
+            }
         }
 
         // グラフの置き場のフォルダ名: グラフ名（使えない文字は '_'）とセーブキー（同じ名前の別のグラフと混ざらないように。空ならグラフ名だけ）

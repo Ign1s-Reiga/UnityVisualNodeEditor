@@ -15,6 +15,31 @@ namespace Reiga.VisualNodeEditor.Tests
     /// </summary>
     public sealed class GraphSaveKeyTests
     {
+        private string _root;
+        private readonly List<GraphRunner> _runners = new();
+        private readonly List<NodeGraphAsset> _graphs = new();
+
+        [SetUp]
+        public void SetUp()
+        {
+            _root = Path.Combine(Path.GetTempPath(), "VneSaveKey_" + Guid.NewGuid().ToString("N"));
+            GraphSaveSlots.RootOverride = _root;
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            _runners.ForEach(runner => runner.Stop());
+            _runners.Clear();
+            _graphs.ForEach(Object.DestroyImmediate);
+            _graphs.Clear();
+            GraphSaveSlots.RootOverride = null;
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, true);
+            }
+        }
+
         [Test]
         public void GraphsWithTheSameName_KeepTheirSlotsApart()
         {
@@ -109,39 +134,70 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(oldPath).SaveKey, Is.Empty, "graphs without a key are not rewritten");
         }
 
+        // ---- キーを持つ前（グラフ名だけのフォルダ）のセーブ ----
+
         [Test]
-        public void SavesFromBeforeTheKey_CanStillBeLoaded()
+        public void SavesFromBeforeTheKey_AreMovedIntoTheKeyedFolder()
         {
-            var root = Path.Combine(Path.GetTempPath(), "VneSaveKey_" + Guid.NewGuid().ToString("N"));
-            GraphSaveSlots.RootOverride = root;
-            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
-            graph.name = "Main";
-            graph.AddNode(new EntryNode());
-            var runner = new GraphRunner(graph);
-            try
-            {
-                runner.Start();
-                GraphSaveSlots.Save(runner, "slot1");
+            var runner = Run("Main");
+            GraphSaveSlots.Save(runner, "slot1");
 
-                // 後からキーを持っても、グラフ名だけのフォルダのセーブを見つける
-                graph.SaveKey = "k";
-                Assert.That(GraphSaveSlots.Exists(graph, "slot1"), Is.True);
-                Assert.That(GraphSaveSlots.Load(runner, "slot1"), Is.True);
-
-                // 新しく保存したものは、キーの付いたフォルダに入る
-                GraphSaveSlots.Save(runner, "slot1");
-                Assert.That(File.Exists(GraphSaveSlots.GetPath(graph, "slot1")), Is.True);
-            }
-            finally
-            {
-                runner.Stop();
-                GraphSaveSlots.RootOverride = null;
-                Object.DestroyImmediate(graph);
-                if (Directory.Exists(root))
-                {
-                    Directory.Delete(root, true);
-                }
-            }
+            // 後からキーを持っても、グラフ名だけのフォルダのセーブを見つけ、キーのフォルダへ移す
+            runner.Graph.SaveKey = "k";
+            Assert.That(GraphSaveSlots.Exists(runner.Graph, "slot1"), Is.True);
+            Assert.That(File.Exists(LegacyPath("Main", "slot1")), Is.False);
+            Assert.That(File.Exists(GraphSaveSlots.GetPath(runner.Graph, "slot1")), Is.True);
+            Assert.That(GraphSaveSlots.Load(runner, "slot1"), Is.True);
         }
+
+        [Test]
+        public void DeletedSlots_DoNotComeBackFromBeforeTheKey()
+        {
+            // 0.13.2 は、キーを持つ前のセーブを残したままキーのフォルダへ保存していた
+            var runner = Run("Main");
+            GraphSaveSlots.Save(runner, "slot1");
+            runner.Graph.SaveKey = "k";
+            Directory.CreateDirectory(Path.GetDirectoryName(GraphSaveSlots.GetPath(runner.Graph, "slot1")));
+            File.Copy(LegacyPath("Main", "slot1"), GraphSaveSlots.GetPath(runner.Graph, "slot1"));
+
+            Assert.That(GraphSaveSlots.Delete(runner.Graph, "slot1"), Is.True);
+
+            Assert.That(GraphSaveSlots.Exists(runner.Graph, "slot1"), Is.False);
+            Assert.That(File.Exists(LegacyPath("Main", "slot1")), Is.False);
+        }
+
+        [Test]
+        public void SavesOfAnotherGraphWithTheSameName_AreLeftAlone()
+        {
+            // キーを持たない古いグラフと、キーを持つ新しいグラフが、どちらも Main
+            var old = Run("Main");
+            GraphSaveSlots.Save(old, "slot1");
+            var keyed = Run("Main");
+            keyed.Graph.SaveKey = "k";
+
+            Assert.That(GraphSaveSlots.Exists(keyed.Graph, "slot1"), Is.False);
+            Assert.That(GraphSaveSlots.Load(keyed, "slot1"), Is.False);
+            Assert.That(GraphSaveSlots.Delete(keyed.Graph, "slot1"), Is.False);
+            Assert.That(GraphSaveSlots.Exists(old.Graph, "slot1"), Is.True, "the old graph keeps its save");
+        }
+
+        // その名前の新しいグラフ（Entry → State）を作って動かす
+        private GraphRunner Run(string name)
+        {
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            graph.name = name;
+            var entry = new EntryNode();
+            var state = new StateNode { Title = "State" };
+            graph.AddNode(entry);
+            graph.AddNode(state);
+            graph.AddEdge(new EdgeData(entry.Id, "out", state.Id, "in"));
+            _graphs.Add(graph);
+            var runner = new GraphRunner(graph);
+            runner.Start();
+            _runners.Add(runner);
+            return runner;
+        }
+
+        private string LegacyPath(string graphName, string slot) => Path.Combine(_root, graphName, slot + ".json");
     }
 }
