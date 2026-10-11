@@ -16,11 +16,7 @@ namespace Reiga.VisualNodeEditor.Tests
         public void SetUp() => _temp = new McpTempGraphs();
 
         [TearDown]
-        public void TearDown()
-        {
-            GraphSaveKeySync.Enabled = true;
-            _temp.Dispose();
-        }
+        public void TearDown() => _temp.Dispose();
 
         [Test]
         public void TheGraphWhoseGuidIsTheKey_KeepsIt_WhateverThePathOrder()
@@ -49,9 +45,24 @@ namespace Reiga.VisualNodeEditor.Tests
 
             GraphSaveKeySync.CheckAll();
 
-            Assert.That(original.SaveKey, Is.EqualTo(key), "the first by path keeps the key");
+            Assert.That(original.SaveKey, Is.EqualTo(key), "the first by name keeps the key");
             Assert.That(copy.SaveKey, Is.Not.Empty.And.Not.EqualTo(key));
             Assert.That(EditorUtility.IsDirty(copy), Is.False, "the new key is saved");
+        }
+
+        [Test]
+        public void UnitysCopy_DoesNotTakeTheOriginalsKey()
+        {
+            // Unity の複製は "Main 1"。パスの順では "Main 1.asset" が "Main.asset" より先になる（' ' が '.' より前）
+            var original = Create("Main");
+            var copy = Create("Main 1");
+            var key = original.SaveKey;
+            WriteKeysWithoutChecking(key, copy);
+
+            GraphSaveKeySync.CheckAll();
+
+            Assert.That(original.SaveKey, Is.EqualTo(key));
+            Assert.That(copy.SaveKey, Is.Not.Empty.And.Not.EqualTo(key));
         }
 
         [Test]
@@ -82,10 +93,8 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         // 重なったキーを、直されないままディスクに書く
-        private static void WriteKeysWithoutChecking(string key, params NodeGraphAsset[] graphs)
-        {
-            GraphSaveKeySync.Enabled = false;
-            try
+        private static void WriteKeysWithoutChecking(string key, params NodeGraphAsset[] graphs) =>
+            GraphSaveKeySync.WithoutFixing(() =>
             {
                 foreach (var graph in graphs)
                 {
@@ -93,11 +102,6 @@ namespace Reiga.VisualNodeEditor.Tests
                     EditorUtility.SetDirty(graph);
                     AssetDatabase.SaveAssetIfDirty(graph);
                 }
-            }
-            finally
-            {
-                GraphSaveKeySync.Enabled = true;
-            }
-        }
+            });
     }
 }
