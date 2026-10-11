@@ -479,6 +479,8 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
 
 - 繋ぐ Runner: 指定したグラフ（空なら実行中のどれか）を実行中のものを `GraphRunner.Running` から探す。後から始まったものには `GraphRunner.Started` で付く
 - Dialogue ノードに入ったら、そのノードの Yarn ノードで会話を始める（`StartDialogue`）。会話中なら先に止める
+- DialogueRunner に Yarn Project が無い・そのノードが無いときは、始めずに警告を出し、会話が終わったときと同じく次へ進める
+  （Yarn は始めるのに失敗すると終わりの知らせを出さないので、待つとその Dialogue ノードで止まってしまう）
 - Bridge が有効になった時点で Runner がすでに Dialogue ノードにいれば、その会話を始める（シーンの読み込みが終わる前に、自動遷移で Dialogue ノードへ進んでいた場合）
 - 会話が終わったら（`onDialogueComplete`）、次のフレームで次の順に試す（会話の終わりの通知の中では次の会話を始められないため）:
   1. 会話の中で `<<graph_next 名前>>` があれば、その名前で Raise
