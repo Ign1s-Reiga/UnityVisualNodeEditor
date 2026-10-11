@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Debugging;
@@ -130,6 +132,40 @@ namespace Reiga.VisualNodeEditor.Tests
 
             Assert.That(panel.RefreshCount, Is.EqualTo(before), "not redrawn right away");
             Assert.That(panel.IsRefreshQueued, Is.True, "one redraw waits for the next update");
+        }
+
+        [Test]
+        public void Panel_NoticesDebugSavesMadeElsewhere_WhenTheNodeChanges()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "VnePanelSlot_" + Guid.NewGuid().ToString("N"));
+            GraphSaveSlots.RootOverride = root;
+            try
+            {
+                var runner = new GraphRunner(_graph);
+                runner.Start();
+                var panel = new RuntimePanel();
+                panel.Show(runner);
+                Assert.That(panel.CanLoadDebugSlot, Is.False);
+
+                // ゲーム側（オートセーブなど）がスロット debug に保存した
+                GraphSaveSlots.Save(runner, RuntimePanel.DebugSlot);
+                runner.Raise("StartGame");
+                panel.Refresh();
+                Assert.That(panel.CanLoadDebugSlot, Is.True);
+
+                GraphSaveSlots.Delete(_graph, RuntimePanel.DebugSlot);
+                runner.Raise("Back");
+                panel.Refresh();
+                Assert.That(panel.CanLoadDebugSlot, Is.False);
+            }
+            finally
+            {
+                GraphSaveSlots.RootOverride = null;
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
         }
 
         // ---- Blackboard の実行中の値 ----

@@ -61,8 +61,10 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
         private readonly Button _saveButton;
         private readonly Button _loadButton;
 
-        // スロット debug にセーブがあるか（表示し直すたびにディスクを見ないよう、Runner を変えたとき・セーブしたときだけ確かめる）
+        // スロット debug にセーブがあるかと、それを確かめたときのノード（表示し直すたびにディスクを見ないよう、
+        // Runner を変えたとき・ノードを移ったとき・セーブしたときだけ確かめる。ゲーム側のセーブ・オートセーブでできた・消えたスロットも、次に移ったときに分かる）
         private bool _debugSlotExists;
+        private NodeData _debugSlotCheckedAt;
 
         // 値の変化での表示し直しを、次の更新まで 1 回にまとめているか
         private bool _refreshQueued;
@@ -92,6 +94,9 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
         /// <summary>値の変化での表示し直しを待っているか（テスト用）。</summary>
         internal bool IsRefreshQueued => _refreshQueued;
 
+        /// <summary>Load のボタンを押せるか（テスト用）。</summary>
+        internal bool CanLoadDebugSlot => _loadButton.enabledSelf;
+
         /// <summary>表示中の Runner。表示していなければ null。</summary>
         public GraphRunner Runner => _runner;
 
@@ -116,7 +121,7 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
                 _runner.ParameterChanged += OnParameterChanged;
             }
 
-            _debugSlotExists = _runner != null && GraphSaveSlots.Exists(_runner.Graph, DebugSlot);
+            _debugSlotCheckedAt = null;
             Refresh();
         }
 
@@ -150,6 +155,12 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             }
 
             _location.text = GetLocation(_runner);
+            if (_runner.Current != _debugSlotCheckedAt)
+            {
+                _debugSlotCheckedAt = _runner.Current;
+                _debugSlotExists = GraphSaveSlots.Exists(_runner.Graph, DebugSlot);
+            }
+
             _loadButton.SetEnabled(_debugSlotExists);
             var actions = RuntimeActions.For(_runner.Query, _runner.Current);
             foreach (var action in actions)
