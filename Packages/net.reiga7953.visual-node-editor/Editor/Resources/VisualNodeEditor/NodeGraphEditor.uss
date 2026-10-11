@@ -9,6 +9,7 @@
   --vne-category-entity: #2bb3a3;
   --vne-category-system: #d19a52;
   --vne-category-container: #d9668a;
+  --vne-category-adv: #e0b83c;
 }
 
 .vne-inspector-view__icon.vne-category--flow,
@@ -39,6 +40,12 @@
 .vne-inspector-view__icon.vne-category--container,
 .vne-node-tree__icon.vne-category--container {
   background-color: var(--vne-category-container);
+}
+
+/* ADV nodes (the Yarn Spinner Dialogue node) */
+.vne-inspector-view__icon.vne-category--adv,
+.vne-node-tree__icon.vne-category--adv {
+  background-color: var(--vne-category-adv);
 }
 
 /* Toolbar */

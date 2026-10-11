@@ -1,0 +1,28 @@
+{
+  "name": "Reiga.VisualNodeEditor.YarnSpinner.Tests",
+  "rootNamespace": "Reiga.VisualNodeEditor.YarnSpinner.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.YarnSpinner",
+    "Reiga.VisualNodeEditor.YarnSpinner.Editor",
+    "YarnSpinner.Unity"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll", "YarnSpinner.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VNE_YARN_SPINNER"],
+  "versionDefines": [
+    {
+      "name": "dev.yarnspinner.unity",
+      "expression": "3.0.0",
+      "define": "VNE_YARN_SPINNER"
+    }
+  ],
+  "noEngineReferences": false
+}

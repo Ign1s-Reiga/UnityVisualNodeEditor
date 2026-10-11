@@ -470,8 +470,8 @@ ADV（ノベル・アドベンチャー）では、会話の中身を Yarn Spinn
 ### Dialogue ノード（`DialogueNode`、`[NodeMenu("ADV/Dialogue")]`）
 
 - 待機ノード。Yarn のノード名 `_yarnNode` と、会話が終わったときに起こすイベント名 `_completeEvent`（既定 `Done`）を持つ。振る舞い（`IBehaviourHost`）も付けられる。`IRestartOnLoad`
-- ポートは `in` / `out`（State と同じ）。カテゴリ色は `dialogue`。タイトル未入力なら Yarn のノード名をタイトルに出す
-- ノード自身の検証: Yarn のノード名が空なら Warning
+- ポートは `in` / `out`（State と同じ）。カテゴリ色は `adv`（メニューの `ADV/` から）。タイトル未入力なら Yarn のノード名をタイトル・ノードツリー・Now running に出す（`NodeData.ContentTitle`）
+- ノード自身の検証（`NodeData.GetIssues()`）: Yarn のノード名が空なら Warning
 
 ### 会話の進め方（`YarnGraphBridge`）
 
@@ -491,7 +491,11 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
   - `<<graph_event 名前>>`: すぐ Raise する（演出の合図など。それで Dialogue ノードを離れれば会話は止まる）
   - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）
 - オートセーブ: `Auto Save Slot`（空なら無効）を指定すると、Dialogue ノードに入るたびにそのスロットへ保存する（「続きから」用）
-- エディタで追加したとき（`Reset`）、同じ GameObject に `GraphVariableStorage` が無ければ足し、DialogueRunner の Variable Storage に設定する
+- エディタで追加したとき（`ObjectFactory.componentWasAdded`。`YarnBridgeSetup`）、同じ GameObject に `GraphVariableStorage` が無ければ足し、
+  DialogueRunner の Variable Storage に設定する（別の Variable Storage が設定されていれば置き換えない）
+- 判定は Yarn に依存しない純粋なクラス `DialogueFlow` に置き、会話の開始・停止を `IDialoguePlayer`（実物は `DialogueRunnerPlayer`）越しに行う（EditMode テストで偽物に差し替える）。
+  同じ Dialogue ノードに入り直したときも会話をやり直せるよう、ノードに入るたびに番号を振って見分ける。
+  Yarn は `StartDialogue` 1 回につき、終わったときも `Stop()` で止めたときも `onDialogueComplete` をちょうど 1 回呼ぶので、止めるよう頼んだ後の 1 回は「止まった」として扱い、次へは進めない
 
 ### 変数の共有（`GraphVariableStorage`）
 
@@ -502,15 +506,20 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
 - 型の対応: Bool ↔ Yarn の bool、Int ↔ 数（書くときは四捨五入し、整数でなければ警告）、Float ↔ 数、String ↔ 文字列。型の合わない書き込みはエラーを出して無視する
 - Blackboard に無い変数（Yarn だけで使う変数や、Yarn が使う訪問回数 `$Yarn.Internal.*`）は Runner の `Extras` に置く（セーブに含まれ、`Start()` で消える）
 - Runner が見つからない間は、自分の中の一時的な置き場を使い、警告を 1 回出す（会話は続けられる）
-- 値が変わったら Yarn の変更リスナー（`AddChangeListener`）にも知らせる
+- 値が変わったら Yarn の変更リスナー（`AddChangeListener`）にも知らせる。有効な間は Runner の `ParameterChanged` を聞き、グラフ側（ゲームのコード・ロードなど）で変わった値も知らせる
+- `Clear()` は Yarn だけの変数（Extras と一時的な置き場の `$` で始まるもの）を消す。Blackboard のパラメータはグラフのものなので消さない
 
 ### エディタ
 
-- Dialogue ノードのインスペクタ: Yarn Node は、プロジェクトの YarnProject（`AssetDatabase.FindAssets("t:YarnProject")`）のノード名から選ぶドロップダウン
-  （プロジェクトごとにまとめる。一覧に無い名前も入力できる）。Complete Event は Event 名の入力欄（`EventNameField` と同じ候補）
-- エディタでの検証（Warning）: どの YarnProject にも無い Yarn のノード名 / Blackboard のパラメータと、同じ名前の Yarn の変数（YarnProject の初期値から型が分かる）の型が合わない
-- 拡張点（コアに足す）: Runtime の `NodeData.GetIssues()`（仮想メソッド。ノード自身の検証。`GraphValidator` が呼ぶ）と、
-  Editor の `IGraphIssueCheck`（`TypeCache` で集め、`GraphIssues.Collect` が呼ぶ。AssetDatabase を見る検証用）
+- Dialogue ノードのインスペクタ: Yarn Node（`[YarnNode]` の欄。`YarnNodeDrawer`）は、入力欄と「▾」のメニュー（プロジェクトの YarnProject のノード名。
+  プロジェクトが 2 つ以上ならプロジェクトごとにまとめる。一覧に無い名前も入力できる）。Yarn が内部で作るノード（`$` で始まる・`Yarn.Internal` を含む）は出さない。
+  Complete Event（`[EventName]` の欄）は Event 名の入力欄（`EventNameField` と同じ候補）
+- YarnProject のノード名と変数の初期値は `YarnProjects` が集めて覚え、プロジェクトのアセットが変わったら（`EditorApplication.projectChanged`）捨てる（編集のたびの検証で読み直さない）
+- エディタでの検証（Warning。`YarnIssueCheck`。Dialogue ノードの無いグラフには何も言わない）: YarnProject が 1 つも無い / どの YarnProject にも無い Yarn のノード名 /
+  Blackboard のパラメータと、同じ名前の Yarn の変数（YarnProject の初期値から型が分かる。Yarn の数は Int・Float のどちらとも合う）の型が合わない
+- 拡張点（コアに足す。Yarn 以外のアドオンも使える）: Runtime の `NodeData.ContentTitle`（タイトル未入力のときに型名の代わりに出す名前）・
+  `NodeData.GetIssues()`（ノード自身の検証。`GraphValidator` が呼ぶ）・`[EventName]`（イベント名を選べる欄にする属性）・`NodeBehaviourList`（public に）・
+  `GraphRunner.FindRunning` / `TryGetParameter`。Editor の `IGraphIssueCheck`（`TypeCache` で集め、`GraphIssues.Collect` が呼ぶ。AssetDatabase を見る検証用。例外はログに出して次へ）
 
 ### 中断と再開
 

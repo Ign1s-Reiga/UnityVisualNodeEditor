@@ -36,6 +36,11 @@
   border-top-color: var(--vne-category-container);
 }
 
+/* ADV nodes (the Yarn Spinner Dialogue node) */
+.vne-node--adv #title {
+  border-top-color: var(--vne-category-adv);
+}
+
 /* One-line summary directly below the title */
 
 .vne-node__summary {

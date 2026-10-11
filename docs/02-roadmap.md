@@ -111,9 +111,9 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - [x] `GraphSaveSlots`、`GraphRunnerBehaviour` / `GraphEventButton` の Save / Load、Now running の Save / Load
 
 フェーズ 3: Yarn Spinner 連携
-- [ ] 開発用プロジェクトに Yarn Spinner 3.2.8 を入れ、任意のアセンブリを作る。コアの拡張点（`NodeData.GetIssues`、`IGraphIssueCheck`）
-- [ ] Dialogue ノード、`YarnGraphBridge`（会話の開始・終了・コマンド・オートセーブ）、`GraphVariableStorage`
-- [ ] エディタ（View・インスペクタ・検証）
+- [x] 開発用プロジェクトに Yarn Spinner 3.2.8 を入れ、任意のアセンブリを作る。コアの拡張点（`NodeData.GetIssues`、`IGraphIssueCheck`）
+- [x] Dialogue ノード、`YarnGraphBridge`（会話の開始・終了・コマンド・オートセーブ）、`GraphVariableStorage`
+- [x] エディタ（View・インスペクタ・検証）
 
 フェーズ 4: ADV Starter と仕上げ
 - [ ] ADV Starter（グラフ・Yarn スクリプト・Yarn プロジェクト）
