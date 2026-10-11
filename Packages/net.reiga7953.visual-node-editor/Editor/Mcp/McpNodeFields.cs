@@ -45,18 +45,18 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0
                             && p.DeclaringType != typeof(NodeData) && typeof(NodeData).IsAssignableFrom(p.DeclaringType)
-                            && (p.PropertyType == typeof(string) || p.PropertyType == typeof(bool)
-                                || p.PropertyType == typeof(int) || p.PropertyType == typeof(float)))
+                            && TryGetParameterType(p.PropertyType, out _))
                 .OrderBy(p => p.MetadataToken);
 
-        private static object Convert(PropertyInfo property, object value)
+        /// <summary><paramref name="property"/> に入れる値にする。扱わない型のプロパティ・型の合わない値は例外。</summary>
+        internal static object Convert(PropertyInfo property, object value)
         {
-            var type = property.PropertyType;
-            // プロパティの型は string / bool / int / float だけなので、パラメータの型と同じ規則で変える
-            var parameterType = type == typeof(string) ? GraphParameterType.String
-                : type == typeof(bool) ? GraphParameterType.Bool
-                : type == typeof(int) ? GraphParameterType.Int
-                : GraphParameterType.Float;
+            if (!TryGetParameterType(property.PropertyType, out var parameterType))
+            {
+                throw new McpToolException(
+                    $"The field '{property.Name}' is a {property.PropertyType.Name}, which cannot be set here (only string, bool, int and float fields can).");
+            }
+
             if (value == null && parameterType == GraphParameterType.String)
             {
                 return string.Empty;
@@ -64,6 +64,34 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
 
             return McpValues.ToParameterValue(value, parameterType)
                    ?? throw new McpToolException($"The field '{property.Name}' must be {McpValues.Describe(parameterType)}.");
+        }
+
+        // プロパティの型に当たるパラメータの型（値はパラメータと同じ規則で変える）。string / bool / int / float 以外は扱わない
+        private static bool TryGetParameterType(Type type, out GraphParameterType parameterType)
+        {
+            if (type == typeof(string))
+            {
+                parameterType = GraphParameterType.String;
+            }
+            else if (type == typeof(bool))
+            {
+                parameterType = GraphParameterType.Bool;
+            }
+            else if (type == typeof(int))
+            {
+                parameterType = GraphParameterType.Int;
+            }
+            else if (type == typeof(float))
+            {
+                parameterType = GraphParameterType.Float;
+            }
+            else
+            {
+                parameterType = default;
+                return false;
+            }
+
+            return true;
         }
     }
 }

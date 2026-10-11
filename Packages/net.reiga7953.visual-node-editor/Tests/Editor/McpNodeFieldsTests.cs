@@ -64,6 +64,17 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(_probe.Content, Is.Null, "nothing changes");
         }
 
+        [Test]
+        public void UnsupportedPropertyTypes_AreRefused_NotTreatedAsNumbers()
+        {
+            // 数を渡しても Vector2 のプロパティには入れない（float として扱わない）
+            var position = typeof(NodeData).GetProperty(nameof(NodeData.Position));
+
+            var error = Assert.Throws<McpToolException>(() => McpNodeFields.Convert(position, 1.0));
+
+            Assert.That(error.Message, Does.Contain("'Position' is a Vector2"));
+        }
+
         // ---- add_parameter ----
 
         [Test]
