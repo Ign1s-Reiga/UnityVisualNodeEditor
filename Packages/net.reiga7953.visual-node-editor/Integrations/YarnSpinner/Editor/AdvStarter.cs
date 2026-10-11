@@ -47,7 +47,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
 
             // 同じ名前の Yarn のノードが既にあれば（2 つ目のひな形など）、Yarn プロジェクトがコンパイルできなくなるので頭に付ける
             YarnProjects.Invalidate();
-            var prefix = NodeNames.Any(YarnProjects.HasNode) ? ToIdentifier(name) + "_" : string.Empty;
+            var prefix = ChoosePrefix(name, YarnProjects.HasNode);
 
             var scriptPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{name}.yarn");
             File.WriteAllText(scriptPath, BuildYarnScript(prefix));
@@ -192,6 +192,29 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                     return projectFolder != null && (folder == projectFolder || folder.StartsWith(projectFolder + "/", StringComparison.Ordinal));
                 })
                 .ToArray();
+
+        /// <summary>
+        /// ひな形のノード名の頭に付ける文字。どのノード名もまだ無ければ付けない。あれば、グラフのファイル名（<c>ADV1_</c>）、
+        /// それを付けた名前も既にあれば番号を足していく（<c>ADV2_</c>、<c>ADV3_</c> …）。<paramref name="hasNode"/> は Yarn にそのノードがあるか。
+        /// </summary>
+        internal static string ChoosePrefix(string graphName, Func<string, bool> hasNode)
+        {
+            bool IsFree(string prefix) => !NodeNames.Any(node => hasNode(prefix + node));
+            if (IsFree(string.Empty))
+            {
+                return string.Empty;
+            }
+
+            var stem = ToIdentifier(graphName);
+            for (var number = 1; ; number++)
+            {
+                var prefix = (number == 1 ? stem : stem + number) + "_";
+                if (IsFree(prefix))
+                {
+                    return prefix;
+                }
+            }
+        }
 
         // Yarn のノード名に使える形（英数字と '_' だけ。例: "ADV 1" → "ADV1"）
         private static string ToIdentifier(string name)
