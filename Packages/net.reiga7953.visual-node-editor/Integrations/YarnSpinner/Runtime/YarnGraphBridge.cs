@@ -37,8 +37,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
         private DialogueFlow _flow;
 
-        // _flow が会話を流す DialogueRunner
+        // _flow が会話を流す DialogueRunner（Dialogue Runner の欄と違えば繋ぎ直す）と、それが壊されたことを伝えたか
         private DialogueRunner _flowRunner;
+        private bool _warnedDestroyed;
 
         // onDialogueComplete を聞いている DialogueRunner（無効の間も聞き続ける）と、コマンドを登録している DialogueRunner（有効の間だけ）
         private DialogueRunner _listening;
@@ -71,7 +72,38 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
         /// <summary>繋いでいる Runner。無ければ null。</summary>
         public GraphRunner Runner => _flow?.Runner;
 
-        private void OnEnable()
+        private void OnEnable() => Connect();
+
+        private void OnDisable() => Disconnect();
+
+        private void OnDestroy() => StopListening();
+
+        private void Update()
+        {
+            // 有効の間に Dialogue Runner の欄を替えたら、繋ぎ直す（会話の状態も作り直す）
+            if (_dialogueRunner != _flowRunner)
+            {
+                Disconnect();
+                Connect();
+            }
+
+            // 会話を流す Dialogue Runner が壊された（別の GameObject にあって先に消えたなど）なら、会話を始めない
+            // （壊れたものに始めさせても終わりの知らせが来ず、その Dialogue ノードで止まる）。欄に別のものを入れれば、上で繋ぎ直す
+            if (_flowRunner == null)
+            {
+                if (_flow != null && !_warnedDestroyed)
+                {
+                    _warnedDestroyed = true;
+                    Debug.LogWarning($"[VisualNodeEditor] '{name}': the Dialogue Runner was destroyed, so no dialogue plays until another one is assigned.", this);
+                }
+
+                return;
+            }
+
+            _flow?.Tick();
+        }
+
+        private void Connect()
         {
             if (_dialogueRunner == null)
             {
@@ -81,14 +113,17 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             if (_dialogueRunner == null)
             {
                 Debug.LogWarning($"[VisualNodeEditor] '{name}': Yarn Graph Bridge needs a Dialogue Runner (on this GameObject or assigned).", this);
+                _flow = null;
+                _flowRunner = null;
                 return;
             }
 
-            // 無効の間に Dialogue Runner の欄を替えたら、会話の状態を作り直す（替える前の Runner の知らせはもう聞かないので、前の状態のままだと待ち続ける）
+            // Dialogue Runner の欄を替えたら、会話の状態を作り直す（替える前の Runner の知らせはもう聞かないので、前の状態のままだと待ち続ける）
             if (_flow == null || _flowRunner != _dialogueRunner)
             {
                 _flow = new DialogueFlow(new DialogueRunnerPlayer(_dialogueRunner));
                 _flowRunner = _dialogueRunner;
+                _warnedDestroyed = false;
             }
 
             _flow.AutoSaveSlot = _autoSaveSlot;
@@ -99,7 +134,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             _flow.Attach(GraphRunner.FindRunning(_graph));
         }
 
-        private void OnDisable()
+        private void Disconnect()
         {
             GraphRunner.Started -= OnRunnerStarted;
             GraphRunner.Stopped -= OnRunnerStopped;
@@ -107,10 +142,6 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             _flow?.Shutdown();
             RemoveCommands();
         }
-
-        private void OnDestroy() => StopListening();
-
-        private void Update() => _flow?.Tick();
 
         private void Listen(DialogueRunner runner)
         {

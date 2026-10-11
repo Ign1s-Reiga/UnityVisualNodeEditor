@@ -507,7 +507,9 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
   - 止まった知らせを聞けないまま会話がもう流れていなければ（DialogueRunner を壊した・知らせが届かなかったなど）、待つのをやめて次の会話を始める。
     「流れている」は、Yarn の `IsDialogueRunning` か、`DialogueTask` がまだ終わっていないこと（`IsDialogueRunning` は止めた時点で false になり、
     知らせはその後の後片付けが済んでから来る。`DialogueTask` はその知らせの直前に終わる）
-  - 無効の間に Dialogue Runner の欄を別のものに替えたら、また有効になったときに会話の状態を作り直す（替える前の Runner の知らせは聞かない）
+  - Dialogue Runner の欄を別のものに替えたら（有効の間も、無効の間も）、繋ぎ直して会話の状態を作り直す（替える前の Runner の知らせは聞かない）
+  - 会話を流す Dialogue Runner が壊されたら（別の GameObject にあって先に消えたなど）、警告を 1 回出し、別のものを入れるまで会話を始めない
+    （壊れたものに始めさせても終わりの知らせが来ず、その Dialogue ノードで止まるため）
 - Yarn のコマンド（Bridge が DialogueRunner に登録する）:
   - `<<graph_event 名前>>`: すぐ Raise する（演出の合図など。それで Dialogue ノードを離れれば会話は止まる）
   - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）
