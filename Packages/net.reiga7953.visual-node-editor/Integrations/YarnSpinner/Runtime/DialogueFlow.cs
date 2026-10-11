@@ -86,6 +86,23 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             _nextEvent = null;
         }
 
+        /// <summary>
+        /// Runner から外し、流している会話を止めて、その会話のことを忘れる（<see cref="YarnGraphBridge"/> が無効になるとき）。
+        /// 止まったことの知らせはもう受け取らないので、待たずに「流していない」状態に戻す（また有効になったら、すぐ次の会話を始められる）。
+        /// </summary>
+        public void Shutdown()
+        {
+            Detach();
+            if (_runningToken != 0 && !_stopping)
+            {
+                _player.Stop();
+            }
+
+            _runningToken = 0;
+            _stopping = false;
+            _finishedToken = 0;
+        }
+
         /// <summary>会話が終わった（Yarn の <c>onDialogueComplete</c>。止めたときも呼ばれる）。</summary>
         public void OnDialogueCompleted()
         {

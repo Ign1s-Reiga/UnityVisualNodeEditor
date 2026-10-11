@@ -203,6 +203,20 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         }
 
         [Test]
+        public void Shutdown_StopsTheDialogue_AndStartsAgainWithoutWaitingForTheStop()
+        {
+            // Bridge が無効になると、止まった知らせを聞かずに外れる。また有効になったら、その知らせを待たずに会話を始められる
+            AtChapter();
+
+            _flow.Shutdown();
+            Assert.That(_player.StopCount, Is.EqualTo(1));
+
+            _flow.Attach(_runner);
+            _flow.Tick();
+            Assert.That(_player.Started, Is.EqualTo(new[] { "Chapter1", "Chapter1" }));
+        }
+
+        [Test]
         public void GraphEvent_RaisesRightAway()
         {
             var shake = Event("Shake");

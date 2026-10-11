@@ -90,13 +90,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
         {
             GraphRunner.Started -= OnRunnerStarted;
             GraphRunner.Stopped -= OnRunnerStopped;
-            if (_flow != null)
-            {
-                // 流している会話も止める（外した後の Tick で止まる）
-                _flow.Detach();
-                _flow.Tick();
-            }
-
+            // 流している会話も止める。止まった知らせ（onDialogueComplete）はこの後外すので待たない
+            // （待つ状態のまま残すと、また有効になったときに次の会話を始められなくなる）
+            _flow?.Shutdown();
             Unhook();
         }
 
