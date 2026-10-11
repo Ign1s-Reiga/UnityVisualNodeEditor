@@ -432,7 +432,8 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 | `GraphRunnerState` | 保存する状態（`[Serializable]`。`ToJson` / `FromJson` は `JsonUtility`）。形式の版、グラフ名（確認用）、今いるノードの ID、最後に読み込みを頼んだシーン、パラメータの値（名前・型・値）、Extras |
 | `GraphExtras` | Runner の `Extras`。パラメータ（Blackboard）に無い値の置き場（キー → Bool / Int / Float / String）。Yarn Spinner の変数などアドオンが使う。`Start()` で空になり、セーブに含まれる |
 | `IRestartOnLoad` | ロードするとノードの最初からやり直すノード（Dialogue ノード）の印。このノードにいる間に保存すると、ノードに入る前の値で保存する |
-| `GraphSaveSlots` | スロット名でファイルに読み書きする（`Application.persistentDataPath/VisualNodeEditor/<グラフ名>/<スロット>.json`）。`Save` / `Load` / `Exists` / `Delete`。スロット名はファイル名に使える文字だけ |
+| `GraphSaveSlots` | スロット名でファイルに読み書きする（`Application.persistentDataPath/VisualNodeEditor/<グラフ名>-<グラフのセーブキー>/<スロット>.json`）。`Save` / `Load` / `Exists` / `Delete`。スロット名はファイル名に使える文字だけ |
+| `NodeGraphAsset.SaveKey` | グラフごとに一意なセーブの置き場の名前。エディタがアセットの GUID を入れる（`GraphSaveKeySync`。アセットを作った・複製した・読み込み直したときに、GUID と違えば入れ直して保存する。未保存の変更があるグラフは保存せず、未保存状態にするだけ）。同じ名前の別のグラフとスロットが混ざらない。空（古いアセット）ならグラフ名だけのフォルダ |
 
 ### 実行（GraphRunner）
 
