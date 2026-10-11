@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Reiga.VisualNodeEditor.Editor.Mcp
 {
@@ -12,9 +13,21 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
         /// <summary>
         /// <paramref name="raw"/> を <paramref name="type"/> の値（bool / int / float / string）にする。合わなければ null
         /// （Int に小数・int の範囲外の数、Float に NaN・無限大・float の範囲外の数、型の違う値）。
+        /// Int と Float には、数の文字列（<c>"5"</c>・<c>"0.5"</c>。書き方は InvariantCulture）も数として受け付ける。
         /// </summary>
         public static object ToParameterValue(object raw, GraphParameterType type)
         {
+            // 数を文字列で渡すエージェントもいる（0.13.0 までも受け付けていた）
+            if ((type == GraphParameterType.Int || type == GraphParameterType.Float) && raw is string text)
+            {
+                if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                {
+                    return null;
+                }
+
+                raw = parsed;
+            }
+
             switch (type)
             {
                 case GraphParameterType.Bool:
