@@ -116,7 +116,7 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - [x] エディタ（View・インスペクタ・検証）
 
 フェーズ 4: ADV Starter と仕上げ
-- [ ] ADV Starter（グラフ・Yarn スクリプト・Yarn プロジェクト）
+- [x] ADV Starter（グラフ・Yarn スクリプト・Yarn プロジェクト）
 - [ ] CI で Yarn 連携をコンパイル
 - [ ] README・スキル（`build-flow-with-mcp` に ADV の組み方）
 

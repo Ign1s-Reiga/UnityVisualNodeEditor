@@ -543,7 +543,10 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
   ```
 
 - Yarn スクリプト（`ADV.yarn`）: 上の 4 つのノード。Chapter1 の選択肢で `$Affection` を増やす
-- Yarn プロジェクト（`ADV.yarnproject`）: そのフォルダ（と親のフォルダ）に Yarn プロジェクトが無ければ作る
+- Yarn プロジェクト（`ADV.yarnproject`）: そのフォルダ（と親のフォルダ）に Yarn プロジェクトが無ければ作る（Yarn Spinner の `YarnEditorUtility.CreateYarnProject`）。
+  あれば、そのプロジェクトをすぐ読み込み直す（Yarn Spinner は新しいスクリプトを次のフレームで入れるので、開いたグラフが「無いノード」の警告を出さないように）
+- Yarn のノード名がプロジェクトの中で重なるとコンパイルできないので、既にあれば（2 つ目のひな形など）グラフのファイル名を頭に付ける（例: `ADV1_Chapter1`）。
+  `$Affection` は宣言せず、`<<set>>` の使い方から数と決めさせる（宣言が重ならないように）
 
 ## Build Settings 連携
 

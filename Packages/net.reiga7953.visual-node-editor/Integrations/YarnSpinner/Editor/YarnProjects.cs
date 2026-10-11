@@ -23,6 +23,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
         /// <summary>プロジェクトのすべての Yarn プロジェクト（パスの順）。コンパイルに失敗しているものは、ノード名・変数が空。</summary>
         public static IReadOnlyList<YarnProjectInfo> All => _all ??= Load();
 
+        /// <summary>覚えている結果を捨てる（アセットを作った直後など、projectChanged を待たずに読み直したいとき）。</summary>
+        public static void Invalidate() => _all = null;
+
         /// <summary>どれかの Yarn プロジェクトにそのノードがあるか。</summary>
         public static bool HasNode(string nodeName) => All.Any(p => p.NodeNames.Contains(nodeName));
 
