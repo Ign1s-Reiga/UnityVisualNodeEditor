@@ -1,3 +1,4 @@
+using System;
 using Yarn.Unity;
 
 namespace Reiga.VisualNodeEditor.YarnSpinner
@@ -12,8 +13,36 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             _runner = runner;
         }
 
-        public void Start(string yarnNode) => _runner.StartDialogue(yarnNode).Forget();
+        // 無いノードを渡すと、Yarn は始めるのに失敗して終わりの知らせを出さないので、先に確かめる
+        public bool Start(string yarnNode)
+        {
+            if (!HasNode(_runner.YarnProject, yarnNode))
+            {
+                return false;
+            }
+
+            _runner.StartDialogue(yarnNode).Forget();
+            return true;
+        }
 
         public void Stop() => _runner.Stop().Forget();
+
+        private static bool HasNode(YarnProject project, string yarnNode)
+        {
+            if (project == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                return Array.IndexOf(project.NodeNames, yarnNode) >= 0;
+            }
+            catch (Exception)
+            {
+                // スクリプトにエラーがあって、プログラムが無い
+                return false;
+            }
+        }
     }
 }

@@ -209,8 +209,17 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
                 return;
             }
 
+            // 始められなければ（Yarn にそのノードが無いなど）終わりの知らせは来ないので、待たずに次へ進める（その Dialogue ノードで止まらないように）
+            var yarnNode = node.YarnNode.Trim();
             _runningToken = token;
-            _player.Start(node.YarnNode.Trim());
+            if (!_player.Start(yarnNode))
+            {
+                _runningToken = 0;
+                _finishedToken = token;
+                Warn($"'{node.Title}' could not start the Yarn node '{yarnNode}' (the Dialogue Runner has no Yarn Project, " +
+                     "or the project has no node with that name). Moved on as if the dialogue had finished.");
+                Finish(node);
+            }
         }
 
         // graph_next の名前 → 完了イベント → Advance の順に試す

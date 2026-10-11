@@ -244,6 +244,20 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         }
 
         [Test]
+        public void YarnNodeMissingFromTheProject_WarnsAndMovesOn()
+        {
+            // Yarn に無いノードは始められず、終わりの知らせも来ない。待たずに、終わったときと同じく次へ進める
+            _player.Missing.Add("Chapter1");
+            AtChapter(expectStart: false);
+
+            Assert.That(_warnings, Has.Some.Contains("could not start the Yarn node 'Chapter1'"));
+            Assert.That(_runner.Current, Is.SameAs(_normal));
+
+            _flow.Tick();
+            Assert.That(_player.Started, Is.EqualTo(new[] { "NormalEnd" }), "the next dialogue still plays");
+        }
+
+        [Test]
         public void AutoSave_SavesWhenEnteringADialogue_WithTheValuesFromBefore()
         {
             var root = Path.Combine(Path.GetTempPath(), "VneYarnAutoSave_" + Guid.NewGuid().ToString("N"));
