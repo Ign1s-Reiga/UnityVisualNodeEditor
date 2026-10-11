@@ -112,6 +112,27 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
         }
 
+        [Test]
+        public void SavingAgain_WhereFileReplaceIsUnavailable_DeletesThenMoves()
+        {
+            GraphSaveSlots.Save(_runner, "slot1");
+            _runner.Raise("Start");
+            var replace = GraphSaveSlots.ReplaceFile;
+            GraphSaveSlots.ReplaceFile = (_, _) => throw new PlatformNotSupportedException();
+            try
+            {
+                GraphSaveSlots.Save(_runner, "slot1");
+            }
+            finally
+            {
+                GraphSaveSlots.ReplaceFile = replace;
+            }
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
+            var folder = Path.GetDirectoryName(GraphSaveSlots.GetPath(_graph, "slot1"));
+            Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
+        }
+
         [TestCase("slot1", true)]
         [TestCase("Chapter 2-b_x", true)]
         [TestCase("", false)]

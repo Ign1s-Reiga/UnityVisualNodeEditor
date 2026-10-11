@@ -17,6 +17,9 @@ namespace Reiga.VisualNodeEditor
         /// <summary>保存先のフォルダ（テストで差し替える）。null なら persistentDataPath の下。</summary>
         internal static string RootOverride;
 
+        /// <summary>今のセーブを一時ファイルで 1 回で置き換える（テストで、<see cref="File.Replace(string, string, string)"/> が使えない場所を真似るのに差し替える）。</summary>
+        internal static Action<string, string> ReplaceFile = (source, destination) => File.Replace(source, destination, null);
+
         /// <summary>スロットを置くフォルダ。</summary>
         public static string Root => RootOverride ?? Path.Combine(Application.persistentDataPath, "VisualNodeEditor");
 
@@ -81,12 +84,20 @@ namespace Reiga.VisualNodeEditor
             File.WriteAllText(temporary, json);
 
             // 古いセーブを消してから移すと、その間に落ちた・移すのに失敗したときにスロットが無くなるので、1 回で置き換える
-            if (File.Exists(path))
+            if (!File.Exists(path))
             {
-                File.Replace(temporary, path, null);
+                File.Move(temporary, path);
+                return;
             }
-            else
+
+            try
             {
+                ReplaceFile(temporary, path);
+            }
+            catch (Exception exception) when (exception is IOException or PlatformNotSupportedException or UnauthorizedAccessException)
+            {
+                // File.Replace が使えない（対応しないファイルシステム・プラットフォーム）。消してから移す
+                File.Delete(path);
                 File.Move(temporary, path);
             }
         }
