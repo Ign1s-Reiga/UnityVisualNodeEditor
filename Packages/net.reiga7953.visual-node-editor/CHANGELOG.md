@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.0] - 2026-10-11
+- 追加: Event ノードの条件（Blackboard のパラメータとの比較。すべて満たすとき有効）。同じ名前の Event を条件違いで並べると、Raise で行き先を分けられる
+- 追加: Event ノードのトリガー Automatic。待機中に条件を満たしたら自分で進む（ノードに入った直後と、パラメータが変わったときに調べる）
+- 追加: 条件の検証（無いパラメータ・型に合わない比較・使われない条件・選ばれない自動の Event）、インスペクタの条件の一覧、ノードのサマリー行の条件、Now running で条件を満たさない Raise を薄く表示
+- 追加: セーブ・ロード（`GraphRunner.CaptureState` / `RestoreState`、`GraphSaveSlots`、`GraphRunnerBehaviour.SaveSlot` / `LoadSlot`、Graph Event Button の Save / Load、Now running の Save / Load）
+- 追加: Yarn Spinner 3.x 連携（任意。Yarn Spinner が入っているときだけコンパイル）: Dialogue ノード、Yarn Graph Bridge（`<<graph_event>>` / `<<graph_next>>`、オートセーブ）、Graph Variable Storage（Yarn の `$Name` は Blackboard の `Name`）、ADV Starter
+- 追加: MCP の `add_parameter`、Event の `trigger` / `conditions`、組み込み以外のノード型の値を読み書きする `fields`
+- 追加: アドオンのための拡張点（`NodeData.ContentTitle` / `GetIssues`、`IGraphIssueCheck`、`[EventName]`、`NodeBehaviourList` の公開、`GraphRunner.FindRunning` / `TryGetParameter`）
+
 ## [0.12.7] - 2026-10-10
 - 修正: `create_graph` が、Unity が読み込まない名前（`.` で始まる・`~` で終わる・`cvs`・`.tmp` で終わる）を、パスの最後のフォルダでしか、しかも `.` と `~` しか見ていなかった。途中のフォルダでは「更新して」と誤った案内をし、まだ無いフォルダは Unity が知らないまま作って失敗後も残すことがあった。パスのどこにあっても、何かを作る前に断る
 - 修正: `create_graph` の失敗の後片付けで、Unity がアセットを消すのに失敗すると、ディスクに残ったファイルも消さず、そのパスでのやり直しが断られ続けた。それぞれ別に行う
