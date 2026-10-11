@@ -491,8 +491,9 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
   4. どれもできなければ警告を出して留まる
   - そのときの Runner のノードが、その会話を始めた Dialogue ノードでなければ何もしない
 - Dialogue ノードから出たとき、まだ会話中なら止める（`Stop()`。`<<graph_event>>`・自動遷移・外からの Raise でノードを離れた場合）
-- Bridge が無効になったとき（GameObject を消した・ポーズで止めたなど）も会話を止める。止まった知らせはもう聞かないので、その会話は忘れる
-  （`DialogueFlow.Shutdown`。知らせを待つ状態のまま残すと、また有効になったときに次の会話を始められなくなる）
+- Bridge が無効になったとき（GameObject を消した・ポーズで止めたなど）も会話を止める。止まった知らせ（`onDialogueComplete`）は無効の間も聞き続け（外すのは Bridge を壊したとき）、
+  また有効になっても、その知らせが来るまでは次の会話を始めない（`DialogueFlow.Shutdown`。Yarn は止めた会話の後片付けが終わってから知らせるので、
+  その前に始めると、遅れて来た知らせを新しい会話の終わりと取り違えて次へ進んでしまう）。コマンドは無効の間は外す
 - Yarn のコマンド（Bridge が DialogueRunner に登録する）:
   - `<<graph_event 名前>>`: すぐ Raise する（演出の合図など。それで Dialogue ノードを離れれば会話は止まる）
   - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）

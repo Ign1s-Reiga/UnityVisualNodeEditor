@@ -203,9 +203,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         }
 
         [Test]
-        public void Shutdown_StopsTheDialogue_AndStartsAgainWithoutWaitingForTheStop()
+        public void Shutdown_StopsTheDialogue_AndWaitsForTheStopBeforeStartingAgain()
         {
-            // Bridge が無効になると、止まった知らせを聞かずに外れる。また有効になったら、その知らせを待たずに会話を始められる
+            // Bridge が無効になってすぐ有効になっても、止めた会話の知らせが来るまでは次を始めない（その知らせで次へ進めない）
             AtChapter();
 
             _flow.Shutdown();
@@ -213,7 +213,13 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
 
             _flow.Attach(_runner);
             _flow.Tick();
+            Assert.That(_player.Started, Is.EqualTo(new[] { "Chapter1" }), "waits until the old dialogue has stopped");
+
+            _flow.OnDialogueCompleted();
+            _flow.Tick();
+            Assert.That(_runner.Current, Is.SameAs(_chapter), "the stop does not move the graph");
             Assert.That(_player.Started, Is.EqualTo(new[] { "Chapter1", "Chapter1" }));
+            Assert.That(_player.StopCount, Is.EqualTo(1));
         }
 
         [Test]
