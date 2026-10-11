@@ -36,7 +36,10 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
         [SerializeField] private string _autoSaveSlot = string.Empty;
 
         private DialogueFlow _flow;
-        private DialogueRunner _hooked;
+
+        // onDialogueComplete を聞いている DialogueRunner（無効の間も聞き続ける）と、コマンドを登録している DialogueRunner（有効の間だけ）
+        private DialogueRunner _listening;
+        private DialogueRunner _commands;
 
         /// <summary>会話を流す Dialogue Runner。</summary>
         public DialogueRunner DialogueRunner => _dialogueRunner;
@@ -80,7 +83,8 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
 
             _flow ??= new DialogueFlow(new DialogueRunnerPlayer(_dialogueRunner));
             _flow.AutoSaveSlot = _autoSaveSlot;
-            Hook(_dialogueRunner);
+            Listen(_dialogueRunner);
+            AddCommands(_dialogueRunner);
             GraphRunner.Started += OnRunnerStarted;
             GraphRunner.Stopped += OnRunnerStopped;
             _flow.Attach(GraphRunner.FindRunning(_graph));
@@ -90,35 +94,56 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
         {
             GraphRunner.Started -= OnRunnerStarted;
             GraphRunner.Stopped -= OnRunnerStopped;
-            // 流している会話も止める。止まった知らせ（onDialogueComplete）はこの後外すので待たない
-            // （待つ状態のまま残すと、また有効になったときに次の会話を始められなくなる）
+            // 流している会話も止める。止まった知らせ（onDialogueComplete）は無効の間も聞き、また有効になってもそれが来るまで次の会話を始めない
             _flow?.Shutdown();
-            Unhook();
+            RemoveCommands();
         }
+
+        private void OnDestroy() => StopListening();
 
         private void Update() => _flow?.Tick();
 
-        private void Hook(DialogueRunner runner)
+        private void Listen(DialogueRunner runner)
         {
-            Unhook();
-            _hooked = runner;
-            runner.onDialogueComplete ??= new UnityEvent();
-            runner.onDialogueComplete.AddListener(OnDialogueComplete);
-            runner.AddCommandHandler(EventCommand, (Action<string>)OnEventCommand);
-            runner.AddCommandHandler(NextCommand, (Action<string>)OnNextCommand);
-        }
-
-        private void Unhook()
-        {
-            if (_hooked == null)
+            if (_listening == runner)
             {
                 return;
             }
 
-            _hooked.onDialogueComplete?.RemoveListener(OnDialogueComplete);
-            _hooked.RemoveCommandHandler(EventCommand);
-            _hooked.RemoveCommandHandler(NextCommand);
-            _hooked = null;
+            StopListening();
+            _listening = runner;
+            runner.onDialogueComplete ??= new UnityEvent();
+            runner.onDialogueComplete.AddListener(OnDialogueComplete);
+        }
+
+        private void StopListening()
+        {
+            if (_listening != null)
+            {
+                _listening.onDialogueComplete?.RemoveListener(OnDialogueComplete);
+            }
+
+            _listening = null;
+        }
+
+        private void AddCommands(DialogueRunner runner)
+        {
+            RemoveCommands();
+            _commands = runner;
+            runner.AddCommandHandler(EventCommand, (Action<string>)OnEventCommand);
+            runner.AddCommandHandler(NextCommand, (Action<string>)OnNextCommand);
+        }
+
+        private void RemoveCommands()
+        {
+            if (_commands == null)
+            {
+                return;
+            }
+
+            _commands.RemoveCommandHandler(EventCommand);
+            _commands.RemoveCommandHandler(NextCommand);
+            _commands = null;
         }
 
         private void OnRunnerStarted(GraphRunner runner)
