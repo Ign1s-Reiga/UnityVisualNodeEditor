@@ -216,15 +216,50 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void ATemporaryFileCutOffMidWrite_IsNotASave()
+        public void ATemporaryFileCutOffMidWrite_IsNotASave_AndDeleteRemovesIt()
         {
-            // 書いている途中で落ちた一時ファイルは読めないので、スロットとしては扱わない
+            // 書いている途中で落ちた一時ファイルは読めないので、スロットとしては扱わない。それでも Delete は消す
             var path = GraphSaveSlots.GetPath(_graph, "slot1");
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             File.WriteAllText(path + ".tmp", "{\"_version\":1,\"_nod");
 
             Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.False);
             Assert.That(GraphSaveSlots.Read(_graph, "slot1"), Is.Null);
+
+            Assert.That(GraphSaveSlots.Delete(_graph, "slot1"), Is.False, "there was no save");
+            Assert.That(File.Exists(path + ".tmp"), Is.False);
+        }
+
+        [Test]
+        public void ASaveKeptInTheTemporaryFile_IsMovedIntoTheSlotBeforeTheNextSave()
+        {
+            // 前の保存の失敗で、セーブの唯一の写しが .tmp に残っている（スロットのファイルは無い）
+            _runner.Raise("Start");
+            GraphSaveSlots.Save(_runner, "slot1");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            File.Move(path, path + ".tmp");
+
+            // 次の保存が失敗しても、その写しは消えない（上書きする前にスロットへ移す）
+            _runner.SetInt("Score", 9);
+            WithReplaceFile((_, _) => throw new UnauthorizedAccessException("Access denied."), () =>
+                Assert.Throws<UnauthorizedAccessException>(() => GraphSaveSlots.Save(_runner, "slot1")));
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").Parameters[0].Value, Is.EqualTo(0), "the kept save, not the failed one");
+            Assert.That(FilesInSlotFolder(), Is.EqualTo(new[] { "slot1.json" }));
+        }
+
+        [Test]
+        public void ANewerTemporaryFile_WinsOverAnOlderBackup()
+        {
+            // 古いセーブを .bak に退けた後、新しいセーブを移すのにも、古いセーブを戻すのにも失敗した。新しいほう（.tmp）を読む
+            GraphSaveSlots.Save(_runner, "slot1");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            File.Move(path, path + ".bak");
+            _runner.Raise("Start");
+            GraphSaveSlots.Save(_runner, "slot1");
+            File.Move(path, path + ".tmp");
+
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
         }
 
         private static void WithReplaceFile(Action<string, string> replace, Action action)
