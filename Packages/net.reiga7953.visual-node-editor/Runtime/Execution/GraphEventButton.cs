@@ -23,6 +23,7 @@ namespace Reiga.VisualNodeEditor
     public sealed class GraphEventButton : MonoBehaviour
     {
         private const string ClickEventName = "onClick";
+        private const string InteractableName = "interactable";
 
         [Tooltip("このグラフを実行中の Graph Runner へ送る。空なら、実行中のどれか 1 つへ送る。")]
         [SerializeField] private NodeGraphAsset _graph;
@@ -38,6 +39,9 @@ namespace Reiga.VisualNodeEditor
 
         [Tooltip("同じ GameObject のボタン（onClick を持つコンポーネント）が押されたら送る。")]
         [SerializeField] private bool _sendOnClick = true;
+
+        [Tooltip("Load のとき、スロットにセーブが無ければ、同じ GameObject のボタン（interactable を持つコンポーネント）を押せないようにする。")]
+        [SerializeField] private bool _disableWithoutSave = true;
 
         private UnityEvent _clickEvent;
 
@@ -77,6 +81,63 @@ namespace Reiga.VisualNodeEditor
         {
             get => _sendOnClick;
             set => _sendOnClick = value;
+        }
+
+        /// <summary>Load のとき、スロットにセーブが無ければボタンを押せないようにするか（<see cref="RefreshInteractable"/>）。</summary>
+        public bool DisableWithoutSave
+        {
+            get => _disableWithoutSave;
+            set => _disableWithoutSave = value;
+        }
+
+        /// <summary>
+        /// Load のボタンを、スロットにセーブがあるときだけ押せるようにする（<see cref="DisableWithoutSave"/> で Load のときだけ。有効になったときにも呼ばれる）。
+        /// 同じ GameObject の、public な bool の <c>interactable</c> プロパティを持つコンポーネント（uGUI の Button など）を名前で探して変える。
+        /// グラフが空で実行中の Runner も無いと、どのグラフのセーブか分からないので変えない。ゲームでセーブを消したときなどに呼び直す。
+        /// </summary>
+        public void RefreshInteractable()
+        {
+            if (!_disableWithoutSave || _action != GraphEventButtonAction.Load)
+            {
+                return;
+            }
+
+            var graph = _graph != null ? _graph : FindRunner(null)?.Graph;
+            if (graph == null)
+            {
+                return;
+            }
+
+            SetInteractable(gameObject, GraphSaveSlots.Exists(graph, _slot));
+        }
+
+        /// <summary>
+        /// <paramref name="gameObject"/> の、public な bool の <c>interactable</c> プロパティを持つ最初のコンポーネントに値を入れる。あれば true。
+        /// パッケージを uGUI に依存させないため、<c>onClick</c> と同じく型ではなく名前で探す。
+        /// </summary>
+        internal static bool SetInteractable(GameObject gameObject, bool value)
+        {
+            if (gameObject == null)
+            {
+                return false;
+            }
+
+            foreach (var component in gameObject.GetComponents<Component>())
+            {
+                if (component == null || component is GraphEventButton)
+                {
+                    continue;
+                }
+
+                var property = component.GetType().GetProperty(InteractableName, BindingFlags.Public | BindingFlags.Instance);
+                if (property != null && property.PropertyType == typeof(bool) && property.CanWrite && property.GetIndexParameters().Length == 0)
+                {
+                    property.SetValue(component, value);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>実行中の Runner へ送る。UnityEvent（Button の OnClick など）から直接呼べる。</summary>
@@ -197,7 +258,11 @@ namespace Reiga.VisualNodeEditor
             return field != null ? field.GetValue(source) as UnityEvent : null;
         }
 
-        private void OnEnable() => HookClick(FindClickEvent(gameObject));
+        private void OnEnable()
+        {
+            HookClick(FindClickEvent(gameObject));
+            RefreshInteractable();
+        }
 
         private void OnDisable() => UnhookClick();
 

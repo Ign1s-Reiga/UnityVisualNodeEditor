@@ -20,6 +20,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         internal const string EventNamePropertyName = "_eventName";
         internal const string SendOnClickPropertyName = "_sendOnClick";
         internal const string SlotPropertyName = "_slot";
+        internal const string DisableWithoutSavePropertyName = "_disableWithoutSave";
 
         private const string StyleSheetPath = "VisualNodeEditor/GraphEventButtonInspector";
 
@@ -70,6 +71,13 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 var slot = new PropertyField(serializedObject.FindProperty(SlotPropertyName), "Slot");
                 slot.Bind(serializedObject);
                 _eventField.Add(slot);
+                if (action == GraphEventButtonAction.Load)
+                {
+                    var disable = new PropertyField(serializedObject.FindProperty(DisableWithoutSavePropertyName), "Disable Without Save");
+                    disable.Bind(serializedObject);
+                    _eventField.Add(disable);
+                }
+
                 return;
             }
 
