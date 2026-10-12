@@ -350,6 +350,7 @@ Runner が後から始まっても（シーンを読み込むと、ボタンな�
   パッケージを uGUI に依存させないため、`GraphEventButton` の `onClick` と同じく型ではなく名前で探す
 - 書式は `string.Format`（`CultureInfo.InvariantCulture`。`{0}` が値。`{0:0.0}` なども使える）。書式が誤っていれば値だけを出し、1 度だけ警告を出す
 - 書き換えるのは、有効になったとき・そのパラメータが変わったとき（`ParameterChanged`）・Runner が始まったとき。Runner が無ければ書き換えない（シーンに置いた文字のまま）
+- 値を読んでいる Runner が止まったら（`Stopped`）、ほかの実行中の Runner を探し直す。無ければ止まった Runner から外れ（参照を持ち続けない）、文字はそのまま
 
 `GraphEventKey`:
 - グラフは任意（空なら実行中のどれか）、キー（`KeyCode`）、操作（`GraphEventKeyAction`: Raise / Advance）、イベント名（Graph Event Button と同じドロップダウン）

@@ -131,11 +131,12 @@ namespace Reiga.VisualNodeEditor
 
         private void OnDisable() => Disable();
 
-        /// <summary>有効になったとき: Runner の開始とパラメータの変化を聞き、テキストを書き換える（テストからも呼ぶ）。</summary>
+        /// <summary>有効になったとき: Runner の開始・停止とパラメータの変化を聞き、テキストを書き換える（テストからも呼ぶ）。</summary>
         internal void Enable()
         {
             _listening = true;
             GraphRunner.Started += OnRunnerStarted;
+            GraphRunner.Stopped += OnRunnerStopped;
             Refresh();
         }
 
@@ -144,7 +145,17 @@ namespace Reiga.VisualNodeEditor
         {
             _listening = false;
             GraphRunner.Started -= OnRunnerStarted;
+            GraphRunner.Stopped -= OnRunnerStopped;
             SetRunner(null);
+        }
+
+        // 値を読んでいる Runner が止まったら、ほかの実行中の Runner を探し直す（無ければ外れて、止まった Runner を持ち続けない。文字はそのまま）
+        private void OnRunnerStopped(GraphRunner runner)
+        {
+            if (runner == _runner)
+            {
+                Refresh();
+            }
         }
 
         private void OnRunnerStarted(GraphRunner runner)
