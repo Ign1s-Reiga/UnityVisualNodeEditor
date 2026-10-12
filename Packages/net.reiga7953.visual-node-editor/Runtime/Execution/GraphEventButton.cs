@@ -45,22 +45,35 @@ namespace Reiga.VisualNodeEditor
 
         private UnityEvent _clickEvent;
 
-        // クリックを繋いだコンポーネント（onClick を持つもの。押せる・押せないもこれを変える）と、セーブが無いので押せないようにしたか
+        // クリックを繋いだコンポーネント（onClick を持つもの。押せる・押せないもこれを変える）
         private Component _clickSource;
-        private bool _disabledWithoutSave;
+
+        // セーブが無いので押せないようにしたコンポーネント。戻すのはこれだけ（選び直すと、ほかで押せないようにしたものを点けることがある）
+        private Component _disabledTarget;
+
+        // Enable から Disable までの間（セーブの知らせを聞いている）。この間に設定を変えたら、押せるかを直す
+        private bool _listening;
 
         /// <summary>送り先のグラフ。null なら実行中のどれか 1 つ。</summary>
         public NodeGraphAsset Graph
         {
             get => _graph;
-            set => _graph = value;
+            set
+            {
+                _graph = value;
+                RefreshIfListening();
+            }
         }
 
         /// <summary>送る操作。</summary>
         public GraphEventButtonAction Action
         {
             get => _action;
-            set => _action = value;
+            set
+            {
+                _action = value;
+                RefreshIfListening();
+            }
         }
 
         /// <summary>Raise するイベント名。</summary>
@@ -77,7 +90,11 @@ namespace Reiga.VisualNodeEditor
         public string Slot
         {
             get => _slot;
-            set => _slot = value ?? string.Empty;
+            set
+            {
+                _slot = value ?? string.Empty;
+                RefreshIfListening();
+            }
         }
 
         /// <summary>同じ GameObject のボタンのクリックで送るか。</summary>
@@ -91,38 +108,63 @@ namespace Reiga.VisualNodeEditor
         public bool DisableWithoutSave
         {
             get => _disableWithoutSave;
-            set => _disableWithoutSave = value;
+            set
+            {
+                _disableWithoutSave = value;
+                RefreshIfListening();
+            }
         }
 
         /// <summary>
         /// Load のボタンを、スロットから再開できる（<see cref="GraphSaveSlots.CanLoad"/>）ときだけ押せるようにする（<see cref="DisableWithoutSave"/> で Load のときだけ）。
-        /// 有効になったとき、スロットに保存した・消したとき（<see cref="GraphSaveSlots.SlotChanged"/>）、グラフが空なら Runner が始まったときにも呼ばれる。
+        /// 有効になったとき、スロットに保存した・消したとき（<see cref="GraphSaveSlots.SlotChanged"/>）、グラフが空なら Runner が始まったとき、
+        /// 有効な間にグラフ・操作・スロット・<see cref="DisableWithoutSave"/> を変えたときにも呼ばれる。
         /// 変えるのは、クリックを繋いだコンポーネント（無ければ同じ GameObject の、public な bool の <c>interactable</c> を持つ最初のもの。uGUI の Button など）。
-        /// 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたときだけ（作者やほかのスクリプトが押せないようにしたボタンは点けない）。
+        /// 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたコンポーネントだけ（作者やほかのスクリプトが押せないようにしたボタンは点けない）。
+        /// セーブができたときのほか、<see cref="DisableWithoutSave"/> を切った・Load 以外の操作にした・このコンポーネントが無効になったときにも戻す。
         /// グラフが空で実行中の Runner も無いと、どのグラフのセーブか分からないので押せないようにはしない。
         /// </summary>
         public void RefreshInteractable()
         {
-            var target = ChooseInteractableTarget(_clickSource, gameObject);
-            if (target == null)
+            // Load で DisableWithoutSave のボタンだけが確かめる（ほかのボタンは、セーブの知らせのたびにコンポーネントを探したり、ファイルを読んだりしない）
+            if (!_disableWithoutSave || _action != GraphEventButtonAction.Load)
             {
+                RestoreInteractable();
                 return;
             }
 
             var graph = _graph != null ? _graph : FindRunner(null)?.Graph;
-            var disable = _disableWithoutSave && _action == GraphEventButtonAction.Load && graph != null && !GraphSaveSlots.CanLoad(graph, _slot);
-            if (disable)
+            if (graph == null || GraphSaveSlots.CanLoad(graph, _slot))
             {
-                if (GetInteractable(target))
-                {
-                    SetInteractable(target, false);
-                    _disabledWithoutSave = true;
-                }
+                RestoreInteractable();
+                return;
             }
-            else if (_disabledWithoutSave)
+
+            var target = _disabledTarget != null ? _disabledTarget : ChooseInteractableTarget(_clickSource, gameObject);
+            if (target != null && GetInteractable(target))
+            {
+                SetInteractable(target, false);
+                _disabledTarget = target;
+            }
+        }
+
+        // 自分が押せないようにしたコンポーネントを押せるように戻す（無い・壊れていれば何もしない）
+        private void RestoreInteractable()
+        {
+            var target = _disabledTarget;
+            _disabledTarget = null;
+            if (target != null)
             {
                 SetInteractable(target, true);
-                _disabledWithoutSave = false;
+            }
+        }
+
+        // 有効な間に、押せるかに関わる設定が変わったら確かめ直す（無効な間は、有効になったときに確かめる）
+        private void RefreshIfListening()
+        {
+            if (_listening)
+            {
+                RefreshInteractable();
             }
         }
 
@@ -276,21 +318,28 @@ namespace Reiga.VisualNodeEditor
             HookClick(FindClickEventOn(_clickSource));
             GraphSaveSlots.SlotChanged += OnSlotChanged;
             GraphRunner.Started += OnRunnerStarted;
+            _listening = true;
             RefreshInteractable();
         }
 
-        /// <summary>無効になったとき: <see cref="Enable"/> で繋いだものを外す。</summary>
+        /// <summary>
+        /// 無効になったとき（GameObject を隠した・壊したときも）: <see cref="Enable"/> で繋いだものを外し、押せないようにしたボタンを戻す
+        /// （知らせを聞かなくなるので、押せないままにしない。有効になれば確かめ直す）。
+        /// </summary>
         internal void Disable()
         {
+            _listening = false;
             GraphSaveSlots.SlotChanged -= OnSlotChanged;
             GraphRunner.Started -= OnRunnerStarted;
             UnhookClick();
+            RestoreInteractable();
         }
 
-        // 同じ名前のスロットに保存した・消したら（ほかのボタンや、ゲームのコードから）、押せるかを直す
+        // 同じ名前のスロットに保存した・消したら（ほかのボタンや、ゲームのコードから）、押せるかを直す。
+        // 大文字・小文字だけが違う名前も同じファイルのことがある（Windows・macOS）。確かめ直すだけなので、別のファイルでも害は無い
         private void OnSlotChanged(NodeGraphAsset graph, string slot)
         {
-            if (slot == _slot)
+            if (string.Equals(slot, _slot, StringComparison.OrdinalIgnoreCase))
             {
                 RefreshInteractable();
             }

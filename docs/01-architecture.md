@@ -462,10 +462,13 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 - `GraphEventButton`: 操作に `Save` / `Load` を足す（スロット名の欄。既定 `slot1`）。タイトル画面の「続きから」、ゲーム中の「セーブ」をコード無しで置ける
   - Load のボタンは、スロットから再開できるとき（`GraphSaveSlots.CanLoad`: セーブがあり、読めて、保存したノードがグラフにある）だけ押せる（`Disable Without Save`、既定 on）。
     確かめるのは、有効になったとき・スロットに保存した・消したとき（`GraphSaveSlots.SlotChanged`。ほかのボタンやゲームのコードからでも）・グラフが空なら Runner が始まったとき
-    （シーンを読み込むと Runner が始まるより先にボタンが有効になる）・`RefreshInteractable()` を呼んだとき
+    （シーンを読み込むと Runner が始まるより先にボタンが有効になる）・有効な間に Graph / Action / Slot / Disable Without Save を変えたとき・`RefreshInteractable()` を呼んだとき。
+    スロット名は大文字・小文字を区別せずに比べる（Windows・macOS では `Slot1` と `slot1` は同じファイル。確かめ直すだけなので、区別するファイルシステムでも害は無い）。
+    Load で Disable Without Save のボタンだけが確かめる（ほかのボタンは、セーブの知らせのたびにコンポーネントを探したり、ファイルを読んだりしない）
   - 変えるのは、クリックを繋いだコンポーネント（`onClick` を持つもの。無ければ同じ GameObject の bool の `interactable` を持つ最初のもの）の `interactable`。
     パッケージを uGUI に依存させないため、`onClick` と同じく型ではなく名前で探す（同じ GameObject の CanvasGroup を変えないように、クリックを繋いだものを先に選ぶ）
-  - 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたときだけ（作者やほかのスクリプトが押せないようにしたボタンは点けない）。
+  - 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたコンポーネントだけ（覚えておく。選び直すと、作者やほかのスクリプトが押せないようにしたものを点けることがある）。
+    セーブができたときのほか、Disable Without Save を切った・Load 以外の操作にした・Graph Event Button が無効になった（GameObject を隠した・壊したときも。有効になれば確かめ直す）ときにも戻す。
     グラフが空で実行中の Runner も無ければ、どのグラフのセーブか分からないので押せないようにはしない
 - スロット名は英数字・空白・'-'・'_' だけで、Windows が装置の名前として予約している CON・PRN・AUX・NUL・COM0〜9・LPT0〜9 は使えない（`.json` を付けても作れないため。インスペクタで注意を出す）
 - Now running パネルに Save / Load のボタン（スロット `debug`）を出し、Play 中にセーブ・ロードを試せるようにする

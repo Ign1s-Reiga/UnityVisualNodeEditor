@@ -492,6 +492,92 @@ namespace Reiga.VisualNodeEditor.Tests
             }
         }
 
+        [Test]
+        public void LoadButton_HearsSavesToTheSlotNameInAnotherCase()
+        {
+            // Windows・macOS のファイル名は大文字・小文字を区別しないので、"SLOT1" への保存は "slot1" のセーブでもある
+            WithLoadButton(_graph, (button, clickable) =>
+            {
+                GraphSaveSlots.Save(_runner, "SLOT1");
+
+                Assert.That(clickable.interactable, Is.EqualTo(GraphSaveSlots.CanLoad(_graph, "slot1")));
+            });
+        }
+
+        [Test]
+        public void LoadButton_GivesBackOnlyTheComponentItDisabled()
+        {
+            // 押せないようにしたコンポーネントが別のもの（ほかで押せないようにしたもの）に替わった後で、セーブができた。替わったほうを点けない
+            var gameObject = new GameObject("Continue");
+            GraphEventButton button = null;
+            try
+            {
+                var first = gameObject.AddComponent<CanvasGroup>();
+                button = gameObject.AddComponent<GraphEventButton>();
+                button.Graph = _graph;
+                button.Action = GraphEventButtonAction.Load;
+                button.Slot = "slot1";
+                button.Enable();
+                Assert.That(first.interactable, Is.False);
+
+                Object.DestroyImmediate(first);
+                var second = gameObject.AddComponent<CanvasGroup>();
+                second.interactable = false;
+                GraphSaveSlots.Save(_runner, "slot1");
+
+                Assert.That(second.interactable, Is.False);
+            }
+            finally
+            {
+                if (button != null)
+                {
+                    button.Disable();
+                }
+
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void LoadButton_GivesTheButtonBack_WhenItNoLongerChecksTheSlot()
+        {
+            // 押せないようにした後で、確かめるのをやめたら（設定を変えた・無効になった）、押せないままにしない
+            WithLoadButton(_graph, (button, clickable) =>
+            {
+                Assert.That(clickable.interactable, Is.False);
+
+                button.DisableWithoutSave = false;
+                Assert.That(clickable.interactable, Is.True, "Disable Without Save turned off");
+                button.DisableWithoutSave = true;
+                Assert.That(clickable.interactable, Is.False);
+
+                button.Action = GraphEventButtonAction.Raise;
+                Assert.That(clickable.interactable, Is.True, "no longer a Load button");
+                button.Action = GraphEventButtonAction.Load;
+                Assert.That(clickable.interactable, Is.False);
+
+                button.Disable();
+                Assert.That(clickable.interactable, Is.True, "the Graph Event Button was disabled");
+                button.Enable();
+                Assert.That(clickable.interactable, Is.False, "checked again once enabled");
+            });
+        }
+
+        [Test]
+        public void LoadButton_ChecksTheNewSlot_WhenTheSlotChanges()
+        {
+            GraphSaveSlots.Save(_runner, "slot2");
+            WithLoadButton(_graph, (button, clickable) =>
+            {
+                Assert.That(clickable.interactable, Is.False);
+
+                button.Slot = "slot2";
+                Assert.That(clickable.interactable, Is.True);
+                button.Slot = "slot1";
+                Assert.That(clickable.interactable, Is.False);
+            });
+        }
+
         // 有効にした Load のボタン（スロット slot1）で確かめる。CanvasGroup は uGUI の Button と同じく interactable を持つ（名前で探す）
         private static void WithLoadButton(NodeGraphAsset graph, Action<GraphEventButton, CanvasGroup> check)
         {
