@@ -46,8 +46,19 @@ namespace Reiga.VisualNodeEditor.Tests
             GraphSaveKeySync.CheckAll();
 
             Assert.That(original.SaveKey, Is.EqualTo(key), "the first by name keeps the key");
-            Assert.That(copy.SaveKey, Is.Not.Empty.And.Not.EqualTo(key));
+            Assert.That(copy.SaveKey, Is.EqualTo(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(copy))), "the copy's new key is its GUID");
             Assert.That(EditorUtility.IsDirty(copy), Is.False, "the new key is saved");
+        }
+
+        [Test]
+        public void CheckAll_DoesNothing_InsideWithoutFixing()
+        {
+            // 何もしなかったときは、エディタを開いたときの確かめを済んだことにしない（CheckAll の戻り値）
+            var ran = true;
+            GraphSaveKeySync.WithoutFixing(() => ran = GraphSaveKeySync.CheckAll());
+
+            Assert.That(ran, Is.False);
+            Assert.That(GraphSaveKeySync.CheckAll(), Is.True);
         }
 
         // Unity の複製は "Main 1"・"Stage 9" の次の "Stage 10"。文字の順では、どちらも複製のほうが先になる

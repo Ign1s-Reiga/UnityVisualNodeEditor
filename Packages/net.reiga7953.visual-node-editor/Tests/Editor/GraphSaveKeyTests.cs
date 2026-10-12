@@ -104,12 +104,16 @@ namespace Reiga.VisualNodeEditor.Tests
             try
             {
                 var taken = new HashSet<string>();
-                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, out _), Is.False, "a graph without a key is left alone");
+                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, "guid", out _), Is.False, "a graph without a key is left alone");
 
                 graph.SaveKey = "same";
-                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, out _), Is.False, "first one keeps its key");
-                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, out _), Is.True, "a second graph with the same key gets a new one");
-                Assert.That(graph.SaveKey, Is.Not.EqualTo("same"));
+                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, "guid", out _), Is.False, "first one keeps its key");
+                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, "guid", out _), Is.True, "a second graph with the same key gets a new one");
+                Assert.That(graph.SaveKey, Is.EqualTo("guid"), "the new key is the asset's GUID, the same in every build");
+
+                graph.SaveKey = "same";
+                Assert.That(GraphSaveKeySync.MakeUnique(graph, taken, "guid", out _), Is.True);
+                Assert.That(graph.SaveKey, Is.Not.EqualTo("same").And.Not.EqualTo("guid"), "a taken GUID falls back to a random ID");
             }
             finally
             {
@@ -131,6 +135,7 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(keyedPath).SaveKey, Is.EqualTo(key), "the original keeps its key");
             var copyKey = AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(copyPath).SaveKey;
             Assert.That(copyKey, Is.Not.Empty.And.Not.EqualTo(key), "a copy does not share the original's slots");
+            Assert.That(copyKey, Is.EqualTo(AssetDatabase.AssetPathToGUID(copyPath)), "the copy's new key is its GUID");
             Assert.That(AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(oldPath).SaveKey, Is.Empty, "graphs without a key are not rewritten");
         }
 

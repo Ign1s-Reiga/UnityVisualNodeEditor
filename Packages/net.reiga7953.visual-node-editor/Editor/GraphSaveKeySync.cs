@@ -10,7 +10,8 @@ namespace Reiga.VisualNodeEditor.Editor
     /// <summary>
     /// グラフのセーブキー（<see cref="NodeGraphAsset.SaveKey"/>）が、別のグラフと重ならないようにする。
     /// 新しいグラフは作るときにキーを持つ（<see cref="NodeGraphFactory.CreateNew"/>）。アセットを複製すると同じキーを持つので、
-    /// 読み込まれたグラフのキーが別のグラフと同じなら、新しいキーに入れ直して保存する。
+    /// 読み込まれたグラフのキーが別のグラフと同じなら、そのアセットの GUID に入れ直して保存する
+    /// （ランダムな ID にすると、保存しないバッチモードのビルドでビルドのたびにキーが変わり、プレイヤーのセーブが見えなくなる）。
     /// どのグラフがキーを残すかは、読み込まれていないグラフ → アセットの GUID と同じキーを持つグラフ（0.13.1 で入れたキー）→
     /// ファイル名の自然な順（Unity の複製は "Main 1"・"Stage 10" のように番号を付けるので、元のグラフが先）→ パスの順。
     /// キーを持たないグラフ（0.13.0 までに作ったもの）は書き換えない（クローン・再インポート・CI でアセットが変わらないように）。
@@ -33,16 +34,17 @@ namespace Reiga.VisualNodeEditor.Editor
         /// <summary>新しいセーブキー。</summary>
         internal static string NewKey() => Guid.NewGuid().ToString("N");
 
-        /// <summary>全部のグラフで、キーの重なりを直す。</summary>
-        internal static void CheckAll()
+        /// <summary>全部のグラフで、キーの重なりを直す。<see cref="WithoutFixing"/> の中なら何もせず false。</summary>
+        internal static bool CheckAll()
         {
             if (_suspended > 0)
             {
-                return;
+                return false;
             }
 
             _keys = null;
             Resolve(FindAllGraphs(), true);
+            return true;
         }
 
         /// <summary><paramref name="action"/> の間だけ、重なったキーを入れ直さない（テストで、重なったキーをディスクに作るときに使う）。</summary>
@@ -69,11 +71,23 @@ namespace Reiga.VisualNodeEditor.Editor
                 return;
             }
 
-            // 印は確かめてから付ける（その前にスクリプトの再読み込みが起きると delayCall が消えるので、次の読み込みでもう一度頼む）
+            // 印は確かめてから付ける（その前にスクリプトの再読み込みが起きると delayCall が消えるので、次の読み込みでもう一度頼む）。
+            // 確かめるのに失敗しても付ける（失敗するたびに、再読み込みのたびに全部のグラフを読み直さないように）。
+            // WithoutFixing の中で何もしなかったときだけは付けない（次の再読み込みで確かめる）
             EditorApplication.delayCall += () =>
             {
-                CheckAll();
-                SessionState.SetBool(CheckedKey, true);
+                var skipped = false;
+                try
+                {
+                    skipped = !CheckAll();
+                }
+                finally
+                {
+                    if (!skipped)
+                    {
+                        SessionState.SetBool(CheckedKey, true);
+                    }
+                }
             };
         }
 
@@ -122,7 +136,7 @@ namespace Reiga.VisualNodeEditor.Editor
                 .ToList();
             foreach (var (path, graph) in graphs)
             {
-                if (_suspended == 0 && MakeUnique(graph, taken, out var shouldSave) && shouldSave && save)
+                if (_suspended == 0 && MakeUnique(graph, taken, AssetDatabase.AssetPathToGUID(path), out var shouldSave) && shouldSave && save)
                 {
                     AssetDatabase.SaveAssetIfDirty(graph);
                 }
@@ -140,9 +154,10 @@ namespace Reiga.VisualNodeEditor.Editor
 
         /// <summary>
         /// <paramref name="graph"/> のキーが <paramref name="taken"/> にあれば、新しいキーに入れ直して true。どちらにしてもグラフのキーを <paramref name="taken"/> に足す。
+        /// 新しいキーは <paramref name="preferredKey"/>（アセットの GUID。どの環境でも同じキーになる）。空か使われていればランダムな ID。
         /// キーを持たないグラフは何もしない。もともと未保存の変更があったグラフなら <paramref name="shouldSave"/> を false にする（保存はユーザーに任せる）。
         /// </summary>
-        internal static bool MakeUnique(NodeGraphAsset graph, ISet<string> taken, out bool shouldSave)
+        internal static bool MakeUnique(NodeGraphAsset graph, ISet<string> taken, string preferredKey, out bool shouldSave)
         {
             shouldSave = false;
             if (graph == null || graph.SaveKey.Length == 0)
@@ -156,7 +171,7 @@ namespace Reiga.VisualNodeEditor.Editor
             }
 
             shouldSave = !EditorUtility.IsDirty(graph);
-            graph.SaveKey = NewKey();
+            graph.SaveKey = !string.IsNullOrEmpty(preferredKey) && !taken.Contains(preferredKey) ? preferredKey : NewKey();
             taken.Add(graph.SaveKey);
             EditorUtility.SetDirty(graph);
             return true;
