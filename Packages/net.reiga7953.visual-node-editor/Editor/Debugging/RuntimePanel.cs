@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEngine.UIElements;
@@ -54,18 +56,21 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             saveRow.Add(_loadButton);
             Add(saveRow);
 
-            // 押す前に確かめ直す（同じノードにいる間にゲーム側が保存・削除したスロットも、ボタンに出す）
-            RegisterCallback<MouseEnterEvent>(_ => CheckDebugSlot());
+            // ゲーム側のセーブ・オートセーブでできた・消えたスロットも、ノードを移らないうちにボタンに出す（パネルを出している間だけ動く）
+            schedule.Execute(CheckDebugSlot).Every(DebugSlotCheckInterval);
         }
 
         /// <summary>Play 中に試すセーブのスロット名。</summary>
         internal const string DebugSlot = "debug";
 
+        // スロット debug を確かめ直す間隔（ミリ秒）
+        private const long DebugSlotCheckInterval = 1000;
+
         private readonly Button _saveButton;
         private readonly Button _loadButton;
 
-        // スロット debug にセーブがあるか（表示し直すたびにディスクを見ないよう、Runner を変えたとき・ノードに入ったとき（同じノードへ入り直したときも）・
-        // パネルにマウスが入ったとき・セーブしたときだけ確かめる。ゲーム側のセーブ・オートセーブでできた・消えたスロットも、押す前にボタンに出る）
+        // スロット debug にセーブがあるか（表示し直すたび・ノードに入るたびにディスクを見ないよう、Runner を変えたとき・セーブしたときと、
+        // パネルを出している間は 1 秒ごとに確かめる）
         private bool _debugSlotExists;
 
         // 値の変化での表示し直しを、次の更新まで 1 回にまとめているか
@@ -73,12 +78,23 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
 
         private void SaveDebugSlot()
         {
-            if (_runner != null && _runner.IsRunning)
+            if (_runner == null || !_runner.IsRunning)
+            {
+                return;
+            }
+
+            try
             {
                 GraphSaveSlots.Save(_runner, DebugSlot);
                 _debugSlotExists = true;
-                Refresh();
             }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // ほかのプロセスがスロットを開いているなど（古いセーブはそのまま残る）
+                UnityEngine.Debug.LogWarning($"[VisualNodeEditor] Could not save to slot '{DebugSlot}': {exception.Message}");
+            }
+
+            Refresh();
         }
 
         private void LoadDebugSlot()
@@ -115,26 +131,22 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             if (_runner != null)
             {
                 _runner.ParameterChanged -= OnParameterChanged;
-                _runner.NodeEntered -= OnNodeEntered;
             }
 
             _runner = runner;
             if (_runner != null)
             {
                 _runner.ParameterChanged += OnParameterChanged;
-                _runner.NodeEntered += OnNodeEntered;
             }
 
             CheckDebugSlot();
             Refresh();
         }
 
-        private void OnNodeEntered(NodeData node) => CheckDebugSlot();
-
-        /// <summary>スロット debug にセーブがあるか確かめ直し、Load のボタンに出す。</summary>
+        /// <summary>スロット debug にセーブがあるか確かめ直し、Load のボタンに出す（Runner が動いていなければ見ない）。</summary>
         internal void CheckDebugSlot()
         {
-            _debugSlotExists = _runner != null && GraphSaveSlots.Exists(_runner.Graph, DebugSlot);
+            _debugSlotExists = _runner != null && _runner.IsRunning && GraphSaveSlots.Exists(_runner.Graph, DebugSlot);
             _loadButton.SetEnabled(_debugSlotExists);
         }
 
