@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -127,14 +126,7 @@ namespace Reiga.VisualNodeEditor
         public void RefreshInteractable()
         {
             // Load で DisableWithoutSave のボタンだけが確かめる（ほかのボタンは、セーブの知らせのたびにコンポーネントを探したり、ファイルを読んだりしない）
-            if (!_disableWithoutSave || _action != GraphEventButtonAction.Load)
-            {
-                RestoreInteractable();
-                return;
-            }
-
-            var graph = _graph != null ? _graph : FindRunner(null)?.Graph;
-            if (graph == null || GraphSaveSlots.CanLoad(graph, _slot))
+            if (!GraphEventSender.ShouldDisableLoad(_graph, _action, _slot, _disableWithoutSave))
             {
                 RestoreInteractable();
                 return;
@@ -209,66 +201,7 @@ namespace Reiga.VisualNodeEditor
         /// 実行中の Runner へ送る。遷移した（または通知の後で遷移する）、保存した、ロードしたなら true。
         /// Runner が見つからない・その名前の遷移が今のノードから無い・スロットが無ければ false を返し、開発ビルドでは警告を出す。
         /// </summary>
-        public bool TrySend()
-        {
-            var runner = FindRunner(_graph);
-            if (runner == null)
-            {
-                Warn(_graph != null
-                    ? $"No Graph Runner is running '{_graph.name}', so '{name}' did nothing."
-                    : $"No Graph Runner is running, so '{name}' did nothing.");
-                return false;
-            }
-
-            if (_action == GraphEventButtonAction.Save || _action == GraphEventButtonAction.Load)
-            {
-                return SendSlot(runner);
-            }
-
-            var moved = _action == GraphEventButtonAction.Advance ? runner.Advance() : runner.Raise(_eventName);
-            if (!moved)
-            {
-                Warn(_action == GraphEventButtonAction.Advance
-                    ? $"'{name}': there is nothing to advance to from '{runner.Current?.Title}'."
-                    : string.IsNullOrEmpty(_eventName)
-                        ? $"'{name}' has no event name to raise."
-                        : $"'{name}': '{_eventName}' does not lead anywhere from '{runner.Current?.Title}'.");
-            }
-
-            return moved;
-        }
-
-        private bool SendSlot(GraphRunner runner)
-        {
-            if (!GraphSaveSlots.IsValidSlotName(_slot))
-            {
-                Warn($"'{name}': '{_slot}' is not a usable slot name. {GraphSaveSlots.SlotNameRule}");
-                return false;
-            }
-
-            if (_action == GraphEventButtonAction.Save)
-            {
-                try
-                {
-                    GraphSaveSlots.Save(runner, _slot);
-                    return true;
-                }
-                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-                {
-                    // ほかのプロセスがスロットを開いているなど（古いセーブはそのまま残る）。クリックの処理で例外にせず、ビルドでも伝える
-                    Debug.LogWarning($"[VisualNodeEditor] '{name}': could not save to slot '{_slot}': {exception.Message}", this);
-                    return false;
-                }
-            }
-
-            if (!GraphSaveSlots.Load(runner, _slot))
-            {
-                Warn($"'{name}': there is no save in slot '{_slot}' for '{runner.Graph.name}' (or its node is gone).");
-                return false;
-            }
-
-            return true;
-        }
+        public bool TrySend() => GraphEventSender.Send(_graph, _action, _eventName, _slot, name, this);
 
         /// <summary><paramref name="graph"/> を実行中の Runner（null なら実行中のどれか）。無ければ null。</summary>
         internal static GraphRunner FindRunner(NodeGraphAsset graph) => GraphRunner.FindRunning(graph);
@@ -403,14 +336,6 @@ namespace Reiga.VisualNodeEditor
         {
             _clickEvent?.RemoveListener(Send);
             _clickEvent = null;
-        }
-
-        private void Warn(string message)
-        {
-            if (Debug.isDebugBuild)
-            {
-                Debug.LogWarning("[VisualNodeEditor] " + message, this);
-            }
         }
     }
 }
