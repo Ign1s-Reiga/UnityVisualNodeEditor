@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1] - 2026-10-12
+- 修正: 「続きから」（Graph Event Button の Load）が、セーブが無いうちも押せて、押しても何も起きなかった。スロットにセーブがあるときだけ押せるようにする（`Disable Without Save`、既定 on。同じ GameObject のボタンの `interactable` を変える）
+- 修正: ADV Starter が、入れ子の Yarn プロジェクトがあると、ひな形のスクリプトを含まないプロジェクトを Story の Dialogue Runner に入れることがあった。一番近く、ひな形のノードを含むプロジェクトを入れる
+- 修正: ADV Starter のシーンを作れなかったとき、片方のシーンが残り、グラフも開かなかった。作ったシーンを消してエラーを出し、グラフは開く
+- 修正: Yarn Graph Bridge で置き換えた Yarn の In Memory Variable Storage が、使われないまま GameObject に残っていた。外す
+- 修正: ADV Starter を使った直後の Undo に、閉じたシーンの物を指す手順が残っていた
+
 ## [0.14.0] - 2026-10-12
 - 追加: ADV Starter が Title と Story のシーンも作り、グラフの Scene ノードに入れる。ツールバーの Play だけで最初から最後まで遊べる
   - `ADV Title`: 「New Game」（Raise `NewGame`）と「Continue」（スロット `auto` から Load）のボタン、EventSystem、このグラフの Graph Runner
