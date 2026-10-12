@@ -520,7 +520,8 @@ DialogueRunner と同じ GameObject に付けるコンポーネント（`Add Com
   - `<<graph_next 名前>>`: 会話が終わったときに Raise する名前を決める（選択肢でルートを選ぶ）
 - オートセーブ: `Auto Save Slot`（空なら無効）を指定すると、Dialogue ノードに入るたびにそのスロットへ保存する（「続きから」用）
 - エディタで追加したとき（`ObjectFactory.componentWasAdded`。`YarnBridgeSetup`）、同じ GameObject に `GraphVariableStorage` が無ければ足し、
-  DialogueRunner の Variable Storage に設定する（別の Variable Storage が設定されていれば置き換えない）
+  DialogueRunner の Variable Storage に設定する。Yarn の既定の `InMemoryVariableStorage`（`GameObject > Yarn Spinner > Dialogue System` のプレハブに最初から入っている）は置き換える。
+  それ以外の Variable Storage（ユーザーが選んだもの）が設定されていれば置き換えない
 - 判定は Yarn に依存しない純粋なクラス `DialogueFlow` に置き、会話の開始・停止を `IDialoguePlayer`（実物は `DialogueRunnerPlayer`）越しに行う（EditMode テストで偽物に差し替える）。
   同じ Dialogue ノードに入り直したときも会話をやり直せるよう、ノードに入るたびに番号を振って見分ける。
   Yarn は `StartDialogue` 1 回につき、終わったときも `Stop()` で止めたときも `onDialogueComplete` をちょうど 1 回呼ぶので、止めるよう頼んだ後の 1 回は「止まった」として扱い、次へは進めない
@@ -562,9 +563,10 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
 
 ## ADV Starter（ADV のひな形）
 
-`Assets > Create > Visual Node Editor > ADV Starter`（Yarn 連携のエディタ）。選んでいるフォルダに次を作り、グラフを開く（同じ名前があれば番号を付ける）:
+`Assets > Create > Visual Node Editor > ADV Starter`（Yarn 連携のエディタ）。選んでいるフォルダに次を作り、グラフを開く（同じ名前があれば番号を付ける）。
+ツールバーの Play を押せば、そのまま最初から最後まで遊べる（Play が Build Settings への登録と Title を先頭に置くことを尋ねる）:
 
-- グラフ（`ADV.asset`）。Scene ノードのシーンは未設定（自分のシーンを入れる。検証の Warning と「次の一手」のボタンで案内される）
+- グラフ（`ADV.asset`）。Scene ノードには下の 2 つのシーンが入っている
 
   ```
   Entry → [Scene: Title] ─(NewGame)→ [Scene: Story] ─(自動)→ [Container: Story] ─(Ending)→ [Scene: Title]
@@ -578,6 +580,14 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
   あれば、そのプロジェクトをすぐ読み込み直す（Yarn Spinner は新しいスクリプトを次のフレームで入れるので、開いたグラフが「無いノード」の警告を出さないように）
 - Yarn のノード名がプロジェクトの中で重なるとコンパイルできないので、既にあれば（2 つ目のひな形など）グラフのファイル名を頭に付ける（例: `ADV1_Chapter1`）。
   `$Affection` は宣言せず、`<<set>>` の使い方から数と決めさせる（宣言が重ならないように）
+- シーン（`AdvStarterScenes`）。新しいシーンを追加で開いて組み立て、保存して閉じる（今開いているシーンは切り替えない）:
+  - `ADV Title.unity`: Main Camera、EventSystem（入力モジュールは uGUI の `InputModuleComponentFactory` で、プロジェクトの入力の設定に合ったもの）、
+    Canvas に見出しと 2 つのボタン（「New Game」= Graph Event Button の Raise `NewGame`、「Continue」= Load スロット `auto`）、このグラフの Graph Runner
+  - `ADV Story.unity`: Main Camera と、Yarn Spinner の Dialogue System（`GameObject > Yarn Spinner > Dialogue System` と同じプレハブ）。
+    その Dialogue Runner に Yarn プロジェクトを入れ、Yarn Graph Bridge（このグラフ、Auto Save Slot `auto`）を足し、Variable Storage を Graph Variable Storage にする
+  - 未保存の無題のシーンが開いている・Play 中は、Unity が追加でシーンを作れないので、理由を出して「シーン無しで作る」か取り消すかを尋ねる
+    （シーン無しなら Scene ノードのシーンは未設定。検証の Warning と Pick Scene… / Create Scene… のボタンで案内される）
+  - Build Settings には入れない（Play が確認してから入れる）。Dialogue System のプレハブが見つからなければ、Story のシーンは Camera だけにして警告を出す
 
 ## Build Settings 連携
 

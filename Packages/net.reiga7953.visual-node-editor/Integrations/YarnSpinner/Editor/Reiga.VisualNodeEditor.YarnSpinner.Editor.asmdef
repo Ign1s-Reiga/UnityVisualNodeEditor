@@ -6,7 +6,9 @@
     "Reiga.VisualNodeEditor.Editor",
     "Reiga.VisualNodeEditor.YarnSpinner",
     "YarnSpinner.Unity",
-    "YarnSpinner.Unity.Editor"
+    "YarnSpinner.Unity.Editor",
+    "UnityEngine.UI",
+    "UnityEditor.UI"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

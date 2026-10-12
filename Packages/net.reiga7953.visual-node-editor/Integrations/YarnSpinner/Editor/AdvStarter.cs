@@ -6,13 +6,15 @@ using Reiga.VisualNodeEditor.Editor;
 using Reiga.VisualNodeEditor.Editor.Views;
 using UnityEditor;
 using UnityEngine;
+using Yarn.Unity;
 using Yarn.Unity.Editor;
 
 namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
 {
     /// <summary>
     /// ADV のひな形（<c>Assets &gt; Create &gt; Visual Node Editor &gt; ADV Starter</c>）。選んでいるフォルダに、グラフ・Yarn スクリプト・
-    /// （そのフォルダと親のフォルダに無ければ）Yarn プロジェクトを作り、グラフを開く。
+    /// （そのフォルダと親のフォルダに無ければ）Yarn プロジェクト・Title と Story のシーン（<see cref="AdvStarterScenes"/>）を作り、グラフを開く。
+    /// ツールバーの Play だけで、最初から最後まで遊べる。
     /// <code>
     /// Entry → [Scene: Title] ─(NewGame)→ [Scene: Story] ─(自動)→ [Container: Story] ─(Ending)→ [Scene: Title]
     /// Story の中: Entry → [Dialogue: Chapter1] → [Dialogue: Chapter2] ─(Done, Affection &gt;= 3)→ [Dialogue: GoodEnd] → Exit (Ending)
@@ -32,15 +34,27 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
         [MenuItem("Assets/Create/Visual Node Editor/ADV Starter", priority = 81)]
         private static void CreateFromMenu()
         {
-            var graph = CreateIn(GetSelectedFolder());
+            // シーンを作れないとき（未保存の無題のシーン・Play 中）は、シーン無しで作るか尋ねる
+            var problem = AdvStarterScenes.GetProblem();
+            if (problem != null && !EditorUtility.DisplayDialog("ADV Starter",
+                    $"{problem}\n\nCreate the graph and the Yarn files without the Title and Story scenes? " +
+                    "You can pick or create the scenes for the Scene nodes later.",
+                    "Create Without Scenes", "Cancel"))
+            {
+                return;
+            }
+
+            var graph = CreateIn(GetSelectedFolder(), problem == null);
             Selection.activeObject = graph;
             NodeGraphEditorWindow.Open(graph);
         }
 
         /// <summary>
         /// <paramref name="folder"/> にグラフ・Yarn スクリプト・（無ければ）Yarn プロジェクトを作り、保存したグラフを返す。同じ名前のファイルがあれば番号を付ける。
+        /// <paramref name="withScenes"/> なら Title と Story のシーンも作り、グラフの Scene ノードに入れる
+        /// （未保存の無題のシーンが開いている・Play 中は作れないので、<see cref="AdvStarterScenes.GetProblem"/> で先に確かめること）。
         /// </summary>
-        public static NodeGraphAsset CreateIn(string folder)
+        public static NodeGraphAsset CreateIn(string folder, bool withScenes = false)
         {
             var graphPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{BaseName}.asset");
             var name = Path.GetFileNameWithoutExtension(graphPath);
@@ -55,6 +69,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
 
             // フォルダ（と親のフォルダ）の Yarn プロジェクトは、その下の .yarn を自動で含めるので、無いときだけ作る
             var projects = GetYarnProjectsFor(folder);
+            string storyProjectPath;
             if (projects.Length == 0)
             {
                 var project = new Yarn.Compiler.Project
@@ -62,7 +77,8 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                     // Yarn Spinner の Create メニューで作るものと同じ（~ で終わるフォルダとサンプルは含めない）
                     ExcludeFilePatterns = new[] { "**/*~/*", "./Samples/Yarn Spinner*/*" },
                 };
-                YarnEditorUtility.CreateYarnProject(AssetDatabase.GenerateUniqueAssetPath($"{folder}/{name}.yarnproject"), project);
+                storyProjectPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{name}.yarnproject");
+                YarnEditorUtility.CreateYarnProject(storyProjectPath, project);
             }
             else
             {
@@ -71,12 +87,20 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                 {
                     AssetDatabase.ImportAsset(projectPath, ImportAssetOptions.ForceUpdate);
                 }
+
+                storyProjectPath = projects[0];
             }
 
             YarnProjects.Invalidate();
             var graph = BuildGraph(prefix);
             AssetDatabase.CreateAsset(graph, graphPath);
             AssetDatabase.SaveAssets();
+
+            if (withScenes)
+            {
+                AdvStarterScenes.Create(graph, folder, AssetDatabase.LoadAssetAtPath<YarnProject>(storyProjectPath));
+            }
+
             return graph;
         }
 
@@ -130,9 +154,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
 
             // ルート: Title → Story（シーン）→ Story（コンテナ）→ Title
             var entry = graph.Nodes.OfType<EntryNode>().Single();
-            var title = Add(graph, new SceneNode { Title = "Title" }, 250f, 0f);
-            var newGame = Add(graph, new EventNode { EventName = "NewGame" }, 500f, 0f);
-            var storyScene = Add(graph, new SceneNode { Title = "Story" }, 750f, 0f);
+            var title = Add(graph, new SceneNode { Title = AdvStarterScenes.TitleSceneNode }, 250f, 0f);
+            var newGame = Add(graph, new EventNode { EventName = AdvStarterScenes.NewGameEvent }, 500f, 0f);
+            var storyScene = Add(graph, new SceneNode { Title = AdvStarterScenes.StorySceneNode }, 750f, 0f);
             var begin = Add(graph, new EventNode { Title = "Begin", Trigger = EventTriggerMode.Automatic }, 1000f, 0f);
             var story = Add(graph, new ContainerNode { Title = "Story" }, 1250f, 0f);
             foreach (var exit in story.Exits.ToList())
