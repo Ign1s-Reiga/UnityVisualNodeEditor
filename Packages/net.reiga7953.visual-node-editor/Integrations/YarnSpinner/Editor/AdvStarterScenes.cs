@@ -53,24 +53,39 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(DialogueSystemPrefabGuid));
 
         /// <summary>今シーンを作れない理由（未保存の無題のシーンが開いている・Play 中）。作れるなら null。</summary>
-        internal static string GetProblem() =>
-            ScenePicker.GetCreateProblem(GetLoadedScenePaths(), EditorApplication.isPlayingOrWillChangePlaymode);
+        internal static string GetProblem() => ScenePicker.GetCreateProblem();
 
         /// <summary>
         /// <paramref name="folder"/> に Title と Story のシーンを作って保存し、<paramref name="graph"/>（保存済みのアセット）の
         /// 同じタイトルの Scene ノードに入れて、グラフを保存する。作れないとき（<see cref="GetProblem"/>）は呼ばないこと。
+        /// どちらかを作れなければ、作ったシーンを消して例外にする（片方だけのシーンを残さない。グラフの Scene ノードは空のまま）。
         /// </summary>
         internal static void Create(NodeGraphAsset graph, string folder, YarnProject project)
         {
-            var titlePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Title.unity");
-            CreateScene(titlePath, scene => BuildTitle(scene, graph));
-            var storyPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Story.unity");
-            CreateScene(storyPath, scene => BuildStory(scene, graph, project));
+            var created = new List<string>();
+            try
+            {
+                var titlePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Title.unity");
+                CreateScene(titlePath, scene => BuildTitle(scene, graph));
+                created.Add(titlePath);
+                var storyPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Story.unity");
+                CreateScene(storyPath, scene => BuildStory(scene, graph, project));
+                created.Add(storyPath);
 
-            SetScene(graph, TitleSceneNode, titlePath);
-            SetScene(graph, StorySceneNode, storyPath);
-            EditorUtility.SetDirty(graph);
-            AssetDatabase.SaveAssetIfDirty(graph);
+                SetScene(graph, TitleSceneNode, titlePath);
+                SetScene(graph, StorySceneNode, storyPath);
+                EditorUtility.SetDirty(graph);
+                AssetDatabase.SaveAssetIfDirty(graph);
+            }
+            catch
+            {
+                foreach (var path in created)
+                {
+                    AssetDatabase.DeleteAsset(path);
+                }
+
+                throw;
+            }
         }
 
         /// <summary>Title: Main Camera、EventSystem、見出しと「New Game」「Continue」のボタン、このグラフの Graph Runner。</summary>
@@ -92,7 +107,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                 button.Action = GraphEventButtonAction.Load;
                 button.Slot = AutoSaveSlot;
             });
-            AddGraphRunner(scene, graph);
+            PlaySetup.CreateRunner(scene, graph);
         }
 
         /// <summary>
@@ -118,6 +133,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
         /// <summary>
         /// <paramref name="runner"/> をグラフに繋ぐ: Yarn プロジェクトを入れ、Yarn Graph Bridge（このグラフ、オートセーブ <see cref="AutoSaveSlot"/>）を足し、
         /// Variable Storage を Graph Variable Storage にする（Yarn の変数を Blackboard と共有する）。
+        /// 組み立ててすぐ保存して閉じるシーンのためのものなので、Undo には残さない（閉じたシーンの物を指す Undo が残らないように）。
         /// </summary>
         internal static YarnGraphBridge ConnectToGraph(DialogueRunner runner, NodeGraphAsset graph, YarnProject project)
         {
@@ -128,24 +144,15 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             var bridge = runner.gameObject.AddComponent<YarnGraphBridge>();
             bridge.Graph = graph;
             bridge.AutoSaveSlot = AutoSaveSlot;
-            YarnBridgeSetup.ShareVariables(runner);
+            YarnBridgeSetup.ShareVariables(runner, false);
             return bridge;
         }
 
         private static void CreateScene(string path, Action<Scene> build)
         {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-            try
+            if (!ScenePicker.CreateSceneFile(path, NewSceneSetup.EmptyScene, build))
             {
-                build(scene);
-                if (!EditorSceneManager.SaveScene(scene, path))
-                {
-                    throw new InvalidOperationException($"ADV Starter could not save the scene '{path}'.");
-                }
-            }
-            finally
-            {
-                EditorSceneManager.CloseScene(scene, true);
+                throw new InvalidOperationException($"ADV Starter could not save the scene '{path}'.");
             }
         }
 
@@ -227,28 +234,11 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             return text;
         }
 
-        // Play の「Add Graph Runner」と同じもの（PlaySetup.AddRunner と同じ名前・設定。保存はシーンごと行う）
-        private static void AddGraphRunner(Scene scene, NodeGraphAsset graph)
-        {
-            var runner = CreateRoot(scene, PlaySetup.GetRunnerObjectName(graph)).AddComponent<GraphRunnerBehaviour>();
-            var serializedRunner = new SerializedObject(runner);
-            serializedRunner.FindProperty(PlaySetup.RunnerGraphPropertyName).objectReferenceValue = graph;
-            serializedRunner.ApplyModifiedPropertiesWithoutUndo();
-        }
-
         private static GameObject CreateRoot(Scene scene, string name)
         {
             var gameObject = new GameObject(name);
             SceneManager.MoveGameObjectToScene(gameObject, scene);
             return gameObject;
-        }
-
-        private static IEnumerable<string> GetLoadedScenePaths()
-        {
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-            {
-                yield return SceneManager.GetSceneAt(i).path;
-            }
         }
     }
 }

@@ -124,15 +124,24 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         /// <summary>シーンに、<paramref name="graph"/> を動かす Graph Runner の GameObject を追加する（Undo 可。保存はしない）。</summary>
         internal static GraphRunnerBehaviour AddRunner(Scene scene, NodeGraphAsset graph)
         {
+            var runner = CreateRunner(scene, graph);
+            Undo.RegisterCreatedObjectUndo(runner.gameObject, "Add Graph Runner");
+            EditorSceneManager.MarkSceneDirty(scene);
+            return runner;
+        }
+
+        /// <summary>
+        /// シーンに、<paramref name="graph"/> を動かす Graph Runner の GameObject を作る。Undo にも残さず、未保存の印も付けない
+        /// （<see cref="AddRunner"/> と、組み立ててすぐ保存して閉じるシーン（ADV Starter）が使う）。
+        /// </summary>
+        internal static GraphRunnerBehaviour CreateRunner(Scene scene, NodeGraphAsset graph)
+        {
             var gameObject = new GameObject(GetRunnerObjectName(graph));
             SceneManager.MoveGameObjectToScene(gameObject, scene);
-            Undo.RegisterCreatedObjectUndo(gameObject, "Add Graph Runner");
-
             var runner = gameObject.AddComponent<GraphRunnerBehaviour>();
             var serializedRunner = new SerializedObject(runner);
             serializedRunner.FindProperty(RunnerGraphPropertyName).objectReferenceValue = graph;
             serializedRunner.ApplyModifiedPropertiesWithoutUndo();
-            EditorSceneManager.MarkSceneDirty(scene);
             return runner;
         }
 

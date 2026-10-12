@@ -32,6 +32,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
             _graph.name = "ADV";
             _project = ScriptableObject.CreateInstance<YarnProject>();
             _scene = EditorSceneManager.NewPreviewScene();
+            AssetDatabase.DeleteAsset(Folder); // 前に止めたテストの残り
             AssetDatabase.CreateFolder("Assets", "__VneAdvStarterScenesTemp");
             AdvStarterScenes.DialogueSystemPrefabOverride = TestDialogueSystemPrefab.Create(Folder + "/Dialogue System.prefab");
         }
@@ -110,6 +111,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
             Assert.That(serializedRunner.FindProperty(AdvStarterScenes.YarnProjectPropertyName).objectReferenceValue, Is.SameAs(_project));
             Assert.That(serializedRunner.FindProperty(YarnBridgeSetup.VariableStoragePropertyName).objectReferenceValue, Is.InstanceOf<GraphVariableStorage>(),
                 "Yarn's $Affection is the graph's Affection");
+            Assert.That(runner.GetComponent<InMemoryVariableStorage>(), Is.Null, "the prefab's default storage is removed, not left unused");
 
             var bridge = runner.GetComponent<YarnGraphBridge>();
             Assert.That(bridge, Is.Not.Null);

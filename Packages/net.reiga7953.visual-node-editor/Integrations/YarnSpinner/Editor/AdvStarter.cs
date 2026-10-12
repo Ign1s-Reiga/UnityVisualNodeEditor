@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -88,7 +89,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                     AssetDatabase.ImportAsset(projectPath, ImportAssetOptions.ForceUpdate);
                 }
 
-                storyProjectPath = projects[0];
+                storyProjectPath = ChooseProject(projects, path => ProjectHasNode(path, prefix + NodeNames[0]));
             }
 
             YarnProjects.Invalidate();
@@ -98,10 +99,48 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
 
             if (withScenes)
             {
-                AdvStarterScenes.Create(graph, folder, AssetDatabase.LoadAssetAtPath<YarnProject>(storyProjectPath));
+                try
+                {
+                    AdvStarterScenes.Create(graph, folder, AssetDatabase.LoadAssetAtPath<YarnProject>(storyProjectPath));
+                }
+                catch (Exception exception)
+                {
+                    // グラフと Yarn のファイルはできているので、そのまま使えるように返す（作りかけのシーンは消してある。Scene ノードは空のまま）
+                    Debug.LogException(exception);
+                    Debug.LogError("[VisualNodeEditor] ADV Starter created the graph and the Yarn files, but could not create the Title and Story scenes. " +
+                                   "Pick or create the scenes for the Scene nodes (the issue list has buttons for it).");
+                }
             }
 
             return graph;
+        }
+
+        /// <summary>
+        /// Story の Dialogue Runner に入れる Yarn プロジェクト: <paramref name="projectPaths"/>（フォルダを含むもの）のうち、
+        /// 近いフォルダのもの（深いものから）で、ひな形のノードを含むもの。どれも含まなければ一番近いもの。無ければ null。
+        /// <paramref name="containsStarter"/> は、そのプロジェクトがひな形のノードを含むか（入れ子のプロジェクトは、下のフォルダを除いていることがある）。
+        /// </summary>
+        internal static string ChooseProject(IEnumerable<string> projectPaths, Func<string, bool> containsStarter)
+        {
+            var nearestFirst = projectPaths
+                .OrderByDescending(path => (Path.GetDirectoryName(path) ?? string.Empty).Replace('\\', '/').Length)
+                .ThenBy(path => path, StringComparer.Ordinal)
+                .ToList();
+            return nearestFirst.FirstOrDefault(containsStarter) ?? nearestFirst.FirstOrDefault();
+        }
+
+        // その Yarn プロジェクトにノードがあるか（スクリプトにエラーがあってプログラムが無ければ false）
+        private static bool ProjectHasNode(string projectPath, string node)
+        {
+            var project = AssetDatabase.LoadAssetAtPath<YarnProject>(projectPath);
+            try
+            {
+                return project != null && Array.IndexOf(project.NodeNames, node) >= 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         /// <summary>

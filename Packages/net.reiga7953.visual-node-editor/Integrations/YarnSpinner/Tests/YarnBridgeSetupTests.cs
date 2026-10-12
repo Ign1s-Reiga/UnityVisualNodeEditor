@@ -26,13 +26,33 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         public void TearDown() => Object.DestroyImmediate(_gameObject);
 
         [Test]
-        public void ShareVariables_ReplacesYarnsDefaultInMemoryStorage()
+        public void ShareVariables_ReplacesYarnsDefaultInMemoryStorage_AndRemovesIt()
         {
             SetStorage(_gameObject.AddComponent<InMemoryVariableStorage>());
 
             Assert.That(YarnBridgeSetup.ShareVariables(_runner), Is.True);
 
             Assert.That(GetStorage(), Is.InstanceOf<GraphVariableStorage>());
+            Assert.That(_gameObject.GetComponent<InMemoryVariableStorage>(), Is.Null, "an unused storage left behind could be picked by GetComponent");
+        }
+
+        [Test]
+        public void ShareVariables_LeavesAStorageOnAnotherGameObject()
+        {
+            var other = new GameObject("Variables");
+            try
+            {
+                SetStorage(other.AddComponent<InMemoryVariableStorage>());
+
+                Assert.That(YarnBridgeSetup.ShareVariables(_runner, false), Is.True);
+
+                Assert.That(GetStorage(), Is.InstanceOf<GraphVariableStorage>());
+                Assert.That(other.GetComponent<InMemoryVariableStorage>(), Is.Not.Null, "only the one on the Dialogue Runner's GameObject is removed");
+            }
+            finally
+            {
+                Object.DestroyImmediate(other);
+            }
         }
 
         [Test]
