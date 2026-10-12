@@ -17,6 +17,6 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
 
         internal override NodeGraphAsset BuildGraph() => SnakeStarter.Instance.BuildGraph();
 
-        internal override RectTransform BuildGame(Scene scene, NodeGraphAsset graph) => SnakeStarter.Instance.BuildGame(scene, graph);
+        internal override GameObject BuildGame(Scene scene, NodeGraphAsset graph) => SnakeStarter.Instance.BuildGame(scene, graph);
     }
 }

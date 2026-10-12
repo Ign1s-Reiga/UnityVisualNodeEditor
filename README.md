@@ -76,6 +76,22 @@ Yarn はノードの途中から再開できないので、会話の途中でセ
 コンテナは何段でも入れ子にできる（スライドパズルの Starter は Levels › Level の 2 段）。
 詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「ゲーム向けのコンポーネント」「組み込みの振る舞い」「ゲームの Starter」を参照。
 
+## UI Toolkit で画面を作る（UI Builder）
+
+ランタイムの UI Toolkit（UIDocument・UXML・USS）でも、コードを書かずに画面をグラフに繋げられる。画面の配置は Unity の UI Builder で行う。
+
+- UI Builder の Library に、グラフに繋がるコントロールが出る:
+
+  | コントロール | すること（uGUI のコンポーネント版） |
+  |---|---|
+  | `GraphButton` | クリックで Raise / Advance / Save / Load（Graph Event Button） |
+  | `GraphParameterLabel` | パラメータを `Score: {0}` のような書式で出す（Graph Parameter Text） |
+  | `GraphNodePanel` | グラフが指定したノード（`Paused`・`Round/Paused`、コンテナなら中のどこか）にいる間だけ、中の要素を出す（Graph Node Activator） |
+
+  `graph` 属性を入れると、イベント名・パラメータ・ノードを UI Builder のインスペクタでグラフから選べる（空なら実行中のグラフを使う）
+- Scene ノードのインスペクタの **Edit Screen** で、そのシーンの UXML を UI Builder で開く。まだ無ければ **Create Screen…** で、UXML と、それを出す UIDocument・Panel Settings を作って開く
+- `Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、画面を UXML / USS で作る Starter（グラフとキーは uGUI 版と同じ）
+
 ## AI エージェントから使う（MCP）
 
 Unity エディタの中で MCP サーバーを動かし、Claude Code などの AI エージェントがグラフを読み・組み立て・検証し、Play 中の流れを確かめられるようにできる。

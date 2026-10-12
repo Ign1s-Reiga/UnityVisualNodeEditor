@@ -480,6 +480,26 @@
   white-space: normal;
 }
 
+/* The Screen row of a Scene node: open or create its UI Toolkit screen in UI Builder (SceneScreenField) */
+.vne-scene-screen {
+  flex-direction: row;
+  align-items: center;
+  margin: 4px 3px 2px 3px;
+}
+
+.vne-scene-screen__label {
+  flex-grow: 1;
+}
+
+.vne-scene-screen__none {
+  color: #8a8a8a;
+}
+
+.vne-scene-screen__button {
+  margin-left: 2px;
+  margin-right: 0;
+}
+
 .vne-event-name-field {
   flex-direction: row;
   align-items: center;

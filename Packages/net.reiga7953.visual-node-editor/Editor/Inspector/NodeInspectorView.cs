@@ -92,11 +92,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             }
 
             // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので書いておく
-            if (asset.Nodes[_index] is SceneNode)
+            if (asset.Nodes[_index] is SceneNode sceneNode)
             {
                 var note = new Label(SceneReloadNote);
                 note.AddToClassList("vne-inspector-view__note");
                 content.Add(note);
+
+                // そのシーンの UI Toolkit の画面を UI Builder で開く・作る
+                content.Add(new SceneScreenField(sceneNode));
             }
 
             // 出口はポートとエッジに関わるので、PropertyField ではなく専用の UI で編集する
