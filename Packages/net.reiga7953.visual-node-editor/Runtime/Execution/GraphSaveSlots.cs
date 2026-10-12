@@ -80,7 +80,8 @@ namespace Reiga.VisualNodeEditor
         /// <exception cref="InvalidOperationException">Runner が実行中でない。</exception>
         /// <exception cref="IOException">
         /// ほかのプロセスがスロットを開いているなどで置き換えられない。たいていは古いセーブがそのまま残る。
-        /// 古いセーブが退けられた後で失敗したときは、新しいセーブが <c>.tmp</c> に残り、<see cref="Exists"/>・<see cref="Read"/>・<see cref="Load"/> はそれを読む。
+        /// 古いセーブが退けられた後や、スロットの最初の保存で失敗したときは、新しいセーブが <c>.tmp</c> に残り、
+        /// <see cref="Exists"/>・<see cref="Read"/>・<see cref="Load"/> はそれを読む（次の保存は、上書きする前にそれをスロットへ移す）。
         /// </exception>
         public static void Save(GraphRunner runner, string slot)
         {
@@ -93,6 +94,14 @@ namespace Reiga.VisualNodeEditor
             var json = runner.CaptureState().ToJson();
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var temporary = TemporaryPath(path);
+
+            // 前の保存の失敗で、セーブの唯一の写しが .tmp に残っていれば、上書きする前にスロットへ移す
+            // （書き直すのに失敗すると、その写しを消してしまう）。移せなければ、その .tmp に触らずに失敗にする
+            if (!File.Exists(path) && File.Exists(temporary) && IsSaveOf(temporary, runner.Graph))
+            {
+                File.Move(temporary, path);
+            }
+
             var written = false;
             try
             {
@@ -103,7 +112,8 @@ namespace Reiga.VisualNodeEditor
             catch
             {
                 // 保存できなかった。書きかけの一時ファイルと、古いセーブがスロットに残っているときの一時ファイルは要らない。
-                // 古いセーブが退けられた後で失敗したなら（File.Replace の途中の失敗など）、書き終えた一時ファイルが新しいセーブの唯一の写しなので残す（FindFile が読む）
+                // スロットにセーブが無いまま失敗したなら（File.Replace の途中の失敗・最初の保存の失敗など）、
+                // 書き終えた一時ファイルが新しいセーブの唯一の写しなので残す（FindFile が読み、次の保存がスロットへ移す）
                 if (!written || File.Exists(path))
                 {
                     TryDelete(temporary);
@@ -210,11 +220,13 @@ namespace Reiga.VisualNodeEditor
         /// </summary>
         public static bool Delete(NodeGraphAsset graph, string slot)
         {
-            if (FindFile(graph, slot) == null)
+            var found = FindFile(graph, slot) != null;
+            if (graph == null || !IsValidSlotName(slot))
             {
                 return false;
             }
 
+            // セーブとして読めない .tmp（書いている途中で落ちたものなど）も、残っていれば消す
             var path = GetPath(graph, slot);
             DeleteIfExists(path);
             DeleteIfExists(BackupPath(path));
@@ -225,12 +237,13 @@ namespace Reiga.VisualNodeEditor
                 File.Delete(legacy);
             }
 
-            return true;
+            return found;
         }
 
         // そのスロットのファイル。無ければ null。読むだけで、ファイルは動かさない（消すのは Delete だけ）。
-        // セーブが無ければ、保存の途中で落ちたときの .bak、古いセーブが退けられた後で保存に失敗したときの .tmp（書き終えて読めるものだけ。
-        // 書いている途中で落ちたものは読めない）、キーを持つグラフならキーを持つ前のこのグラフのセーブの順に探す
+        // セーブが無ければ、保存に失敗したときの .tmp（書き終えて読めるものだけ。書いている途中で落ちたものは読めない）、
+        // 保存の途中で落ちたときの .bak、キーを持つグラフならキーを持つ前のこのグラフのセーブの順に探す。
+        // .tmp と .bak が両方残っていれば、.tmp が新しいセーブ（.bak は退けた古いセーブ）
         private static string FindFile(NodeGraphAsset graph, string slot)
         {
             if (graph == null || !IsValidSlotName(slot))
@@ -244,14 +257,14 @@ namespace Reiga.VisualNodeEditor
                 return path;
             }
 
-            var backup = BackupPath(path);
-            if (File.Exists(backup))
+            var temporary = TemporaryPath(path);
+            if (File.Exists(temporary) && IsSaveOf(temporary, graph))
             {
-                return backup;
+                return temporary;
             }
 
-            var temporary = TemporaryPath(path);
-            return File.Exists(temporary) && IsSaveOf(temporary, graph) ? temporary : FindLegacyFile(graph, slot);
+            var backup = BackupPath(path);
+            return File.Exists(backup) ? backup : FindLegacyFile(graph, slot);
         }
 
         private static string BackupPath(string path) => path + ".bak";
