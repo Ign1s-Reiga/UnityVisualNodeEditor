@@ -13,10 +13,10 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             _runner = runner;
         }
 
-        // 無いノードを渡すと、Yarn は始めるのに失敗して終わりの知らせを出さないので、先に確かめる
+        // 無いノードを渡したり、壊された DialogueRunner で始めたりすると、終わりの知らせが来ないので、先に確かめる
         public bool Start(string yarnNode)
         {
-            if (!HasNode(_runner.YarnProject, yarnNode))
+            if (_runner == null || !HasNode(_runner.YarnProject, yarnNode))
             {
                 return false;
             }
@@ -25,7 +25,13 @@ namespace Reiga.VisualNodeEditor.YarnSpinner
             return true;
         }
 
-        public void Stop() => _runner.Stop().Forget();
+        public void Stop()
+        {
+            if (_runner != null)
+            {
+                _runner.Stop().Forget();
+            }
+        }
 
         // IsDialogueRunning は止めた時点で false になるが、終わりの知らせはその後の後片付けが済んでから来る。
         // DialogueTask はその知らせの直前に終わるので、両方を見る（壊された DialogueRunner はもう知らせを出さない）
