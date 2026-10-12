@@ -67,6 +67,31 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void AStoppedRunner_IsLetGo_AndTheNextOneIsFollowed()
+        {
+            _runner.Start();
+            _parameterText.Enable();
+            _runner.SetInt("Score", 3);
+
+            _runner.Stop();
+            _runner.SetInt("Score", 5);
+            Assert.That(_text.text, Is.EqualTo("Score: 3"), "no longer listening to the stopped runner (the text stays)");
+
+            var next = new GraphRunner(_game.Graph);
+            try
+            {
+                next.Start();
+                Assert.That(_text.text, Is.EqualTo("Score: 0"));
+                next.SetInt("Score", 8);
+                Assert.That(_text.text, Is.EqualTo("Score: 8"));
+            }
+            finally
+            {
+                next.Stop();
+            }
+        }
+
+        [Test]
         public void ChangingTheSettings_WhileEnabled_RewritesTheText()
         {
             _runner.Start();

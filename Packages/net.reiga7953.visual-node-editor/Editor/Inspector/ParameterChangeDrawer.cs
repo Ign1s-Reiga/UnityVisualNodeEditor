@@ -71,7 +71,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 names.Insert(0, string.IsNullOrEmpty(idProperty.stringValue) ? ChooseLabel : MissingLabel);
             }
 
-            var parameterField = new DropdownField(names, parameter == null ? 0 : parameters.IndexOf(parameter))
+            // 名前の無い・同じ名前のパラメータが並んでも、別の項目として選べるように番号を付ける
+            var parameterField = new DropdownField(DropdownLabels.MakeUnique(names), parameter == null ? 0 : parameters.IndexOf(parameter))
             {
                 tooltip = parameters.Count == 0 ? "Add a parameter in the Blackboard first" : "The Blackboard parameter to change",
             };

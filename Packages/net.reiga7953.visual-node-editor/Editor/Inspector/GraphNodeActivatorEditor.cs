@@ -60,7 +60,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 labels.Insert(0, string.IsNullOrEmpty(currentId) ? ChooseLabel : MissingLabel);
             }
 
-            var dropdown = new DropdownField("Node", labels, current < 0 ? 0 : current)
+            // 先頭の "(choose)" などと同じ表示のノードがあっても、別の項目として選べるように
+            var dropdown = new DropdownField("Node", DropdownLabels.MakeUnique(labels), current < 0 ? 0 : current)
             {
                 tooltip = "Show the targets while the graph is on this node (for a container: anywhere inside it)",
             };

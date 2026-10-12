@@ -41,7 +41,7 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
         [Test]
         public void Writing_RenamesOnlyTheClass()
         {
-            var path = StarterScripts.Write(_folder, "SnakeGame", "SnakeGameTemplate");
+            var path = StarterScripts.Write(_folder, "SnakeGame", StarterScripts.Generate("SnakeGameTemplate", "SnakeGame"));
 
             var text = File.ReadAllText(path);
             Assert.That(path, Does.EndWith("/SnakeGame.cs"), "Unity needs the file name to match the class");
@@ -68,6 +68,22 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             // 既定では、同じ名前のファイルがフォルダにあれば使わない
             File.WriteAllText(Path.Combine(_folder, "PuzzleTestGame.cs"), "// taken");
             Assert.That(StarterScripts.ChooseClassName("Puzzle Test", _folder), Is.EqualTo("PuzzleTestGame2"));
+        }
+
+        [Test]
+        public void ScriptsAnywhereInTheProject_TakeTheirName_EvenBeforeTheyCompile()
+        {
+            // 別のフォルダで作った Starter のスクリプトは、コンパイルが終わるまでクラスとしては見えない。スクリプトのファイルで見つける
+            Assert.That(StarterScripts.IsScriptNameTaken("SnakeGameTemplate"), Is.True, "a script in the package");
+            Assert.That(StarterScripts.IsScriptNameTaken("snakegametemplate"), Is.True, "file names ignore case on Windows and macOS");
+            Assert.That(StarterScripts.IsScriptNameTaken("NoScriptIsCalledThis"), Is.False);
+            Assert.That(StarterScripts.IsScriptNameTaken("SnakeGameTemp"), Is.False, "only whole file names count");
+        }
+
+        [Test]
+        public void AMissingTemplate_Throws()
+        {
+            Assert.That(() => StarterScripts.Generate("NoSuchTemplate", "SnakeGame"), Throws.InvalidOperationException);
         }
     }
 }

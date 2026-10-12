@@ -111,5 +111,16 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             Assert.That(PendingStarterComponents.FindComponentType(StandInClass), Is.EqualTo(typeof(GraphRunnerBehaviour)));
             Assert.That(PendingStarterComponents.FindComponentType("NotCompiledYetGame"), Is.Null);
         }
+
+        [Test]
+        public void AMissingTemplate_CreatesNothing()
+        {
+            // ひな形は何かを作る前に読むので、読めなければグラフもシーンも残らない
+            Assert.That(() => new MissingTemplateStarter().CreateIn(Folder, withScenes: true), Throws.InvalidOperationException);
+
+            var left = AssetDatabase.FindAssets(string.Empty, new[] { Folder }).Select(AssetDatabase.GUIDToAssetPath);
+            Assert.That(left, Is.EqualTo(new[] { Folder + "/Host.unity" }));
+            Assert.That(PendingStarterComponents.Count, Is.Zero);
+        }
     }
 }

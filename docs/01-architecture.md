@@ -350,6 +350,7 @@ Runner が後から始まっても（シーンを読み込むと、ボタンな�
   パッケージを uGUI に依存させないため、`GraphEventButton` の `onClick` と同じく型ではなく名前で探す
 - 書式は `string.Format`（`CultureInfo.InvariantCulture`。`{0}` が値。`{0:0.0}` なども使える）。書式が誤っていれば値だけを出し、1 度だけ警告を出す
 - 書き換えるのは、有効になったとき・そのパラメータが変わったとき（`ParameterChanged`）・Runner が始まったとき。Runner が無ければ書き換えない（シーンに置いた文字のまま）
+- 値を読んでいる Runner が止まったら（`Stopped`）、ほかの実行中の Runner を探し直す。無ければ止まった Runner から外れ（参照を持ち続けない）、文字はそのまま
 
 `GraphEventKey`:
 - グラフは任意（空なら実行中のどれか）、キー（`KeyCode`）、操作（`GraphEventKeyAction`: Raise / Advance）、イベント名（Graph Event Button と同じドロップダウン）
@@ -675,7 +676,9 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
 
 作るもの（`<名前>` はグラフのファイル名。同じ名前があれば番号を付ける。`Snake`・`Snake 1`…）:
 - グラフ `<名前>.asset`（Scene ノードには下のシーンが入っている）
-- ゲームのスクリプト `<クラス名>.cs`（`SnakeGame`・`SlidingPuzzleGame`。グラフ名から作り、同じ名前のファイル・クラスがあれば番号を付ける。名前空間は無し）
+- ゲームのスクリプト `<クラス名>.cs`（`SnakeGame`・`SlidingPuzzleGame`。グラフ名から作り、同じ名前のクラス・スクリプトがあれば番号を付ける。名前空間は無し）。
+  スクリプトは、コンパイル済みのクラスのほか、プロジェクトのどこかにある同じ名前のスクリプト（大文字小文字は区別しない）も見る
+  （コンパイルが終わる前に別のフォルダで 2 つ目を作っても、同じクラス名にならないように）
 - シーン `<名前> Title.unity`（Main Camera・EventSystem・見出し・Start のボタン・Return / Space で `Start` の Graph Event Key・このグラフの Graph Runner）と
   `<名前> Game.unity`（Main Camera・EventSystem・Canvas（盤・パラメータの表示・パネル）・キー）
 
@@ -726,7 +729,8 @@ Blackboard: Level（Int、1）、Moves（Int、0）
   クラスが見つからなければ（コンパイルエラー中など）、ドメインリロードのたびに試し直す（Unity を閉じると忘れるので、付け方を警告に出す）。Play 中なら Play を終えてから付ける
 - スクリプトのひな形は `Starters/Templates/`（`SnakeGameTemplate.cs`・`SlidingPuzzleGameTemplate.cs`）。そのまま C# としてコンパイルできる形で持ち
   （アセンブリ `Reiga.VisualNodeEditor.Starters.Templates`、エディタだけ。テストを含めるとき（`UNITY_INCLUDE_TESTS`）だけコンパイルする）、
-  書き出すときにクラス名（`SnakeGameTemplate`）だけを置き換える。ひな形がコンパイルできること、遊びの規則（`IsInside`・`HitsBody`・`Slide`・`Shuffle` など）を EditMode テストで確かめる
+  書き出すときにクラス名（`SnakeGameTemplate`）だけを置き換える。ひな形がコンパイルできること、遊びの規則（`IsInside`・`HitsBody`・`Slide`・`Shuffle` など）を EditMode テストで確かめる。
+  ひな形は何かを作る前に読む（読めなければ、グラフもシーンも作らずにエラーを出す。作りかけの物を残さない）
 - アセンブリ: `Reiga.VisualNodeEditor.Starters.Editor`（`Starters/Editor`。uGUI を使うので `com.unity.ugui` があるときだけ。`versionDefines` で `VNE_UGUI`）。
   ADV Starter（Yarn 連携のエディタ）もシーンの組み立てにこれを使う
 
@@ -938,7 +942,9 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 ### ゲーム向けのコンポーネントのインスペクタ
 
 - Graph Node Activator（`GraphNodeActivatorEditor`）: ノードは、グラフの待機ノードとコンテナから選ぶドロップダウン（場所付き。例: `Round › Playing`）。
-  通過ノード（Entry・Event・コンテナの Entry / Exit）と Note は出さない。グラフが無い・ノードが無い（消した）・`Targets` が空・自分や親を指すときは HelpBox で直し方を出す
+  通過ノード（Entry・Event・コンテナの Entry / Exit）と Note は出さない。グラフが無い・ノードが無い（消した）・`Targets` が空・自分や親を指すときは HelpBox で直し方を出す。
+  同じ表示のノードが 2 つ以上あれば `Playing (2)` のように番号を付ける（`DropdownField` は表示の文字で選んだ位置を決めるので、同じ文字だと最初のものを選んでしまう。
+  Set Parameter のパラメータ・Event の条件のパラメータのドロップダウンも同じ）
 - Graph Parameter Text（`GraphParameterTextEditor`）: グラフを決めればパラメータを Blackboard から選ぶドロップダウン、決めなければ名前の入力欄。
   テキストのコンポーネントが無い・パラメータがグラフに無いときは HelpBox
 - Graph Event Key（`GraphEventKeyEditor`）: イベント名は Graph Event Button と同じドロップダウン（`EventNameChoices` を共有する）。グラフに無い名前は HelpBox
