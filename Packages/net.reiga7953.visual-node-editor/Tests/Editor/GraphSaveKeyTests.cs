@@ -137,17 +137,22 @@ namespace Reiga.VisualNodeEditor.Tests
         // ---- キーを持つ前（グラフ名だけのフォルダ）のセーブ ----
 
         [Test]
-        public void SavesFromBeforeTheKey_AreMovedIntoTheKeyedFolder()
+        public void SavesFromBeforeTheKey_AreReadWhereTheyAre_UntilSavedOver()
         {
             var runner = Run("Main");
             GraphSaveSlots.Save(runner, "slot1");
 
-            // 後からキーを持っても、グラフ名だけのフォルダのセーブを見つけ、キーのフォルダへ移す
+            // 後からキーを持っても、グラフ名だけのフォルダのセーブを見つける。読むだけでは動かさない
             runner.Graph.SaveKey = "k";
             Assert.That(GraphSaveSlots.Exists(runner.Graph, "slot1"), Is.True);
-            Assert.That(File.Exists(LegacyPath("Main", "slot1")), Is.False);
-            Assert.That(File.Exists(GraphSaveSlots.GetPath(runner.Graph, "slot1")), Is.True);
             Assert.That(GraphSaveSlots.Load(runner, "slot1"), Is.True);
+            Assert.That(File.Exists(LegacyPath("Main", "slot1")), Is.True);
+
+            // 保存すると、キーのフォルダのセーブを読む。そのあとも、読むだけでは古いセーブを消さない
+            GraphSaveSlots.Save(runner, "slot1");
+            Assert.That(File.Exists(GraphSaveSlots.GetPath(runner.Graph, "slot1")), Is.True);
+            Assert.That(GraphSaveSlots.Exists(runner.Graph, "slot1"), Is.True);
+            Assert.That(File.Exists(LegacyPath("Main", "slot1")), Is.True);
         }
 
         [Test]

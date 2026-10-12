@@ -112,38 +112,65 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
         }
 
-        [Test]
-        public void SavingAgain_WhereFileReplaceIsUnavailable_DeletesThenMoves()
+        [TestCase(typeof(PlatformNotSupportedException))]
+        [TestCase(typeof(IOException))]
+        public void SavingAgain_WhereFileReplaceFails_ReplacesThroughABackup(Type failure)
         {
+            // File.Replace に対応しないプラットフォーム・ドライブ。古いセーブを .bak に退けてから移す
             GraphSaveSlots.Save(_runner, "slot1");
             _runner.Raise("Start");
-            var replace = GraphSaveSlots.ReplaceFile;
-            GraphSaveSlots.ReplaceFile = (_, _) => throw new PlatformNotSupportedException();
-            try
-            {
-                GraphSaveSlots.Save(_runner, "slot1");
-            }
-            finally
-            {
-                GraphSaveSlots.ReplaceFile = replace;
-            }
+
+            WithReplaceFile((_, _) => throw (Exception)Activator.CreateInstance(failure), () => GraphSaveSlots.Save(_runner, "slot1"));
 
             Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
-            var folder = Path.GetDirectoryName(GraphSaveSlots.GetPath(_graph, "slot1"));
-            Assert.That(Directory.GetFiles(folder).Select(Path.GetFileName), Is.EqualTo(new[] { "slot1.json" }));
+            Assert.That(FilesInSlotFolder(), Is.EqualTo(new[] { "slot1.json" }));
         }
 
         [Test]
         public void SavingAgain_WhileTheSlotIsLocked_FailsAndKeepsTheOldSave()
         {
-            // 一時的なロック（ウイルス対策ソフトなど）で消してから移すと、その間に落ちたときにスロットが無くなるので、失敗にする
+            // ほかのプロセス（ウイルス対策ソフトなど）が開いている間は、置き換えも .bak に退けるのもできない。古いセーブを残して失敗にする
+            RequireFileLocks();
             GraphSaveSlots.Save(_runner, "slot1");
             _runner.Raise("Start");
 
-            WithReplaceFile((_, _) => throw new IOException("The file is in use."), () =>
-                Assert.Throws<IOException>(() => GraphSaveSlots.Save(_runner, "slot1")));
+            using (File.Open(GraphSaveSlots.GetPath(_graph, "slot1"), FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                Assert.That(() => GraphSaveSlots.Save(_runner, "slot1"),
+                    Throws.InstanceOf<IOException>().Or.InstanceOf<UnauthorizedAccessException>());
+            }
 
             Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_title.Id));
+        }
+
+        [Test]
+        public void ASaveInterruptedHalfway_IsFoundInTheBackup_AndTheNextSaveCleansUp()
+        {
+            // .bak に退けた後、新しいセーブを移す前に落ちた
+            GraphSaveSlots.Save(_runner, "slot1");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            File.Move(path, path + ".bak");
+
+            Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.True);
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_title.Id));
+
+            _runner.Raise("Start");
+            GraphSaveSlots.Save(_runner, "slot1");
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
+            Assert.That(FilesInSlotFolder(), Is.EqualTo(new[] { "slot1.json" }));
+        }
+
+        [Test]
+        public void Delete_AlsoRemovesALeftoverBackup()
+        {
+            GraphSaveSlots.Save(_runner, "slot1");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            File.Copy(path, path + ".bak");
+
+            Assert.That(GraphSaveSlots.Delete(_graph, "slot1"), Is.True);
+
+            Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.False);
+            Assert.That(FilesInSlotFolder(), Is.Empty);
         }
 
         [Test]
@@ -175,6 +202,18 @@ namespace Reiga.VisualNodeEditor.Tests
                 GraphSaveSlots.ReplaceFile = original;
             }
         }
+
+        // FileShare.None でほかのプロセスからの置き換え・移動を止められるのは Windows だけ
+        private static void RequireFileLocks()
+        {
+            if (Application.platform != RuntimePlatform.WindowsEditor)
+            {
+                Assert.Ignore("Only Windows enforces FileShare.None against renames.");
+            }
+        }
+
+        private string[] FilesInSlotFolder() =>
+            Directory.GetFiles(Path.GetDirectoryName(GraphSaveSlots.GetPath(_graph, "slot1"))).Select(Path.GetFileName).ToArray();
 
         [TestCase("slot1", true)]
         [TestCase("Chapter 2-b_x", true)]
@@ -219,6 +258,31 @@ namespace Reiga.VisualNodeEditor.Tests
                 button.Action = GraphEventButtonAction.Load;
                 Assert.That(button.TrySend(), Is.True);
                 Assert.That(_runner.Current, Is.SameAs(_game));
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void Button_WarnsWhenItCannotSave()
+        {
+            // クリックの処理で例外にせず、警告を出して false（警告は Unity のログに出る）
+            RequireFileLocks();
+            GraphSaveSlots.Save(_runner, "slot1");
+            var gameObject = new GameObject("Save Button");
+            try
+            {
+                var button = gameObject.AddComponent<GraphEventButton>();
+                button.Graph = _graph;
+                button.Action = GraphEventButtonAction.Save;
+                button.Slot = "slot1";
+
+                using (File.Open(GraphSaveSlots.GetPath(_graph, "slot1"), FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.That(button.TrySend(), Is.False);
+                }
             }
             finally
             {

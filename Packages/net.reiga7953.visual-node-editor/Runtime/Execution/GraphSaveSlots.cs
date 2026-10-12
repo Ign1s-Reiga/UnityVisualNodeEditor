@@ -69,7 +69,7 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>
         /// そのスロットにセーブがあるか。キーを持つ前にグラフ名だけのフォルダへ保存した、このグラフのセーブも含む
-        /// （見つけたらキーのフォルダへ移す。<see cref="Read"/>・<see cref="Load"/>・<see cref="Delete"/> も同じ）。
+        /// （<see cref="Read"/>・<see cref="Load"/> も同じ。読むだけで、ファイルは動かさない）。
         /// </summary>
         public static bool Exists(NodeGraphAsset graph, string slot) => FindFile(graph, slot) != null;
 
@@ -95,25 +95,47 @@ namespace Reiga.VisualNodeEditor
             if (!File.Exists(path))
             {
                 File.Move(temporary, path);
-                return;
+            }
+            else
+            {
+                try
+                {
+                    ReplaceFile(temporary, path);
+                }
+                catch (IOException) when (!File.Exists(path))
+                {
+                    // 置き換えの途中で失敗し、古いセーブが別の名前に退けられた（Windows の ReplaceFile）。スロットを空けないよう、新しいセーブを移す
+                    File.Move(temporary, path);
+                }
+                catch (Exception exception) when (exception is NotSupportedException or IOException)
+                {
+                    // File.Replace に対応しないプラットフォーム・ドライブ（一部のネットワークドライブ・リムーバブルドライブなど）
+                    ReplaceThroughBackup(temporary, path);
+                }
             }
 
+            // 前に保存の途中で落ちたときの .bak が残っていれば、もう要らない
+            DeleteIfExists(BackupPath(path));
+        }
+
+        // 古いセーブを .bak に退けてから一時ファイルを移し、.bak を消す。途中で落ちても、セーブか .bak のどちらかが残る（FindFile が .bak も探す）。
+        // ほかのプロセスがスロットを開いていれば、退けるところで失敗し、古いセーブはそのまま残る
+        private static void ReplaceThroughBackup(string temporary, string path)
+        {
+            var backup = BackupPath(path);
+            DeleteIfExists(backup);
+            File.Move(path, backup);
             try
             {
-                ReplaceFile(temporary, path);
-            }
-            catch (NotSupportedException)
-            {
-                // File.Replace に対応しないプラットフォーム。ほかに置き換える手が無いので、消してから移す
-                File.Delete(path);
                 File.Move(temporary, path);
             }
-            catch (IOException) when (!File.Exists(path))
+            catch
             {
-                // 置き換えの途中で失敗し、古いセーブが別の名前に退けられた（Windows の ReplaceFile）。スロットを空けないよう、新しいセーブを移す。
-                // ほかのプロセスが開いているなど、古いセーブが残っているときは、そのまま例外にする（一時的なロックでも消してから移すと、その間に落ちたときにスロットが無くなる）
-                File.Move(temporary, path);
+                File.Move(backup, path);
+                throw;
             }
+
+            File.Delete(backup);
         }
 
         /// <summary>そのスロットのセーブ。無ければ null。</summary>
@@ -139,22 +161,31 @@ namespace Reiga.VisualNodeEditor
             return state != null && runner.RestoreState(state);
         }
 
-        /// <summary>スロットを消す。無ければ false。</summary>
+        /// <summary>
+        /// スロットを消す。無ければ false。保存の途中で落ちたときの .bak と、キーを持つ前のこのグラフのセーブも消す
+        /// （残すと、消したスロットがそれで戻ってくる）。
+        /// </summary>
         public static bool Delete(NodeGraphAsset graph, string slot)
         {
-            var file = FindFile(graph, slot);
-            if (file == null)
+            if (FindFile(graph, slot) == null)
             {
                 return false;
             }
 
-            File.Delete(file);
+            var path = GetPath(graph, slot);
+            DeleteIfExists(path);
+            DeleteIfExists(BackupPath(path));
+            var legacy = FindLegacyFile(graph, slot);
+            if (legacy != null)
+            {
+                File.Delete(legacy);
+            }
+
             return true;
         }
 
-        // そのスロットのファイル。無ければ null。
-        // キーを持つグラフは、グラフ名だけのフォルダにキーを持つ前のこのグラフのセーブがあれば、先にキーのフォルダへ移す
-        // （キーのフォルダにもうあれば、古いほうは要らないので消す。残すと、消したスロットが古いセーブで戻ってくる）
+        // そのスロットのファイル。無ければ null。読むだけで、ファイルは動かさない（消すのは Delete だけ）。
+        // セーブが無ければ、保存の途中で落ちたときの .bak、キーを持つグラフならキーを持つ前のこのグラフのセーブの順に探す
         private static string FindFile(NodeGraphAsset graph, string slot)
         {
             if (graph == null || !IsValidSlotName(slot))
@@ -163,32 +194,23 @@ namespace Reiga.VisualNodeEditor
             }
 
             var path = GetPath(graph, slot);
-            var legacy = FindLegacyFile(graph, slot);
-            if (legacy != null)
+            if (File.Exists(path))
             {
-                try
-                {
-                    if (File.Exists(path))
-                    {
-                        File.Delete(legacy);
-                    }
-                    else
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(path));
-                        File.Move(legacy, path);
-                    }
-                }
-                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-                {
-                    // 移せなければ（ほかのプロセスが開いているなど）、今回はそのまま使う
-                    if (!File.Exists(path))
-                    {
-                        return legacy;
-                    }
-                }
+                return path;
             }
 
-            return File.Exists(path) ? path : null;
+            var backup = BackupPath(path);
+            return File.Exists(backup) ? backup : FindLegacyFile(graph, slot);
+        }
+
+        private static string BackupPath(string path) => path + ".bak";
+
+        private static void DeleteIfExists(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
 
         // キーを持つ前（グラフ名だけのフォルダ）に保存した、このグラフのセーブ。キーを持たないグラフ・セーブが無い・別のグラフのものなら null。
