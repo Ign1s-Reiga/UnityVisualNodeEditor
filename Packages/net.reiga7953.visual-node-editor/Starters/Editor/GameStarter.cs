@@ -57,7 +57,19 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                 return;
             }
 
-            var graph = CreateIn(GetSelectedFolder(), problem == null);
+            NodeGraphAsset graph;
+            try
+            {
+                graph = CreateIn(GetSelectedFolder(), problem == null);
+            }
+            catch (Exception exception)
+            {
+                // ひな形が読めないなど。何かを作る前に失敗しているので、理由を出して終える
+                Debug.LogException(exception);
+                EditorUtility.DisplayDialog(StarterName, $"{StarterName} could not create the game: {exception.Message}", "OK");
+                return;
+            }
+
             Selection.activeObject = graph;
             NodeGraphEditorWindow.Open(graph);
         }
@@ -66,11 +78,13 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// <paramref name="folder"/> にグラフと（<paramref name="writeScript"/> なら）ゲームのスクリプトを作り、保存したグラフを返す。
         /// <paramref name="withScenes"/> なら Title と Game のシーンも作ってグラフの Scene ノードに入れ、スクリプトのコンパイルが終わったら盤に付ける。
         /// シーンを作れなければ、作ったシーンを消してエラーを出す（グラフとスクリプトはそのまま使える）。
+        /// スクリプトのひな形は何かを作る前に読む（読めなければ、何も作らずに例外。作りかけの物を残さない）。
         /// </summary>
         internal NodeGraphAsset CreateIn(string folder, bool withScenes, bool writeScript = true)
         {
             var graphPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{BaseName}.asset");
             var className = StarterScripts.ChooseClassName(Path.GetFileNameWithoutExtension(graphPath), folder);
+            var script = writeScript ? StarterScripts.Generate(TemplateClass, className) : null;
             var graph = BuildGraph();
             AssetDatabase.CreateAsset(graph, graphPath);
             AssetDatabase.SaveAssets();
@@ -91,10 +105,10 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                 }
             }
 
-            if (writeScript)
+            if (script != null)
             {
-                // 付ける予定は、スクリプトを書けてから覚える（ひな形が無いなどで書けなければ、いつまでも付けられない）
-                var scriptPath = StarterScripts.Write(folder, className, TemplateClass);
+                // 付ける予定は、スクリプトを書けてから覚える（書けなければ、いつまでも付けられない）
+                var scriptPath = StarterScripts.Write(folder, className, script);
                 if (gameScenePath != null)
                 {
                     PendingStarterComponents.Add(new PendingStarterComponent(gameScenePath, boardPath, className, AssetDatabase.AssetPathToGUID(graphPath)));

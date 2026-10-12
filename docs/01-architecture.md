@@ -676,7 +676,9 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
 
 作るもの（`<名前>` はグラフのファイル名。同じ名前があれば番号を付ける。`Snake`・`Snake 1`…）:
 - グラフ `<名前>.asset`（Scene ノードには下のシーンが入っている）
-- ゲームのスクリプト `<クラス名>.cs`（`SnakeGame`・`SlidingPuzzleGame`。グラフ名から作り、同じ名前のファイル・クラスがあれば番号を付ける。名前空間は無し）
+- ゲームのスクリプト `<クラス名>.cs`（`SnakeGame`・`SlidingPuzzleGame`。グラフ名から作り、同じ名前のクラス・スクリプトがあれば番号を付ける。名前空間は無し）。
+  スクリプトは、コンパイル済みのクラスのほか、プロジェクトのどこかにある同じ名前のスクリプト（大文字小文字は区別しない）も見る
+  （コンパイルが終わる前に別のフォルダで 2 つ目を作っても、同じクラス名にならないように）
 - シーン `<名前> Title.unity`（Main Camera・EventSystem・見出し・Start のボタン・Return / Space で `Start` の Graph Event Key・このグラフの Graph Runner）と
   `<名前> Game.unity`（Main Camera・EventSystem・Canvas（盤・パラメータの表示・パネル）・キー）
 
@@ -727,7 +729,8 @@ Blackboard: Level（Int、1）、Moves（Int、0）
   クラスが見つからなければ（コンパイルエラー中など）、ドメインリロードのたびに試し直す（Unity を閉じると忘れるので、付け方を警告に出す）。Play 中なら Play を終えてから付ける
 - スクリプトのひな形は `Starters/Templates/`（`SnakeGameTemplate.cs`・`SlidingPuzzleGameTemplate.cs`）。そのまま C# としてコンパイルできる形で持ち
   （アセンブリ `Reiga.VisualNodeEditor.Starters.Templates`、エディタだけ。テストを含めるとき（`UNITY_INCLUDE_TESTS`）だけコンパイルする）、
-  書き出すときにクラス名（`SnakeGameTemplate`）だけを置き換える。ひな形がコンパイルできること、遊びの規則（`IsInside`・`HitsBody`・`Slide`・`Shuffle` など）を EditMode テストで確かめる
+  書き出すときにクラス名（`SnakeGameTemplate`）だけを置き換える。ひな形がコンパイルできること、遊びの規則（`IsInside`・`HitsBody`・`Slide`・`Shuffle` など）を EditMode テストで確かめる。
+  ひな形は何かを作る前に読む（読めなければ、グラフもシーンも作らずにエラーを出す。作りかけの物を残さない）
 - アセンブリ: `Reiga.VisualNodeEditor.Starters.Editor`（`Starters/Editor`。uGUI を使うので `com.unity.ugui` があるときだけ。`versionDefines` で `VNE_UGUI`）。
   ADV Starter（Yarn 連携のエディタ）もシーンの組み立てにこれを使う
 

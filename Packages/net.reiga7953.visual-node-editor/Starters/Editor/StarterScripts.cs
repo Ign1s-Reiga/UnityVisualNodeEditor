@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 using Reiga.VisualNodeEditor.Editor.Behaviours;
 using UnityEditor;
@@ -37,11 +38,12 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         /// <summary>
         /// グラフ名から作るクラス名（例: "Snake" → "SnakeGame"、"Snake 1" → "Snake1Game"、"Sliding Puzzle" → "SlidingPuzzleGame"）。
-        /// <paramref name="isTaken"/>（そのクラス名か、<paramref name="folder"/> の同じ名前のファイルがあるか）なら番号を足す（"SnakeGame2" …）。
+        /// <paramref name="isTaken"/> なら番号を足す（"SnakeGame2" …）。既定では、コンパイル済みの同じ名前のクラス、プロジェクトのどこかにある同じ名前のスクリプト
+        /// （<see cref="IsScriptNameTaken"/>。まだコンパイルされていないものも）、<paramref name="folder"/> の同じ名前のファイルがあれば使わない。
         /// </summary>
         internal static string ChooseClassName(string graphName, string folder, Func<string, bool> isTaken = null)
         {
-            isTaken ??= name => NodeBehaviourScriptCreator.IsClassNameTaken(name) || File.Exists($"{folder}/{name}.cs");
+            isTaken ??= name => NodeBehaviourScriptCreator.IsClassNameTaken(name) || IsScriptNameTaken(name) || File.Exists($"{folder}/{name}.cs");
             var stem = NodeBehaviourScriptTemplate.ToClassName(graphName) + "Game";
             if (!isTaken(stem))
             {
@@ -58,11 +60,23 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             }
         }
 
-        /// <summary><paramref name="folder"/> に <paramref name="className"/>.cs を書き出し、パスを返す（読み込みは呼ぶ側で行う）。</summary>
-        internal static string Write(string folder, string className, string templateClass)
+        /// <summary>
+        /// プロジェクト（パッケージを含む）に、ファイル名が <paramref name="name"/> のスクリプトがあるか（大文字小文字は区別しない）。
+        /// コンパイルが終わる前の、別のフォルダで作った Starter のスクリプトも見つける（同じクラス名にすると、コンパイルできなくなる）。
+        /// </summary>
+        internal static bool IsScriptNameTaken(string name) =>
+            AssetDatabase.FindAssets($"{name} t:MonoScript")
+                .Select(AssetDatabase.GUIDToAssetPath)
+                .Any(path => string.Equals(Path.GetFileNameWithoutExtension(path), name, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>ひな形 <paramref name="templateClass"/> から、クラス名を <paramref name="className"/> にしたスクリプトの中身を作る。ひな形が無ければ例外。</summary>
+        internal static string Generate(string templateClass, string className) => Render(LoadTemplate(templateClass), templateClass, className);
+
+        /// <summary><paramref name="folder"/> に <paramref name="className"/>.cs として <paramref name="text"/> を書き出し、パスを返す（読み込みは呼ぶ側で行う）。</summary>
+        internal static string Write(string folder, string className, string text)
         {
             var path = $"{folder}/{className}.cs";
-            File.WriteAllText(path, Render(LoadTemplate(templateClass), templateClass, className));
+            File.WriteAllText(path, text);
             return path;
         }
     }
