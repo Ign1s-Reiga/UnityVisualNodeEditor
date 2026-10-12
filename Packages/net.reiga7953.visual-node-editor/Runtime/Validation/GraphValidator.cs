@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -12,6 +13,41 @@ namespace Reiga.VisualNodeEditor
             var issues = Validate(graph.Nodes, graph.Edges);
             issues.AddRange(ValidateParameters(graph.Parameters));
             issues.AddRange(ConditionValidator.Validate(graph.Nodes, graph.Edges, graph.Parameters));
+            issues.AddRange(ValidateBehaviours(graph));
+            return issues;
+        }
+
+        /// <summary>振る舞い自身の検証（<see cref="NodeBehaviour.GetIssues"/>）。読めなかった振る舞い（null）は <see cref="Validate(IReadOnlyList{NodeData}, IReadOnlyList{EdgeData})"/> が出す。</summary>
+        public static List<GraphIssue> ValidateBehaviours(NodeGraphAsset graph)
+        {
+            var issues = new List<GraphIssue>();
+            foreach (var node in graph.Nodes)
+            {
+                if (!(node is IBehaviourHost host))
+                {
+                    continue;
+                }
+
+                foreach (var behaviour in host.Behaviours)
+                {
+                    if (behaviour == null)
+                    {
+                        continue;
+                    }
+
+                    // 振る舞いはユーザーのコードなので、検証の途中で例外を出しても、ほかの問題は出す
+                    try
+                    {
+                        issues.AddRange(behaviour.GetIssues(graph, node) ?? Enumerable.Empty<GraphIssue>());
+                    }
+                    catch (Exception exception)
+                    {
+                        issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
+                            $"'{node.Title}': checking its {behaviour.GetType().Name} failed ({exception.Message}).", node.Id));
+                    }
+                }
+            }
+
             return issues;
         }
 

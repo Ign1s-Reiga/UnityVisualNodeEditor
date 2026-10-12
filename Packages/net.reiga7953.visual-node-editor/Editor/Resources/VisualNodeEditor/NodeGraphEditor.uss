@@ -371,6 +371,29 @@
   margin-top: 4px;
 }
 
+/* One change of the Set Parameter behaviour (ParameterChangeDrawer) */
+.vne-parameter-change {
+  flex-direction: row;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.vne-parameter-change__parameter {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 60px;
+}
+
+.vne-parameter-change__operation {
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.vne-parameter-change__value {
+  width: 72px;
+  flex-shrink: 0;
+}
+
 /* "Now running" panel above the inspector while playing (RuntimePanel) */
 
 .vne-runtime-panel {

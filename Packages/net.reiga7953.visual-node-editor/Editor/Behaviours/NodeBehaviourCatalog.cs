@@ -33,9 +33,20 @@ namespace Reiga.VisualNodeEditor.Editor.Behaviours
         /// <summary><c>[Serializable]</c> が付いているか。無いとグラフアセットに保存できない。</summary>
         public static bool IsSaveable(Type type) => type != null && type.IsSerializable;
 
-        /// <summary>メニューのパス。名前空間を階層にする（例: "MyGame/Stage/PlayerMovement"）。</summary>
-        public static string GetMenuPath(Type type) =>
-            string.IsNullOrEmpty(type.Namespace) ? type.Name : type.Namespace.Replace('.', '/') + "/" + type.Name;
+        /// <summary>
+        /// メニューのパス。<see cref="BehaviourMenuAttribute"/> があればそのパス（例: "Visual Node Editor/Set Parameter"）、
+        /// 無ければ名前空間を階層にする（例: "MyGame/Stage/PlayerMovement"）。
+        /// </summary>
+        public static string GetMenuPath(Type type)
+        {
+            var menu = (BehaviourMenuAttribute)Attribute.GetCustomAttribute(type, typeof(BehaviourMenuAttribute), false);
+            if (menu != null && menu.Path.Length > 0)
+            {
+                return menu.Path;
+            }
+
+            return string.IsNullOrEmpty(type.Namespace) ? type.Name : type.Namespace.Replace('.', '/') + "/" + type.Name;
+        }
 
         /// <summary>型を定義しているスクリプト。ファイル名がクラス名と違うなどで見つからなければ null。</summary>
         public static MonoScript FindScript(Type type) =>

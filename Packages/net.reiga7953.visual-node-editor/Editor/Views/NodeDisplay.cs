@@ -151,14 +151,26 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         /// </summary>
         public static string GetFieldLabel(string propertyName) => ObjectNames.NicifyVariableName(propertyName);
 
-        /// <summary>振る舞いの表示名（クラス名を単語に区切る。例: "PlayerMovement" → "Player Movement"）。</summary>
-        public static string GetBehaviourName(Type behaviourType) =>
-            behaviourType == null ? string.Empty : ObjectNames.NicifyVariableName(behaviourType.Name);
+        /// <summary>
+        /// 振る舞いの表示名。<see cref="BehaviourMenuAttribute"/> があればそのパスの最後（例: "Set Parameter"）、
+        /// 無ければクラス名を単語に区切ったもの（例: "PlayerMovement" → "Player Movement"）。
+        /// </summary>
+        public static string GetBehaviourName(Type behaviourType)
+        {
+            if (behaviourType == null)
+            {
+                return string.Empty;
+            }
+
+            var menu = (BehaviourMenuAttribute)Attribute.GetCustomAttribute(behaviourType, typeof(BehaviourMenuAttribute), false);
+            return menu != null && menu.Name.Length > 0 ? menu.Name : ObjectNames.NicifyVariableName(behaviourType.Name);
+        }
 
         /// <summary>
-        /// ノードに出す振る舞いの一覧（例: "Player Movement, Timer"）。読めなかったものは "Missing"。振る舞いが無ければ空文字。
+        /// ノードに出す振る舞いの一覧（例: "Player Movement, Score = 0"）。振る舞いの説明（<see cref="NodeBehaviour.Describe"/>）があればそれ、
+        /// 無ければ表示名。読めなかったものは "Missing"。振る舞いが無ければ空文字。
         /// </summary>
-        public static string GetBehavioursText(IReadOnlyList<NodeBehaviour> behaviours)
+        public static string GetBehavioursText(IReadOnlyList<NodeBehaviour> behaviours, NodeGraphAsset graph = null)
         {
             if (behaviours == null || behaviours.Count == 0)
             {
@@ -168,10 +180,29 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             var names = new string[behaviours.Count];
             for (var i = 0; i < behaviours.Count; i++)
             {
-                names[i] = behaviours[i] == null ? MissingBehaviourName : GetBehaviourName(behaviours[i].GetType());
+                names[i] = behaviours[i] == null ? MissingBehaviourName : Describe(behaviours[i], graph);
             }
 
             return string.Join(", ", names);
+        }
+
+        // 振る舞いの説明。無い・説明で例外が出たら（ユーザーのコード）表示名
+        private static string Describe(NodeBehaviour behaviour, NodeGraphAsset graph)
+        {
+            try
+            {
+                var description = behaviour.Describe(graph);
+                if (!string.IsNullOrEmpty(description))
+                {
+                    return description;
+                }
+            }
+            catch (Exception exception)
+            {
+                UnityEngine.Debug.LogException(exception);
+            }
+
+            return GetBehaviourName(behaviour.GetType());
         }
 
         /// <summary>ノード上の一覧で、読めなかった振る舞いに出す名前。</summary>
