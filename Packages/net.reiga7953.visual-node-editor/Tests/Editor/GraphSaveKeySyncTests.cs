@@ -50,12 +50,14 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(EditorUtility.IsDirty(copy), Is.False, "the new key is saved");
         }
 
-        [Test]
-        public void UnitysCopy_DoesNotTakeTheOriginalsKey()
+        // Unity の複製は "Main 1"・"Stage 9" の次の "Stage 10"。文字の順では、どちらも複製のほうが先になる
+        // （"Main 1.asset" は ' ' が '.' より前、"Stage 10" は '1' が '9' より前）
+        [TestCase("Main", "Main 1")]
+        [TestCase("Stage 9", "Stage 10")]
+        public void UnitysCopy_DoesNotTakeTheOriginalsKey(string originalName, string copyName)
         {
-            // Unity の複製は "Main 1"。パスの順では "Main 1.asset" が "Main.asset" より先になる（' ' が '.' より前）
-            var original = Create("Main");
-            var copy = Create("Main 1");
+            var original = Create(originalName);
+            var copy = Create(copyName);
             var key = original.SaveKey;
             WriteKeysWithoutChecking(key, copy);
 

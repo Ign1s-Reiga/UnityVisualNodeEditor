@@ -12,10 +12,11 @@ namespace Reiga.VisualNodeEditor.Editor
     /// 新しいグラフは作るときにキーを持つ（<see cref="NodeGraphFactory.CreateNew"/>）。アセットを複製すると同じキーを持つので、
     /// 読み込まれたグラフのキーが別のグラフと同じなら、新しいキーに入れ直して保存する。
     /// どのグラフがキーを残すかは、読み込まれていないグラフ → アセットの GUID と同じキーを持つグラフ（0.13.1 で入れたキー）→
-    /// ファイル名の順（Unity の複製は元の名前に " 1" などを足すので、元のグラフが先）→ パスの順。
+    /// ファイル名の自然な順（Unity の複製は "Main 1"・"Stage 10" のように番号を付けるので、元のグラフが先）→ パスの順。
     /// キーを持たないグラフ（0.13.0 までに作ったもの）は書き換えない（クローン・再インポート・CI でアセットが変わらないように）。
     /// 未保存の変更があるグラフ（エディタで編集中など）は、ユーザーの編集まで勝手に書き込まないよう保存せず、未保存状態にするだけにする。
     /// エディタを開いたときに 1 回、全部のグラフで重なりを確かめる（保存しなかった複製や、重なったままコミットされたグラフが残らないように）。
+    /// バッチモード（CI など）では、その確かめをせず、読み込みで入れ直したキーも保存しない（アセットを書き換えないように）。
     /// </summary>
     internal sealed class GraphSaveKeySync : AssetPostprocessor
     {
@@ -41,7 +42,7 @@ namespace Reiga.VisualNodeEditor.Editor
             }
 
             _keys = null;
-            Resolve(FindAllGraphs());
+            Resolve(FindAllGraphs(), true);
         }
 
         /// <summary><paramref name="action"/> の間だけ、重なったキーを入れ直さない（テストで、重なったキーをディスクに作るときに使う）。</summary>
@@ -68,8 +69,12 @@ namespace Reiga.VisualNodeEditor.Editor
                 return;
             }
 
-            SessionState.SetBool(CheckedKey, true);
-            EditorApplication.delayCall += CheckAll;
+            // 印は確かめてから付ける（その前にスクリプトの再読み込みが起きると delayCall が消えるので、次の読み込みでもう一度頼む）
+            EditorApplication.delayCall += () =>
+            {
+                CheckAll();
+                SessionState.SetBool(CheckedKey, true);
+            };
         }
 
         private static void OnPostprocessAllAssets(
@@ -91,17 +96,19 @@ namespace Reiga.VisualNodeEditor.Editor
                 }
             }
 
+            // バッチモード（CI など）では、重なったキーを入れ直しても保存しない（アセットを書き換えないように）
             var imported = importedAssets.Where(IsGraph).ToList();
             if (imported.Count > 0)
             {
-                Resolve(imported);
+                Resolve(imported, !Application.isBatchMode);
             }
         }
 
-        // paths のグラフのキーを、ほかのグラフと重ならないようにして、覚えているキーを直す。
-        // paths の中で重なっていれば、アセットの GUID と同じキーを持つグラフ（元のグラフ）→ ファイル名 → パスの順に、先のものがキーを残す
-        // （パスだけの順では、"Main 1.asset" が "Main.asset" より先になり、複製が元のグラフのキーを取ってしまう）
-        private static void Resolve(IReadOnlyCollection<string> paths)
+        // paths のグラフのキーを、ほかのグラフと重ならないようにして、覚えているキーを直す。save なら入れ直したキーを保存する。
+        // paths の中で重なっていれば、アセットの GUID と同じキーを持つグラフ（元のグラフ）→ ファイル名の自然な順 → パスの順に、先のものがキーを残す
+        // （Unity の複製は "Main 1"・"Stage 9" の次の "Stage 10" のように番号を付けるので、自然な順なら元のグラフが先になる。
+        // 文字の順では "Main 1.asset" が "Main.asset" より、"Stage 10" が "Stage 9" より先になる）
+        private static void Resolve(IReadOnlyCollection<string> paths, bool save)
         {
             var keys = _keys ??= LoadKeys();
             var resolving = new HashSet<string>(paths, StringComparer.Ordinal);
@@ -110,12 +117,12 @@ namespace Reiga.VisualNodeEditor.Editor
                 .Select(path => (path, graph: AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(path)))
                 .Where(entry => entry.graph != null)
                 .OrderBy(entry => entry.graph.SaveKey == AssetDatabase.AssetPathToGUID(entry.path) ? 0 : 1)
-                .ThenBy(entry => Path.GetFileNameWithoutExtension(entry.path), StringComparer.Ordinal)
+                .ThenBy(entry => Path.GetFileNameWithoutExtension(entry.path), Comparer<string>.Create(EditorUtility.NaturalCompare))
                 .ThenBy(entry => entry.path, StringComparer.Ordinal)
                 .ToList();
             foreach (var (path, graph) in graphs)
             {
-                if (_suspended == 0 && MakeUnique(graph, taken, out var shouldSave) && shouldSave)
+                if (_suspended == 0 && MakeUnique(graph, taken, out var shouldSave) && shouldSave && save)
                 {
                     AssetDatabase.SaveAssetIfDirty(graph);
                 }
