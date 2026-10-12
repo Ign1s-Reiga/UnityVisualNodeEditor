@@ -375,6 +375,122 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void LoadButton_FollowsSavesAndDeletes_WhileItIsEnabled()
+        {
+            // ポーズメニューのように、セーブとロードのボタンが同時に出ている
+            WithLoadButton(_graph, (button, clickable) =>
+            {
+                Assert.That(clickable.interactable, Is.False);
+
+                GraphSaveSlots.Save(_runner, "slot1");
+                Assert.That(clickable.interactable, Is.True, "saving tells the button");
+
+                GraphSaveSlots.Delete(_graph, "slot1");
+                Assert.That(clickable.interactable, Is.False, "deleting tells the button");
+            });
+        }
+
+        [Test]
+        public void LoadButton_WithoutAGraph_IsCheckedOnceARunnerStarts()
+        {
+            // シーンを読み込むと、Graph Runner が始まるより先にボタンが有効になる。グラフが空なら、そのときはどのグラフのセーブか分からない
+            _runner.Stop();
+            WithLoadButton(null, (button, clickable) =>
+            {
+                Assert.That(clickable.interactable, Is.True, "no graph to check yet");
+
+                _runner.Start();
+                Assert.That(clickable.interactable, Is.False, "checked against the running graph");
+            });
+        }
+
+        [Test]
+        public void LoadButton_NeverEnablesAButtonThatWasDisabledElsewhere()
+        {
+            // 作者やほかのスクリプトが押せないようにしたボタンは、セーブがあっても点けない
+            GraphSaveSlots.Save(_runner, "slot1");
+            var gameObject = new GameObject("Continue");
+            try
+            {
+                var clickable = gameObject.AddComponent<CanvasGroup>();
+                clickable.interactable = false;
+                var button = gameObject.AddComponent<GraphEventButton>();
+                button.Graph = _graph;
+                button.Action = GraphEventButtonAction.Load;
+                button.Slot = "slot1";
+
+                button.RefreshInteractable();
+
+                Assert.That(clickable.interactable, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void LoadButton_StaysDisabled_WhenTheSaveCannotBeLoaded()
+        {
+            // セーブはあるが、保存したノードがグラフから消えた（ゲームの更新など）。押してもロードできない
+            _runner.Raise("Start");
+            GraphSaveSlots.Save(_runner, "slot1");
+            _graph.RemoveNode(_game);
+
+            WithLoadButton(_graph, (button, clickable) => Assert.That(clickable.interactable, Is.False));
+            Assert.That(GraphSaveSlots.CanLoad(_graph, "slot1"), Is.False);
+        }
+
+        [Test]
+        public void InteractableTarget_IsTheComponentWhoseClickWasHooked()
+        {
+            // 同じ GameObject のボタンの前に CanvasGroup があっても、クリックを繋いだコンポーネントを変える
+            var buttonObject = new GameObject("Continue");
+            var sourceObject = new GameObject("Click source");
+            try
+            {
+                var group = buttonObject.AddComponent<CanvasGroup>();
+                var source = sourceObject.AddComponent<CanvasGroup>();
+
+                Assert.That(GraphEventButton.ChooseInteractableTarget(source, buttonObject), Is.SameAs(source));
+                Assert.That(GraphEventButton.ChooseInteractableTarget(null, buttonObject), Is.SameAs(group), "no click source: the first with interactable");
+                Assert.That(GraphEventButton.ChooseInteractableTarget(sourceObject.transform, buttonObject), Is.SameAs(group),
+                    "a click source without interactable");
+            }
+            finally
+            {
+                Object.DestroyImmediate(buttonObject);
+                Object.DestroyImmediate(sourceObject);
+            }
+        }
+
+        // 有効にした Load のボタン（スロット slot1）で確かめる。CanvasGroup は uGUI の Button と同じく interactable を持つ（名前で探す）
+        private static void WithLoadButton(NodeGraphAsset graph, Action<GraphEventButton, CanvasGroup> check)
+        {
+            var gameObject = new GameObject("Continue");
+            GraphEventButton button = null;
+            try
+            {
+                var clickable = gameObject.AddComponent<CanvasGroup>();
+                button = gameObject.AddComponent<GraphEventButton>();
+                button.Graph = graph;
+                button.Action = GraphEventButtonAction.Load;
+                button.Slot = "slot1";
+                button.Enable();
+                check(button, clickable);
+            }
+            finally
+            {
+                if (button != null)
+                {
+                    button.Disable();
+                }
+
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
         public void Button_WarnsWhenItCannotSave()
         {
             // クリックの処理で例外にせず、警告を出して false（警告は Unity のログに出る）

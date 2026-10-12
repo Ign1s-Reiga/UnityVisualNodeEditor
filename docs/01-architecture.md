@@ -458,8 +458,13 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
 
 - `GraphRunnerBehaviour`: `SaveSlot(string)` / `LoadSlot(string)`（UnityEvent から呼べる）。止まっていてもロードできる（保存したノードから始まる）
 - `GraphEventButton`: 操作に `Save` / `Load` を足す（スロット名の欄。既定 `slot1`）。タイトル画面の「続きから」、ゲーム中の「セーブ」をコード無しで置ける
-  - Load のボタンは、スロットにセーブがあるときだけ押せる（`Disable Without Save`、既定 on。有効になったときと `RefreshInteractable()` で、同じ GameObject の bool の `interactable` を持つコンポーネント（uGUI の Button など）を名前で探して変える。
-    パッケージを uGUI に依存させないため、`onClick` と同じく型ではなく名前で探す。グラフが空で実行中の Runner も無ければ変えない）
+  - Load のボタンは、スロットから再開できるとき（`GraphSaveSlots.CanLoad`: セーブがあり、読めて、保存したノードがグラフにある）だけ押せる（`Disable Without Save`、既定 on）。
+    確かめるのは、有効になったとき・スロットに保存した・消したとき（`GraphSaveSlots.SlotChanged`。ほかのボタンやゲームのコードからでも）・グラフが空なら Runner が始まったとき
+    （シーンを読み込むと Runner が始まるより先にボタンが有効になる）・`RefreshInteractable()` を呼んだとき
+  - 変えるのは、クリックを繋いだコンポーネント（`onClick` を持つもの。無ければ同じ GameObject の bool の `interactable` を持つ最初のもの）の `interactable`。
+    パッケージを uGUI に依存させないため、`onClick` と同じく型ではなく名前で探す（同じ GameObject の CanvasGroup を変えないように、クリックを繋いだものを先に選ぶ）
+  - 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたときだけ（作者やほかのスクリプトが押せないようにしたボタンは点けない）。
+    グラフが空で実行中の Runner も無ければ、どのグラフのセーブか分からないので押せないようにはしない
 - スロット名は英数字・空白・'-'・'_' だけで、Windows が装置の名前として予約している CON・PRN・AUX・NUL・COM0〜9・LPT0〜9 は使えない（`.json` を付けても作れないため。インスペクタで注意を出す）
 - Now running パネルに Save / Load のボタン（スロット `debug`）を出し、Play 中にセーブ・ロードを試せるようにする
 - `GraphSaveKeySync`（エディタ）: 読み込まれたグラフのセーブキーが別のグラフと同じなら、そのアセットの GUID に入れ直す（使われていればランダムな ID。GUID ならどの環境でも同じキーになり、保存しないバッチモードのビルドでもビルドのたびにキーが変わらない）。どのグラフがキーを残すかは、
