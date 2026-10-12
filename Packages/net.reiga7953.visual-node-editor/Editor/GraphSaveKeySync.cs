@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEngine;
 
 namespace Reiga.VisualNodeEditor.Editor
 {
@@ -9,19 +11,23 @@ namespace Reiga.VisualNodeEditor.Editor
     /// グラフのセーブキー（<see cref="NodeGraphAsset.SaveKey"/>）が、別のグラフと重ならないようにする。
     /// 新しいグラフは作るときにキーを持つ（<see cref="NodeGraphFactory.CreateNew"/>）。アセットを複製すると同じキーを持つので、
     /// 読み込まれたグラフのキーが別のグラフと同じなら、新しいキーに入れ直して保存する。
-    /// どのグラフがキーを残すかは、読み込まれていないグラフ → アセットの GUID と同じキーを持つグラフ（0.13.1 で入れたキー）→ パスの順。
+    /// どのグラフがキーを残すかは、読み込まれていないグラフ → アセットの GUID と同じキーを持つグラフ（0.13.1 で入れたキー）→
+    /// ファイル名の順（Unity の複製は元の名前に " 1" などを足すので、元のグラフが先）→ パスの順。
     /// キーを持たないグラフ（0.13.0 までに作ったもの）は書き換えない（クローン・再インポート・CI でアセットが変わらないように）。
     /// 未保存の変更があるグラフ（エディタで編集中など）は、ユーザーの編集まで勝手に書き込まないよう保存せず、未保存状態にするだけにする。
-    /// スクリプトの再読み込みの後に 1 回、全部のグラフで重なりを確かめる（保存しなかった複製や、重なったままコミットされたグラフが残らないように）。
+    /// エディタを開いたときに 1 回、全部のグラフで重なりを確かめる（保存しなかった複製や、重なったままコミットされたグラフが残らないように）。
     /// </summary>
     internal sealed class GraphSaveKeySync : AssetPostprocessor
     {
+        // エディタを開いてから全部のグラフを確かめたか（SessionState はスクリプトの再読み込みでは消えず、エディタを閉じると消える）
+        private const string CheckedKey = "Reiga.VisualNodeEditor.GraphSaveKeySync.Checked";
+
         // グラフのパス → キー（キーを持つグラフだけ）。最初に要るときに全部のグラフから作り、あとは読み込み・削除・移動で直す
         // （グラフを保存するたびに、全部のグラフを読み込まないように）
         private static Dictionary<string, string> _keys;
 
-        /// <summary>重なったキーを入れ直すか（テストで、重なったキーをディスクに作るときだけ止める）。</summary>
-        internal static bool Enabled = true;
+        // 重なったキーを入れ直さない間（WithoutFixing の中）の深さ
+        private static int _suspended;
 
         /// <summary>新しいセーブキー。</summary>
         internal static string NewKey() => Guid.NewGuid().ToString("N");
@@ -29,7 +35,7 @@ namespace Reiga.VisualNodeEditor.Editor
         /// <summary>全部のグラフで、キーの重なりを直す。</summary>
         internal static void CheckAll()
         {
-            if (!Enabled)
+            if (_suspended > 0)
             {
                 return;
             }
@@ -38,8 +44,33 @@ namespace Reiga.VisualNodeEditor.Editor
             Resolve(FindAllGraphs());
         }
 
+        /// <summary><paramref name="action"/> の間だけ、重なったキーを入れ直さない（テストで、重なったキーをディスクに作るときに使う）。</summary>
+        internal static void WithoutFixing(Action action)
+        {
+            _suspended++;
+            try
+            {
+                action();
+            }
+            finally
+            {
+                _suspended--;
+            }
+        }
+
+        // エディタを開いたときに 1 回だけ確かめる（スクリプトの再読み込み・Play に入るたびに全部のグラフを読み込まないように）。
+        // バッチモード（CI など）では、アセットを書き換えないよう確かめない
         [InitializeOnLoadMethod]
-        private static void CheckAfterReload() => EditorApplication.delayCall += CheckAll;
+        private static void CheckOncePerSession()
+        {
+            if (Application.isBatchMode || SessionState.GetBool(CheckedKey, false))
+            {
+                return;
+            }
+
+            SessionState.SetBool(CheckedKey, true);
+            EditorApplication.delayCall += CheckAll;
+        }
 
         private static void OnPostprocessAllAssets(
             string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
@@ -68,7 +99,8 @@ namespace Reiga.VisualNodeEditor.Editor
         }
 
         // paths のグラフのキーを、ほかのグラフと重ならないようにして、覚えているキーを直す。
-        // paths の中で重なっていれば、アセットの GUID と同じキーを持つグラフ（元のグラフ）→ パスの順に、先のものがキーを残す
+        // paths の中で重なっていれば、アセットの GUID と同じキーを持つグラフ（元のグラフ）→ ファイル名 → パスの順に、先のものがキーを残す
+        // （パスだけの順では、"Main 1.asset" が "Main.asset" より先になり、複製が元のグラフのキーを取ってしまう）
         private static void Resolve(IReadOnlyCollection<string> paths)
         {
             var keys = _keys ??= LoadKeys();
@@ -78,11 +110,12 @@ namespace Reiga.VisualNodeEditor.Editor
                 .Select(path => (path, graph: AssetDatabase.LoadAssetAtPath<NodeGraphAsset>(path)))
                 .Where(entry => entry.graph != null)
                 .OrderBy(entry => entry.graph.SaveKey == AssetDatabase.AssetPathToGUID(entry.path) ? 0 : 1)
+                .ThenBy(entry => Path.GetFileNameWithoutExtension(entry.path), StringComparer.Ordinal)
                 .ThenBy(entry => entry.path, StringComparer.Ordinal)
                 .ToList();
             foreach (var (path, graph) in graphs)
             {
-                if (Enabled && MakeUnique(graph, taken, out var shouldSave) && shouldSave)
+                if (_suspended == 0 && MakeUnique(graph, taken, out var shouldSave) && shouldSave)
                 {
                     AssetDatabase.SaveAssetIfDirty(graph);
                 }
