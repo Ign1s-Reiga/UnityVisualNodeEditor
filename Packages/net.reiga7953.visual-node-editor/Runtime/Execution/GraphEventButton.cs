@@ -45,6 +45,10 @@ namespace Reiga.VisualNodeEditor
 
         private UnityEvent _clickEvent;
 
+        // クリックを繋いだコンポーネント（onClick を持つもの。押せる・押せないもこれを変える）と、セーブが無いので押せないようにしたか
+        private Component _clickSource;
+        private bool _disabledWithoutSave;
+
         /// <summary>送り先のグラフ。null なら実行中のどれか 1 つ。</summary>
         public NodeGraphAsset Graph
         {
@@ -91,53 +95,69 @@ namespace Reiga.VisualNodeEditor
         }
 
         /// <summary>
-        /// Load のボタンを、スロットにセーブがあるときだけ押せるようにする（<see cref="DisableWithoutSave"/> で Load のときだけ。有効になったときにも呼ばれる）。
-        /// 同じ GameObject の、public な bool の <c>interactable</c> プロパティを持つコンポーネント（uGUI の Button など）を名前で探して変える。
-        /// グラフが空で実行中の Runner も無いと、どのグラフのセーブか分からないので変えない。ゲームでセーブを消したときなどに呼び直す。
+        /// Load のボタンを、スロットから再開できる（<see cref="GraphSaveSlots.CanLoad"/>）ときだけ押せるようにする（<see cref="DisableWithoutSave"/> で Load のときだけ）。
+        /// 有効になったとき、スロットに保存した・消したとき（<see cref="GraphSaveSlots.SlotChanged"/>）、グラフが空なら Runner が始まったときにも呼ばれる。
+        /// 変えるのは、クリックを繋いだコンポーネント（無ければ同じ GameObject の、public な bool の <c>interactable</c> を持つ最初のもの。uGUI の Button など）。
+        /// 押せないようにするだけで、押せるように戻すのは、自分が押せないようにしたときだけ（作者やほかのスクリプトが押せないようにしたボタンは点けない）。
+        /// グラフが空で実行中の Runner も無いと、どのグラフのセーブか分からないので押せないようにはしない。
         /// </summary>
         public void RefreshInteractable()
         {
-            if (!_disableWithoutSave || _action != GraphEventButtonAction.Load)
+            var target = ChooseInteractableTarget(_clickSource, gameObject);
+            if (target == null)
             {
                 return;
             }
 
             var graph = _graph != null ? _graph : FindRunner(null)?.Graph;
-            if (graph == null)
+            var disable = _disableWithoutSave && _action == GraphEventButtonAction.Load && graph != null && !GraphSaveSlots.CanLoad(graph, _slot);
+            if (disable)
             {
-                return;
+                if (GetInteractable(target))
+                {
+                    SetInteractable(target, false);
+                    _disabledWithoutSave = true;
+                }
             }
-
-            SetInteractable(gameObject, GraphSaveSlots.Exists(graph, _slot));
+            else if (_disabledWithoutSave)
+            {
+                SetInteractable(target, true);
+                _disabledWithoutSave = false;
+            }
         }
 
         /// <summary>
-        /// <paramref name="gameObject"/> の、public な bool の <c>interactable</c> プロパティを持つ最初のコンポーネントに値を入れる。あれば true。
+        /// 押せる・押せないを変える相手: <paramref name="clickSource"/>（クリックを繋いだ、onClick を持つコンポーネント）が bool の <c>interactable</c> を持てばそれ。
+        /// 無ければ <paramref name="gameObject"/> の、それを持つ最初のコンポーネント（例えば、ボタンの前にある CanvasGroup を変えないように）。無ければ null。
         /// パッケージを uGUI に依存させないため、<c>onClick</c> と同じく型ではなく名前で探す。
         /// </summary>
-        internal static bool SetInteractable(GameObject gameObject, bool value)
+        internal static Component ChooseInteractableTarget(Component clickSource, GameObject gameObject)
         {
-            if (gameObject == null)
+            if (FindInteractableProperty(clickSource) != null)
             {
-                return false;
+                return clickSource;
             }
 
-            foreach (var component in gameObject.GetComponents<Component>())
-            {
-                if (component == null || component is GraphEventButton)
-                {
-                    continue;
-                }
+            return gameObject == null
+                ? null
+                : gameObject.GetComponents<Component>().FirstOrDefault(component => !(component is GraphEventButton) && FindInteractableProperty(component) != null);
+        }
 
-                var property = component.GetType().GetProperty(InteractableName, BindingFlags.Public | BindingFlags.Instance);
-                if (property != null && property.PropertyType == typeof(bool) && property.CanWrite && property.GetIndexParameters().Length == 0)
-                {
-                    property.SetValue(component, value);
-                    return true;
-                }
+        private static bool GetInteractable(Component target) => (bool)FindInteractableProperty(target).GetValue(target);
+
+        private static void SetInteractable(Component target, bool value) => FindInteractableProperty(target).SetValue(target, value);
+
+        private static PropertyInfo FindInteractableProperty(Component component)
+        {
+            if (component == null)
+            {
+                return null;
             }
 
-            return false;
+            var property = component.GetType().GetProperty(InteractableName, BindingFlags.Public | BindingFlags.Instance);
+            return property != null && property.PropertyType == typeof(bool) && property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0
+                ? property
+                : null;
         }
 
         /// <summary>実行中の Runner へ送る。UnityEvent（Button の OnClick など）から直接呼べる。</summary>
@@ -214,29 +234,14 @@ namespace Reiga.VisualNodeEditor
         /// <summary>
         /// <paramref name="gameObject"/> にある、public な <c>onClick</c> プロパティかフィールド（<see cref="UnityEvent"/>）。無ければ null。
         /// </summary>
-        internal static UnityEvent FindClickEvent(GameObject gameObject)
-        {
-            if (gameObject == null)
-            {
-                return null;
-            }
+        internal static UnityEvent FindClickEvent(GameObject gameObject) => FindClickEventOn(FindClickSource(gameObject));
 
-            foreach (var component in gameObject.GetComponents<Component>())
-            {
-                if (component == null || component is GraphEventButton)
-                {
-                    continue;
-                }
-
-                var clickEvent = FindClickEventOn(component);
-                if (clickEvent != null)
-                {
-                    return clickEvent;
-                }
-            }
-
-            return null;
-        }
+        /// <summary><paramref name="gameObject"/> にある、public な <c>onClick</c>（<see cref="UnityEvent"/>）を持つ最初のコンポーネント。無ければ null。</summary>
+        internal static Component FindClickSource(GameObject gameObject) =>
+            gameObject == null
+                ? null
+                : gameObject.GetComponents<Component>().FirstOrDefault(component =>
+                    component != null && !(component is GraphEventButton) && FindClickEventOn(component) != null);
 
         /// <summary><paramref name="source"/> の public な <c>onClick</c> プロパティかフィールド（<see cref="UnityEvent"/>）。無ければ null。</summary>
         internal static UnityEvent FindClickEventOn(object source)
@@ -258,13 +263,47 @@ namespace Reiga.VisualNodeEditor
             return field != null ? field.GetValue(source) as UnityEvent : null;
         }
 
-        private void OnEnable()
+        private void OnEnable() => Enable();
+
+        private void OnDisable() => Disable();
+
+        /// <summary>
+        /// 有効になったとき: ボタンのクリックに繋ぎ、セーブの知らせと Runner の開始を聞き、押せるかを直す（テストからも呼ぶ）。
+        /// </summary>
+        internal void Enable()
         {
-            HookClick(FindClickEvent(gameObject));
+            _clickSource = FindClickSource(gameObject);
+            HookClick(FindClickEventOn(_clickSource));
+            GraphSaveSlots.SlotChanged += OnSlotChanged;
+            GraphRunner.Started += OnRunnerStarted;
             RefreshInteractable();
         }
 
-        private void OnDisable() => UnhookClick();
+        /// <summary>無効になったとき: <see cref="Enable"/> で繋いだものを外す。</summary>
+        internal void Disable()
+        {
+            GraphSaveSlots.SlotChanged -= OnSlotChanged;
+            GraphRunner.Started -= OnRunnerStarted;
+            UnhookClick();
+        }
+
+        // 同じ名前のスロットに保存した・消したら（ほかのボタンや、ゲームのコードから）、押せるかを直す
+        private void OnSlotChanged(NodeGraphAsset graph, string slot)
+        {
+            if (slot == _slot)
+            {
+                RefreshInteractable();
+            }
+        }
+
+        // グラフが空なら、Runner が始まって初めてどのグラフのセーブか分かる（シーンを読み込むと、Runner が始まるより先にボタンが有効になる）
+        private void OnRunnerStarted(GraphRunner runner)
+        {
+            if (_graph == null)
+            {
+                RefreshInteractable();
+            }
+        }
 
         /// <summary>
         /// <paramref name="clickEvent"/>（ボタンのクリック）に <see cref="Send"/> を繋ぐ。<see cref="SendOnClick"/> でなければ繋がない。

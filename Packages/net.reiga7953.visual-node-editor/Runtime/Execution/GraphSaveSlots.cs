@@ -18,6 +18,11 @@ namespace Reiga.VisualNodeEditor
         public static readonly string SlotNameRule =
             $"Use up to {MaxSlotLength} letters, digits, spaces, '-' and '_' (no space at either end), and not a name Windows reserves such as CON, NUL or COM1.";
 
+        /// <summary>
+        /// スロットに保存した・スロットを消したときの知らせ（グラフ、スロット名）。「続きから」のボタンが押せるかを直すのに使う（<see cref="GraphEventButton"/>）。
+        /// </summary>
+        public static event Action<NodeGraphAsset, string> SlotChanged;
+
         /// <summary>保存先のフォルダ（テストで差し替える）。null なら persistentDataPath の下。</summary>
         internal static string RootOverride;
 
@@ -124,6 +129,7 @@ namespace Reiga.VisualNodeEditor
 
             // 前に保存の途中で落ちたときの .bak が残っていれば、もう要らない
             DeleteIfExists(BackupPath(path));
+            NotifySlotChanged(runner.Graph, slot);
         }
 
         // 一時ファイルをスロットにする。古いセーブを消してから移すと、その間に落ちた・移すのに失敗したときにスロットが無くなるので、1 回で置き換える
@@ -215,6 +221,23 @@ namespace Reiga.VisualNodeEditor
         }
 
         /// <summary>
+        /// そのスロットから再開できそうか: セーブがあり、読めて、保存したノードがグラフにある（<see cref="Load"/> が失敗する理由が見当たらない）。
+        /// 「続きから」のボタンを押せるようにするかの判定に使う。
+        /// </summary>
+        public static bool CanLoad(NodeGraphAsset graph, string slot)
+        {
+            try
+            {
+                var state = Read(graph, slot);
+                return state != null && graph.FindNode(state.NodeId) != null;
+            }
+            catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// スロットを消す。無ければ false。保存の途中で落ちた・失敗したときの .bak・.tmp と、キーを持つ前のこのグラフのセーブも消す
         /// （残すと、消したスロットがそれで戻ってくる）。
         /// </summary>
@@ -237,7 +260,34 @@ namespace Reiga.VisualNodeEditor
                 File.Delete(legacy);
             }
 
+            if (found)
+            {
+                NotifySlotChanged(graph, slot);
+            }
+
             return found;
+        }
+
+        // 知らせる。受け取る側の例外で、保存・削除を失敗にしない
+        private static void NotifySlotChanged(NodeGraphAsset graph, string slot)
+        {
+            var handlers = SlotChanged;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (var handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    ((Action<NodeGraphAsset, string>)handler)(graph, slot);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
         }
 
         // そのスロットのファイル。無ければ null。読むだけで、ファイルは動かさない（消すのは Delete だけ）。
