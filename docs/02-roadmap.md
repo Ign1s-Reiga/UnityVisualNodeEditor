@@ -136,6 +136,18 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - [x] Snake Starter・Sliding Puzzle Starter（グラフ・シーン・スクリプトのひな形・コンパイル後に盤へ付ける）。ADV Starter とシーンの組み立てを共有する
 - [x] README・Wiki
 
+## UI Toolkit 対応（UI Builder で画面を組む）
+
+ランタイムの UI Toolkit でも、uGUI と同じくコード無しで画面をグラフに繋げるようにする。設計は `docs/01-architecture.md` の「UI Toolkit の画面（UI Builder で組む）」と「ゲームの Starter」。
+
+決めたこと（ユーザーの回答）: グラフに繋がる UI Toolkit のコントロール（UI Builder の Library に出る Graph Button・Graph Parameter Label・Graph Node Panel）を作り、
+Starter に UI Toolkit 版を足す。「2D の画面エディタ」は Unity の UI Builder を使う（独自のキャンバスのエディタは作らない）。Scene ノードから画面の UXML を作る・UI Builder で開く。
+
+- [x] ランタイム: `GraphButton`・`GraphParameterLabel`・`GraphNodePanel`（`[UxmlElement]`）、`GraphEventSender`・`GraphRunnerFollower`・`GraphNodePath` の共通化
+- [x] エディタ: UI Builder の属性のドロップダウン（イベント名・パラメータ・ノードの場所）、Scene ノードの Edit Screen / Create Screen…（`SceneScreens`）
+- [x] Starter の UI Toolkit 版（Snake・スライドパズル）
+- [x] README・Wiki
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
@@ -165,6 +177,8 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - ゲームの Starter: アクション・シューティングなど、ほかのジャンルの Starter を足すか（当面は Snake とスライドパズル）。ハイスコアをセーブに残すか（当面は Runner が動いている間だけ）
 - 入力: Input System 連携を開発用プロジェクトに入れて常にテストするか（当面は入れない。入れると入力の設定の切り替えを尋ねられるため、使い捨てのプロジェクトで確かめる）。
   Graph Event Key でマウス・ゲームパッドのボタンを扱うか（当面はキーボードだけ）
+- UI Toolkit: `GraphNodePanel` はノードをタイトルの並び（`Round/Paused`）で指すので、ノードを改名すると外れる。グラフの検証で、使われている UXML の場所を確かめるか（当面はしない。UI Builder のドロップダウンで選び直す）。
+  UI Builder のドロップダウンは UxmlAttribute の PropertyDrawer に頼る（Unity が描き方を変えたら入力欄に戻る）
 - UX: イベント名の定数クラスを生成するか（骨組みコード生成の一部。`GraphEvents.StartGame` のように書けて打ち間違いが無くなるが、生成物の置き場所と更新のタイミングを決める必要がある）
 - UX: シナリオの所要時間は実機で計測する（`docs/04-ux-audit.md` の現状は机上の通しによる手数と見積もり）
 - MCP: 認証を持つか（当面は 127.0.0.1 だけで待ち受け、`Origin` を確かめ、既定で止めておく。同じ PC の他のプロセスからは書き換えられる）

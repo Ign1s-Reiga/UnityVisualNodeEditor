@@ -368,6 +368,41 @@ Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブ
 - `KeyCode` → `Key` は名前で対応させ、名前の違うもの（`Alpha1` → `Digit1`、`Return` → `Enter`、`Keypad1` → `Numpad1`、`LeftControl` → `LeftCtrl` など）は表で持つ。マウス・ジョイスティックの `KeyCode` は扱わない（false）
 - 開発用プロジェクトには Input System を入れない（入れると Unity が入力の設定を切り替えて再起動するか尋ねる）。連携は、Input System を足した使い捨てのプロジェクトで EditMode テストを走らせて確かめる
 
+### UI Toolkit の画面（UI Builder で組む）
+
+ランタイムの UI Toolkit（`UIDocument` と UXML / USS）でも、uGUI と同じことをコード無しでできるようにする。画面の配置は Unity の UI Builder（2D の編集画面）で行い、
+このパッケージは UI Builder の Library に出る「グラフに繋がるコントロール」を足す（独自の画面エディタは作らない）。
+UI Toolkit のランタイムは UnityEngine のモジュールなので、コアの Runtime アセンブリに置く（追加の依存は無い）。
+
+| 型（UXML のタグ。`[UxmlElement]`） | 元にする要素 | 役割（コンポーネント版） |
+|---|---|---|
+| `GraphButton` | `Button` | クリックで Raise / Advance / Save / Load（Graph Event Button） |
+| `GraphParameterLabel` | `Label` | パラメータの値を書式で出す（Graph Parameter Text） |
+| `GraphNodePanel` | `VisualElement` | グラフが指定したノードにいる間だけ表示する（Graph Node Activator） |
+
+- UXML の属性（`[UxmlAttribute]`）:
+  - 共通: `graph`（グラフ。空なら実行中のどれか）
+  - `GraphButton`: `action`（Raise / Advance / Save / Load）、`event-name`、`save-slot`（既定 `slot1`。UXML の `slot` はテンプレートの予約語なので使わない）、`disable-without-save`（既定 true）
+  - `GraphParameterLabel`: `parameter`（名前）、`format`（既定 `{0}`）
+  - `GraphNodePanel`: `node`（ノードの場所。下）
+- `node` は、ノードのタイトルを `/` で並べた場所（例: `Paused`、`Round/Paused`、コンテナなら `Round`）。UXML は人が読み書きするテキストなので、ID ではなくタイトルで指す
+  （改名すると外れる。UI Builder のドロップダウンで選び直す）。Runner の今の場所（入っているコンテナのタイトルを外側から並べ、最後に今のノード）の中に、
+  その並びが続けて現れれば「いる」（`Paused` は `Round › Paused` でも当てはまる。コンテナを指せば中のどこにいても当てはまる）。判定は純粋関数 `GraphNodePath.IsAt`
+- 動くのはゲームの画面（パネルの `contextType` が Player）のときだけ。UI Builder の中（Editor）では何もしない（パネルを隠さない・文字を書き換えない。編集できるように）
+- パネルに付いたとき（`AttachToPanelEvent`）に Runner を探して聞き始め、外れたとき（`DetachFromPanelEvent`）にやめる。Runner の探し方・開始と停止の追い方はコンポーネント版と同じ
+  （`GraphRunnerFollower` に共通化する: グラフ（空なら実行中のどれか）の Runner を探し、`Started` / `Stopped` で探し直し、今の Runner のノードの出入り・パラメータの変化を伝える）
+- 送る処理（Runner を探す・Raise / Advance / Save / Load・警告）は Graph Event Button と同じもの（`GraphEventSender` に共通化する）。
+  Load で `disable-without-save` なら、再開できないうちは押せないようにし（`SetEnabled(false)`）、戻すのは自分が押せないようにしたときだけ（Graph Event Button と同じ規則）
+- `GraphNodePanel` は、いないとき `style.display = None`、いるとき `Flex`。Runner が無ければ隠す
+- UI Builder のインスペクタ: `event-name`・`parameter`・`node` は、`graph` が入っていればグラフから選ぶドロップダウン（`[EventName]`・`[GraphParameterName]`・`[GraphNodePath]` の PropertyDrawer。
+  同じ並びの `graph` の値を見る）。入っていない・見つからなければ入力欄
+
+Scene ノードの画面（`SceneScreens`）:
+- Scene ノードのインスペクタに Screen の行を出す。シーンが使っている UXML（シーンの依存のうち `.uxml`）があれば **Edit Screen**（UI Builder で開く。2 つ以上ならメニュー）
+- 無ければ **Create Screen…**: シーンの隣に `<シーン名>.uxml`（見出しだけの画面）を作り、Panel Settings（プロジェクトにあればそれ。無ければシーンの隣に
+  `Panel Settings.asset` と、その既定のテーマ `Runtime Theme.tss`（`@import url("unity-theme://default");`）を作る）を使う UIDocument（GameObject `UI`）をシーンに足して、UI Builder で開く。
+  シーンが開いていればそこに足して未保存にし、開いていなければ追加で開いて保存して閉じる。未保存の無題のシーンが開いている・Play 中は作らず、理由を出す
+
 ### 実行中の Runner の一覧
 
 - `GraphRunner.Running`（静的）に実行中の Runner を持ち、`Started` / `Stopped` で通知する。エディタの強調表示が使う
@@ -733,6 +768,16 @@ Blackboard: Level（Int、1）、Moves（Int、0）
   ひな形は何かを作る前に読む（読めなければ、グラフもシーンも作らずにエラーを出す。作りかけの物を残さない）
 - アセンブリ: `Reiga.VisualNodeEditor.Starters.Editor`（`Starters/Editor`。uGUI を使うので `com.unity.ugui` があるときだけ。`versionDefines` で `VNE_UGUI`）。
   ADV Starter（Yarn 連携のエディタ）もシーンの組み立てにこれを使う
+
+UI Toolkit 版（`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)`）:
+- グラフ・キー（Graph Event Key）・Title の Graph Runner は uGUI 版と同じ。画面だけを UI Toolkit にする
+- 作るもの: グラフ、`<名前> Title.uxml` / `<名前> Game.uxml` / `<名前>.uss`（画面）、Panel Settings（`<名前> Panel Settings.asset` と `Runtime Theme.tss`。1920 × 1080 を基準に拡大縮小）、
+  シーン（Main Camera・`UI`（UIDocument。その画面と Panel Settings）・Keys・Title には Graph Runner）、ゲームのスクリプト（ひな形 `SnakeGameToolkitTemplate` /
+  `SlidingPuzzleGameToolkitTemplate`。Game のシーンの `UI` に、コンパイル後に付ける）
+- 画面の中身は uGUI 版と同じ: Title は見出し・操作の説明・Start の `GraphButton`。Game は `GraphParameterLabel`（`Score: {0}` など）、盤（`name="board"` の VisualElement）、
+  パネル（`GraphNodePanel`。`node="Ready"` など。中に見出しと `GraphButton`）。UXML には `graph` を書かない（実行中のグラフを使う。アセットの参照の書式に頼らない）
+- ゲームのスクリプトは、同じ GameObject の UIDocument の `board` に、マス・タイルを VisualElement で（位置と大きさは盤に対する割合で）描く。遊びの規則は uGUI 版と同じ
+- 作れなければ、作った UXML・USS・Panel Settings・シーンを消す（uGUI 版と同じく片方だけ残さない）
 
 ## Build Settings 連携
 
