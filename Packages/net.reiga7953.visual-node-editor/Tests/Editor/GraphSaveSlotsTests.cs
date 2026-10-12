@@ -129,7 +129,7 @@ namespace Reiga.VisualNodeEditor.Tests
         [Test]
         public void SavingAgain_WhileTheSlotIsLocked_FailsAndKeepsTheOldSave()
         {
-            // ほかのプロセス（ウイルス対策ソフトなど）が開いている間は、置き換えも .bak に退けるのもできない。古いセーブを残して失敗にする
+            // ほかのプロセス（ウイルス対策ソフトなど）が開いている間は、置き換えも .bak に退けるのもできない。古いセーブを残して失敗にし、一時ファイルも残さない
             RequireFileLocks();
             GraphSaveSlots.Save(_runner, "slot1");
             _runner.Raise("Start");
@@ -141,6 +141,7 @@ namespace Reiga.VisualNodeEditor.Tests
             }
 
             Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_title.Id));
+            Assert.That(FilesInSlotFolder(), Is.EqualTo(new[] { "slot1.json" }), "no slot1.json.tmp is left behind");
         }
 
         [Test]

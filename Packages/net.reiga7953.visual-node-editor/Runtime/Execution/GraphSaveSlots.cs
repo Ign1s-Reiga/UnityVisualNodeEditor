@@ -89,33 +89,45 @@ namespace Reiga.VisualNodeEditor
             var json = runner.CaptureState().ToJson();
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var temporary = path + ".tmp";
-            File.WriteAllText(temporary, json);
-
-            // 古いセーブを消してから移すと、その間に落ちた・移すのに失敗したときにスロットが無くなるので、1 回で置き換える
-            if (!File.Exists(path))
+            try
             {
-                File.Move(temporary, path);
+                File.WriteAllText(temporary, json);
+                MoveIntoSlot(temporary, path);
             }
-            else
+            catch
             {
-                try
-                {
-                    ReplaceFile(temporary, path);
-                }
-                catch (IOException) when (!File.Exists(path))
-                {
-                    // 置き換えの途中で失敗し、古いセーブが別の名前に退けられた（Windows の ReplaceFile）。スロットを空けないよう、新しいセーブを移す
-                    File.Move(temporary, path);
-                }
-                catch (Exception exception) when (exception is NotSupportedException or IOException)
-                {
-                    // File.Replace に対応しないプラットフォーム・ドライブ（一部のネットワークドライブ・リムーバブルドライブなど）
-                    ReplaceThroughBackup(temporary, path);
-                }
+                // 保存できなかった（古いセーブはそのまま残る）。書いた一時ファイルは要らない
+                TryDelete(temporary);
+                throw;
             }
 
             // 前に保存の途中で落ちたときの .bak が残っていれば、もう要らない
             DeleteIfExists(BackupPath(path));
+        }
+
+        // 一時ファイルをスロットにする。古いセーブを消してから移すと、その間に落ちた・移すのに失敗したときにスロットが無くなるので、1 回で置き換える
+        private static void MoveIntoSlot(string temporary, string path)
+        {
+            if (!File.Exists(path))
+            {
+                File.Move(temporary, path);
+                return;
+            }
+
+            try
+            {
+                ReplaceFile(temporary, path);
+            }
+            catch (IOException) when (!File.Exists(path))
+            {
+                // 置き換えの途中で失敗し、古いセーブが別の名前に退けられた（Windows の ReplaceFile）。スロットを空けないよう、新しいセーブを移す
+                File.Move(temporary, path);
+            }
+            catch (Exception exception) when (exception is NotSupportedException or IOException)
+            {
+                // File.Replace に対応しないプラットフォーム・ドライブ（一部のネットワークドライブ・リムーバブルドライブなど）
+                ReplaceThroughBackup(temporary, path);
+            }
         }
 
         // 古いセーブを .bak に退けてから一時ファイルを移し、.bak を消す。途中で落ちても、セーブか .bak のどちらかが残る（FindFile が .bak も探す）。
@@ -131,11 +143,31 @@ namespace Reiga.VisualNodeEditor
             }
             catch
             {
-                File.Move(backup, path);
+                // 古いセーブを戻す。戻すのにも失敗したら .bak のまま残し（FindFile が読む）、元の失敗を伝える
+                try
+                {
+                    File.Move(backup, path);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                }
+
                 throw;
             }
 
             File.Delete(backup);
+        }
+
+        // 消せなくても構わないファイルを消す（失敗の後片付け。元の失敗を隠さない）
+        private static void TryDelete(string path)
+        {
+            try
+            {
+                DeleteIfExists(path);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+            }
         }
 
         /// <summary>そのスロットのセーブ。無ければ null。</summary>
