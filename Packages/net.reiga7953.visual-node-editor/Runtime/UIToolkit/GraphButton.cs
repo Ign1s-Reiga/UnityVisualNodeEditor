@@ -36,10 +36,12 @@ namespace Reiga.VisualNodeEditor
         private bool _connected;
         private bool _disabledWithoutSave;
 
+        /// <summary>文字の無いボタン（UXML と UI Builder が使う）。<see cref="Action"/> と <see cref="EventName"/> などを決めて使う。</summary>
         public GraphButton() : this(string.Empty)
         {
         }
 
+        /// <summary><paramref name="text"/> を出すボタン。</summary>
         /// <param name="text">ボタンの文字。</param>
         public GraphButton(string text)
         {
@@ -58,8 +60,8 @@ namespace Reiga.VisualNodeEditor
             set
             {
                 _graph = value;
+                // 画面に出ていれば、追う Runner を探し直して押せるかを直す（出ていなければ何もしない）
                 _follower.Graph = value;
-                RefreshEnabled();
             }
         }
 
@@ -137,7 +139,6 @@ namespace Reiga.VisualNodeEditor
             _follower.Graph = _graph;
             GraphSaveSlots.SlotChanged += OnSlotChanged;
             _follower.Start();
-            RefreshEnabled();
         }
 
         /// <summary>外れたとき: 聞くのをやめ、押せないようにしていたら戻す。</summary>
