@@ -1,0 +1,23 @@
+{
+  "name": "Reiga.VisualNodeEditor.Starters.Templates",
+  "rootNamespace": "",
+  "references": [
+    "Reiga.VisualNodeEditor",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VNE_UGUI"],
+  "versionDefines": [
+    {
+      "name": "com.unity.ugui",
+      "expression": "1.0.0",
+      "define": "VNE_UGUI"
+    }
+  ],
+  "noEngineReferences": false
+}

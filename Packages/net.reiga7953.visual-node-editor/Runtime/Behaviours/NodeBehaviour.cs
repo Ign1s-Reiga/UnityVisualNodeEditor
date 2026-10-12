@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Reiga.VisualNodeEditor
 {
@@ -48,6 +49,17 @@ namespace Reiga.VisualNodeEditor
         public virtual void OnExit()
         {
         }
+
+        /// <summary>
+        /// 設定の問題（検証が、付いているノード <paramref name="node"/> の問題として出す）。既定は無し。
+        /// 例: 指しているパラメータが <paramref name="graph"/> に無い。
+        /// </summary>
+        public virtual IEnumerable<GraphIssue> GetIssues(NodeGraphAsset graph, NodeData node) => Array.Empty<GraphIssue>();
+
+        /// <summary>
+        /// ノードに出す 1 行の説明（例: <c>Score = 0</c>）。null ならクラス名（<see cref="BehaviourMenuAttribute"/> があればその名前）を出す。
+        /// </summary>
+        public virtual string Describe(NodeGraphAsset graph) => null;
 
         internal void Bind(GraphRunner runner, NodeData node)
         {

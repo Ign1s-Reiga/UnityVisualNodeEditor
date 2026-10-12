@@ -34,7 +34,8 @@ Unity 上で「ゲームの大まかな構成」をノードグラフとして�
 │       ├── Editor/              # GraphView ウィンドウ・ノード UI・インスペクタ・MCP サーバー（Editor/Mcp）
 │       ├── Tests/Editor/        # EditMode テスト
 │       ├── Tests/Runtime/       # PlayMode テスト
-│       └── Integrations/YarnSpinner/   # Yarn Spinner 3.x 連携（Runtime / Editor / Tests。Yarn が入っているときだけコンパイル）
+│       ├── Starters/            # ゲームの Starter（Snake・スライドパズル。Editor / Templates / Tests。uGUI があるときだけコンパイル）
+│       └── Integrations/        # 任意の連携（YarnSpinner: Yarn Spinner 3.x、InputSystem: Input System。入っているときだけコンパイル）
 ├── ProjectSettings/
 └── docs/                        # 番号付き設計ドキュメント（00-overview, 01-architecture, ...）
 ```
@@ -49,8 +50,14 @@ Unity 上で「ゲームの大まかな構成」をノードグラフとして�
 | `Reiga.VisualNodeEditor.YarnSpinner` | `Reiga.VisualNodeEditor.YarnSpinner` | Runtime + `YarnSpinner.Unity`（`VNE_YARN_SPINNER` のときだけ） |
 | `Reiga.VisualNodeEditor.YarnSpinner.Editor` | `Reiga.VisualNodeEditor.YarnSpinner.Editor` | 上記 + Editor + UnityEditor |
 | `Reiga.VisualNodeEditor.YarnSpinner.Tests` | `Reiga.VisualNodeEditor.YarnSpinner.Tests` | 上記 + NUnit |
+| `Reiga.VisualNodeEditor.Starters.Editor` | `Reiga.VisualNodeEditor.Starters.Editor` | Runtime + Editor + UnityEditor + uGUI（`VNE_UGUI` のときだけ） |
+| `Reiga.VisualNodeEditor.Starters.Templates` | なし（ゲームのスクリプトのひな形。グローバル名前空間） | Runtime + uGUI（エディタだけ。`UNITY_INCLUDE_TESTS` と `VNE_UGUI` のときだけ） |
+| `Reiga.VisualNodeEditor.Starters.Tests` | `Reiga.VisualNodeEditor.Starters.Tests` | 上記 + NUnit |
+| `Reiga.VisualNodeEditor.InputSystem` | `Reiga.VisualNodeEditor.InputSystem` | Runtime + `Unity.InputSystem`（`VNE_INPUT_SYSTEM` のときだけ） |
+| `Reiga.VisualNodeEditor.InputSystem.Tests` | `Reiga.VisualNodeEditor.InputSystem.Tests` | 上記 + NUnit |
 
 - Yarn Spinner 連携のアセンブリは、asmdef の `versionDefines`（`dev.yarnspinner.unity` 3.0.0 以上で `VNE_YARN_SPINNER`）と `defineConstraints` で、Yarn が無ければコンパイルしない。コアのアセンブリから Yarn を参照しない。
+  Starter（`com.unity.ugui` で `VNE_UGUI`）と Input System 連携（`com.unity.inputsystem` で `VNE_INPUT_SYSTEM`）も同じ。Yarn 連携のエディタは Starter のエディタを参照する（シーンの組み立てを共有）。
 
 - Runtime 側に `UnityEditor` / `#if UNITY_EDITOR` を持ち込まない。エディタ専用の情報（ノード座標など）は Runtime の型に持たせてよいが、UnityEditor API は呼ばない。
 - 新しいノード種別は Runtime に `NodeData` のサブクラス（`[Serializable]` 必須）、Editor に対応する `NodeView` を追加し、`[NodeMenu("Category/Name")]` 属性で検索メニューに登録する。

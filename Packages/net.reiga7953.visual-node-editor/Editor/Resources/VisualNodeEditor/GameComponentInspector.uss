@@ -1,0 +1,9 @@
+/* Inspectors of the game components: Graph Node Activator, Graph Parameter Text, Graph Event Key */
+
+.vne-game-component-inspector__hints {
+  margin-top: 6px;
+}
+
+.vne-game-component-inspector__hints > .unity-help-box {
+  margin-bottom: 2px;
+}

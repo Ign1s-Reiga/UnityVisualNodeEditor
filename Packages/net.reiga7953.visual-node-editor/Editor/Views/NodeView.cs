@@ -132,7 +132,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
 
         private void UpdateBehaviours()
         {
-            var text = NodeDisplay.GetBehavioursText((Data as IBehaviourHost)?.Behaviours);
+            var text = NodeDisplay.GetBehavioursText((Data as IBehaviourHost)?.Behaviours, Graph);
             _behavioursLabel.text = text;
             _behavioursLabel.tooltip = text.Length > 0 ? "Behaviours: " + text : string.Empty;
 

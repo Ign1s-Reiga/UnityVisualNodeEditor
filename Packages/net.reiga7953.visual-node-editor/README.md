@@ -60,10 +60,26 @@ public class PlayerMovement : NodeBehaviour
 - 振る舞いからは `Runner`（`Runner.Raise("Win")` など）、`Node`、`Host`（Graph Runner コンポーネント）を使える
 - グラフはアセットなので、シーンのオブジェクトはフィールドで参照できない。`Host` や `FindFirstObjectByType` から実行時に引く
 - 値は `Start()` のたびにアセットから複製されるので、実行中に書き換えてもアセットには残らない
+- 組み込みの振る舞い（Add Behaviour > Visual Node Editor）: `Set Parameter`（ノードに入ったら `Score = 0`・`Level += 1` などを行う）、
+  `Time Scale`（ノードにいる間 `Time.timeScale` を変える。ポーズ用）
+
+## 画面と入力をグラフに繋ぐ（コード無し）
+
+`Add Component > Visual Node Editor` の次のコンポーネントは、Graph Runner への参照なしで、実行中のグラフを探して繋ぐ。
+
+- `Graph Node Activator`: グラフが指定したノード（コンテナなら、その中のどこか）にいる間だけ、指定した GameObject を表示する（ポーズ・ゲームオーバーのパネル）
+- `Graph Parameter Text`: パラメータの値を、同じ GameObject のテキスト（uGUI の Text・TextMeshPro）に `Score: {0}` のような書式で出す
+- `Graph Event Key`: キーを押したら Raise / Advance する（Esc → Pause）。キーは `GraphInput.GetKeyDown(KeyCode)` で読み、旧 Input Manager でも Input System でも動く
+- `Graph Event Button`: ボタンのクリックで Raise / Advance / Save / Load する
+
+## ゲームの Starter
+
+`Assets > Create > Visual Node Editor > Snake Starter` / `Sliding Puzzle Starter` で、グラフ・Title と Game のシーン・ゲームのスクリプトを作る。
+スクリプトはコンパイル後に Game のシーンの盤へ自動で付き、ツールバーの Play ですぐ遊べる（uGUI が必要）。書き出したスクリプトは自由に書き換えてよい。
 
 ## コンテナ（入れ子）
 
-- `Flow/Container` ノードの中にノードを入れられる。ダブルクリックで中を開き、ツールバー下のパンくずで戻る
+- `Flow/Container` ノードの中にノードを入れられる。コンテナの中にコンテナも置ける（深さに制限は無い）。ダブルクリックで中を開き、ツールバー下のパンくずで戻る
 - 中は Entry から始まり、Exit ノードに着くと、コンテナの同じ出口の出力ポートから外へ進む。出口はコンテナのインスペクタで追加・改名・並べ替えできる
 - ゲームのコードからは `container.TryGetExit("Clear", out var exit)` で出口を名前で引ける。実行中に今いるコンテナは `runner.ContainerPath`
 

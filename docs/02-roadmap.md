@@ -35,7 +35,8 @@
 - [x] ランタイムの進み方（コンテナへ入る・Exit から出る、`GraphQuery` の遷移 API、`GraphRunner` 対応）
 - [x] エディタ: 階層の切り替え（ダブルクリックで入る・パンくずで戻る）、階層をまたぐエッジの禁止、コンテナ作成時の Entry / Exit 自動作成、コピー・貼り付け
 - [x] エディタ: 出口の編集（コンテナのインスペクタの一覧、Exit ノードのドロップダウン、削除時の確認）
-- [ ] ゲームのテンプレート（アクション）とテンプレート専用のコンテナのサブクラス（今回は対象外。ADV は「ADV（Yarn Spinner）」の ADV Starter で用意する）
+- [x] ゲームのテンプレート → 「ゲームの Starter（Snake・スライドパズル）」で用意する（テンプレート専用のコンテナのサブクラスは作らない。普通のコンテナで表す）
+- [x] 入れ子の深さ: 制限なし（3〜5 段も可）。5 段のコンテナを通り抜けるテストを足す
 
 ## ノードの振る舞い（Update / FixedUpdate）
 - [x] ランタイム: `NodeBehaviour`（`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit`）、State・Scene への付与、`GraphRunner.Update` / `FixedUpdate` と `GraphRunnerBehaviour` からの呼び出し、Runner ごとの複製、読めない振る舞いの検証
@@ -120,6 +121,21 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - [x] CI で Yarn 連携をコンパイル → しない（uGUI が Unity の外でコンパイルできない）。開発用プロジェクトの EditMode テストで確かめる
 - [x] README・スキル（`build-flow-with-mcp` に ADV の組み方）。MCP に `add_parameter` と、組み込み以外のノード型の値を読み書きする `fields`
 
+## ゲームの Starter（Snake・スライドパズル）
+
+スネークゲームやパズルゲームを、このツールで作れるようにする。遊び（蛇の動き・タイルの入れ替え）は C# に書き、流れ・画面の出し分け・スコア・レベルはグラフで扱う。
+設計は `docs/01-architecture.md` の「ゲーム向けのコンポーネント」「組み込みの振る舞い」「ゲームの Starter」。
+
+決めたこと（ユーザーの回答）: ADV Starter と同じ形の Starter（グラフ・シーン・書き換えてよいゲームのスクリプトを作り、すぐ Play できる）と、
+どのゲームにも使える汎用のコンポーネントを作る。パズルはスライドパズル（15 パズル。レベルごとに 3 × 3・4 × 4・5 × 5）。
+コンポーネントは 4 つすべて: ノードにいる間だけ表示する・パラメータを文字で出す・キーでイベントを送る・パラメータを変える / Time Scale の振る舞い。
+
+- [x] コンテナの入れ子 5 段のテスト
+- [x] 組み込みの振る舞い: Set Parameter・Time Scale（`BehaviourMenu`・`NodeBehaviour.GetIssues` / `Describe`）
+- [x] コンポーネント: Graph Node Activator・Graph Parameter Text・Graph Event Key・`GraphInput`、Input System 連携（任意のアセンブリ）、インスペクタ
+- [x] Snake Starter・Sliding Puzzle Starter（グラフ・シーン・スクリプトのひな形・コンパイル後に盤へ付ける）。ADV Starter とシーンの組み立てを共有する
+- [x] README・Wiki
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
@@ -146,6 +162,9 @@ ADV（ノベル・アドベンチャー）を作れるようにする。会話�
 - ADV: 既読管理・バックログ・オート / スキップ・立ち絵・背景は Yarn Spinner の Presenter とゲーム側で行う（このツールでは持たない）
 - ADV: Yarn Spinner 連携は CI でコンパイルしない（Yarn のランタイムが uGUI を要し、uGUI は Unity の外でコンパイルできないため）。開発用プロジェクトの EditMode テストで確かめる。
   Unity をライセンス付きで CI で動かす（GameCI の test-runner）ようにするかは未決
+- ゲームの Starter: アクション・シューティングなど、ほかのジャンルの Starter を足すか（当面は Snake とスライドパズル）。ハイスコアをセーブに残すか（当面は Runner が動いている間だけ）
+- 入力: Input System 連携を開発用プロジェクトに入れて常にテストするか（当面は入れない。入れると入力の設定の切り替えを尋ねられるため、使い捨てのプロジェクトで確かめる）。
+  Graph Event Key でマウス・ゲームパッドのボタンを扱うか（当面はキーボードだけ）
 - UX: イベント名の定数クラスを生成するか（骨組みコード生成の一部。`GraphEvents.StartGame` のように書けて打ち間違いが無くなるが、生成物の置き場所と更新のタイミングを決める必要がある）
 - UX: シナリオの所要時間は実機で計測する（`docs/04-ux-audit.md` の現状は机上の通しによる手数と見積もり）
 - MCP: 認証を持つか（当面は 127.0.0.1 だけで待ち受け、`Origin` を確かめ、既定で止めておく。同じ PC の他のプロセスからは書き換えられる）

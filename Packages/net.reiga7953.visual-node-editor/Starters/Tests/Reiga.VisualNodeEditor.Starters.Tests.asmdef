@@ -1,0 +1,28 @@
+{
+  "name": "Reiga.VisualNodeEditor.Starters.Tests",
+  "rootNamespace": "Reiga.VisualNodeEditor.Starters.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.Starters.Editor",
+    "Reiga.VisualNodeEditor.Starters.Templates",
+    "UnityEngine.UI"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VNE_UGUI"],
+  "versionDefines": [
+    {
+      "name": "com.unity.ugui",
+      "expression": "1.0.0",
+      "define": "VNE_UGUI"
+    }
+  ],
+  "noEngineReferences": false
+}
