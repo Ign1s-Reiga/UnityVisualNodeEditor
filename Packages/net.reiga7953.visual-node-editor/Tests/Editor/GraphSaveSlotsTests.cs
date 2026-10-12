@@ -339,6 +339,42 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void LoadButton_CanBePressedOnlyWhenTheSlotHasASave()
+        {
+            // 「続きから」は、セーブが無いうちは押せない。CanvasGroup は uGUI の Button と同じく interactable を持つ（名前で探す）
+            var gameObject = new GameObject("Continue");
+            try
+            {
+                var clickable = gameObject.AddComponent<CanvasGroup>();
+                var button = gameObject.AddComponent<GraphEventButton>();
+                button.Graph = _graph;
+                button.Action = GraphEventButtonAction.Load;
+                button.Slot = "slot1";
+
+                button.RefreshInteractable();
+                Assert.That(clickable.interactable, Is.False);
+
+                GraphSaveSlots.Save(_runner, "slot1");
+                button.RefreshInteractable();
+                Assert.That(clickable.interactable, Is.True);
+
+                // 切ってあれば触らない。Load 以外の操作でも触らない
+                GraphSaveSlots.Delete(_graph, "slot1");
+                button.DisableWithoutSave = false;
+                button.RefreshInteractable();
+                Assert.That(clickable.interactable, Is.True);
+                button.DisableWithoutSave = true;
+                button.Action = GraphEventButtonAction.Save;
+                button.RefreshInteractable();
+                Assert.That(clickable.interactable, Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
         public void Button_WarnsWhenItCannotSave()
         {
             // クリックの処理で例外にせず、警告を出して false（警告は Unity のログに出る）

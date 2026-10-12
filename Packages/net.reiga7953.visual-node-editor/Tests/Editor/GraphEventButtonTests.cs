@@ -236,6 +236,8 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(serializedObject.FindProperty(GraphEventButtonEditor.ActionPropertyName), Is.Not.Null);
             Assert.That(serializedObject.FindProperty(GraphEventButtonEditor.EventNamePropertyName), Is.Not.Null);
             Assert.That(serializedObject.FindProperty(GraphEventButtonEditor.SendOnClickPropertyName), Is.Not.Null);
+            Assert.That(serializedObject.FindProperty(GraphEventButtonEditor.SlotPropertyName), Is.Not.Null);
+            Assert.That(serializedObject.FindProperty(GraphEventButtonEditor.DisableWithoutSavePropertyName), Is.Not.Null);
         }
 
         private GraphEventButton CreateButton(GraphEventButtonAction action, string eventName)
