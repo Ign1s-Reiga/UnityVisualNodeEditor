@@ -54,6 +54,28 @@ Yarn はノードの途中から再開できないので、会話の途中でセ
 既読管理・バックログ・オート / スキップ・立ち絵などは Yarn Spinner の Presenter とゲーム側で行う。
 詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「条件付き遷移」「セーブ・ロード」「Yarn Spinner 連携（任意）」を参照。
 
+## スネーク・パズルを作る（ゲームの Starter）
+
+遊び（蛇の動き・タイルの入れ替え）は C# に書き、タイトル・プレイ中・ポーズ・ゲームオーバー・クリア・レベル・スコアはグラフで扱う。
+
+1. `Assets > Create > Visual Node Editor > Snake Starter`（スネークゲーム）か `Sliding Puzzle Starter`（15 パズル。3 × 3 → 4 × 4 → 5 × 5）で、
+   ひな形（グラフ・Title と Game のシーン・ゲームのスクリプト）を作る。スクリプトはコンパイルが終わると Game のシーンの盤に自動で付く
+2. グラフのツールバーの Play で動かす（Snake: Space で始め、矢印キー / WASD で動かし、Esc でポーズ。パズル: 隙間の隣のタイルをクリックか矢印キー）
+3. 書き出したスクリプト（`SnakeGame.cs` など）を書き換えて、自分のゲームにする
+
+ゲームのスクリプトを書かずに、どのゲームでも使えるもの:
+
+| やりたいこと | 使うもの |
+|---|---|
+| ポーズ・ゲームオーバーのパネルを、そのノードにいる間だけ出す | `Graph Node Activator`（コンテナを選べば、その中のどこかにいる間） |
+| スコアなどのパラメータを画面に出す | `Graph Parameter Text`（`Score: {0}` のような書式。uGUI の Text・TextMeshPro） |
+| キーでイベントを送る（Esc → Pause） | `Graph Event Key`（旧 Input Manager でも Input System でも動く。コードからは `GraphInput.GetKeyDown`） |
+| ノードに入ったらパラメータを変える（`Score = 0`・`Level += 1`） | State・Scene ノードの振る舞い `Set Parameter` |
+| ポーズ中は時間を止める | 振る舞い `Time Scale`（ノードにいる間だけ `Time.timeScale` を変える） |
+
+コンテナは何段でも入れ子にできる（スライドパズルの Starter は Levels › Level の 2 段）。
+詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「ゲーム向けのコンポーネント」「組み込みの振る舞い」「ゲームの Starter」を参照。
+
 ## AI エージェントから使う（MCP）
 
 Unity エディタの中で MCP サーバーを動かし、Claude Code などの AI エージェントがグラフを読み・組み立て・検証し、Play 中の流れを確かめられるようにできる。
