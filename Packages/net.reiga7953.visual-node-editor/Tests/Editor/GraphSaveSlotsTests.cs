@@ -175,6 +175,34 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void SavingWhileALeftoverBackupCannotBeDeleted_StillSaves_AndTellsListeners()
+        {
+            // 前に落ちたときの .bak をほかのプロセスが開いている。セーブはもうスロットにあるので、失敗にせず知らせる
+            RequireFileLocks();
+            GraphSaveSlots.Save(_runner, "slot1");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            File.Copy(path, path + ".bak");
+            var changes = 0;
+            Action<NodeGraphAsset, string> onChanged = (graph, slot) => changes++;
+            GraphSaveSlots.SlotChanged += onChanged;
+            try
+            {
+                _runner.Raise("Start");
+                using (File.Open(path + ".bak", FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.DoesNotThrow(() => GraphSaveSlots.Save(_runner, "slot1"));
+                }
+            }
+            finally
+            {
+                GraphSaveSlots.SlotChanged -= onChanged;
+            }
+
+            Assert.That(changes, Is.EqualTo(1));
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id), "the slot is read, not the leftover backup");
+        }
+
+        [Test]
         public void SavingAgain_WhenReplacingFailsHalfway_StillFillsTheSlot()
         {
             // Windows の ReplaceFile は、古いファイルを別の名前に退けた後で失敗することがある

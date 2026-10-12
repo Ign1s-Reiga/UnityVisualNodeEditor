@@ -127,8 +127,9 @@ namespace Reiga.VisualNodeEditor
                 throw;
             }
 
-            // 前に保存の途中で落ちたときの .bak が残っていれば、もう要らない
-            DeleteIfExists(BackupPath(path));
+            // 置き換えに使った .bak・前に保存の途中で落ちたときの .bak は、もう要らない。セーブはもうスロットにあるので、消せなくても失敗にせず知らせる
+            // （スロットにセーブがあれば .bak は読まない。次の保存か Delete で消す）
+            TryDelete(BackupPath(path));
             NotifySlotChanged(runner.Graph, slot);
         }
 
@@ -157,7 +158,7 @@ namespace Reiga.VisualNodeEditor
             }
         }
 
-        // 古いセーブを .bak に退けてから一時ファイルを移し、.bak を消す。途中で落ちても、セーブか .bak のどちらかが残る（FindFile が .bak も探す）。
+        // 古いセーブを .bak に退けてから一時ファイルを移す（.bak は Save が最後に消す）。途中で落ちても、セーブか .bak のどちらかが残る（FindFile が .bak も探す）。
         // ほかのプロセスがスロットを開いていれば、退けるところで失敗し、古いセーブはそのまま残る
         private static void ReplaceThroughBackup(string temporary, string path)
         {
@@ -181,11 +182,9 @@ namespace Reiga.VisualNodeEditor
 
                 throw;
             }
-
-            File.Delete(backup);
         }
 
-        // 消せなくても構わないファイルを消す（失敗の後片付け。元の失敗を隠さない）
+        // 消せなくても構わないファイルを消す（失敗の後片付けでは元の失敗を隠さず、保存できた後の片付けでは保存を失敗にしない）
         private static void TryDelete(string path)
         {
             try
