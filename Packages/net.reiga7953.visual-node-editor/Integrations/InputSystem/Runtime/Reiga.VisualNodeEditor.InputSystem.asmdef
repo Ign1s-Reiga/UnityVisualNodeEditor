@@ -1,0 +1,23 @@
+{
+  "name": "Reiga.VisualNodeEditor.InputSystem",
+  "rootNamespace": "Reiga.VisualNodeEditor.InputSystem",
+  "references": [
+    "Reiga.VisualNodeEditor",
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["VNE_INPUT_SYSTEM"],
+  "versionDefines": [
+    {
+      "name": "com.unity.inputsystem",
+      "expression": "1.0.0",
+      "define": "VNE_INPUT_SYSTEM"
+    }
+  ],
+  "noEngineReferences": false
+}
