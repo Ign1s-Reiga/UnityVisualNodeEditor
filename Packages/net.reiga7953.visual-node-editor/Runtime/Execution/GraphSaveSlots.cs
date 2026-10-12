@@ -89,15 +89,22 @@ namespace Reiga.VisualNodeEditor
             var json = runner.CaptureState().ToJson();
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             var temporary = path + ".tmp";
+            var written = false;
             try
             {
                 File.WriteAllText(temporary, json);
+                written = true;
                 MoveIntoSlot(temporary, path);
             }
             catch
             {
-                // 保存できなかった（古いセーブはそのまま残る）。書いた一時ファイルは要らない
-                TryDelete(temporary);
+                // 保存できなかった。書きかけの一時ファイルと、古いセーブがスロットに残っているときの一時ファイルは要らない。
+                // 古いセーブが退けられた後で失敗したなら（File.Replace の途中の失敗など）、書き終えた一時ファイルが新しいセーブの唯一の写しなので残す
+                if (!written || File.Exists(path))
+                {
+                    TryDelete(temporary);
+                }
+
                 throw;
             }
 

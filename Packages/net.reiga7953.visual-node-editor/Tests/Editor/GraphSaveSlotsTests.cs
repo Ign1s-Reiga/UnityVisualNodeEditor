@@ -190,6 +190,26 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
         }
 
+        [Test]
+        public void SavingAgain_WhenTheOldSaveIsGoneAndMovingFails_KeepsTheNewSaveInTheTemporaryFile()
+        {
+            // 古いセーブが退けられた後で、新しいセーブを移すのにも失敗した（ここでは、スロットの名前のフォルダがあって移せない）。
+            // 一時ファイルが新しいセーブの唯一の写しなので、消さずに残す
+            GraphSaveSlots.Save(_runner, "slot1");
+            _runner.Raise("Start");
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+
+            WithReplaceFile((_, destination) =>
+            {
+                File.Delete(destination);
+                Directory.CreateDirectory(destination);
+                throw new IOException("Unable to move the replacement file.");
+            }, () => Assert.Throws<IOException>(() => GraphSaveSlots.Save(_runner, "slot1")));
+
+            Assert.That(File.Exists(path + ".tmp"), Is.True);
+            Assert.That(GraphRunnerState.FromJson(File.ReadAllText(path + ".tmp")).NodeId, Is.EqualTo(_game.Id));
+        }
+
         private static void WithReplaceFile(Action<string, string> replace, Action action)
         {
             var original = GraphSaveSlots.ReplaceFile;
