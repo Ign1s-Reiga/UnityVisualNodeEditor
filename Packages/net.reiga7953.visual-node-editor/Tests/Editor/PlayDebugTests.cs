@@ -172,6 +172,38 @@ namespace Reiga.VisualNodeEditor.Tests
             }
         }
 
+        [Test]
+        public void Panel_LoadOfAVanishedSlot_FixesTheButton()
+        {
+            // ボタンの表示を直す前（1 秒以内）にスロットが消えても、押せば警告を出してボタンを直す（Unity のログに警告が出る）
+            var root = Path.Combine(Path.GetTempPath(), "VnePanelSlot_" + Guid.NewGuid().ToString("N"));
+            GraphSaveSlots.RootOverride = root;
+            try
+            {
+                var runner = new GraphRunner(_graph);
+                runner.Start();
+                runner.Raise("StartGame");
+                var panel = new RuntimePanel();
+                GraphSaveSlots.Save(runner, RuntimePanel.DebugSlot);
+                panel.Show(runner);
+                Assert.That(panel.CanLoadDebugSlot, Is.True);
+
+                GraphSaveSlots.Delete(_graph, RuntimePanel.DebugSlot);
+                panel.LoadDebugSlot();
+
+                Assert.That(panel.CanLoadDebugSlot, Is.False);
+                Assert.That(runner.Current, Is.SameAs(_game), "nothing was loaded");
+            }
+            finally
+            {
+                GraphSaveSlots.RootOverride = null;
+                if (Directory.Exists(root))
+                {
+                    Directory.Delete(root, true);
+                }
+            }
+        }
+
         // ---- Blackboard の実行中の値 ----
 
         [Test]
