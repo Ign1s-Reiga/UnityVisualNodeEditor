@@ -57,6 +57,37 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ActivatorChoices_NumberNodesWithTheSameLabel_SoEachCanBePicked()
+        {
+            // DropdownField は表示の文字で選んだ位置を決めるので、同じ文字だと 2 つ目を選べない
+            var game = new GameComponentTestGraph();
+            try
+            {
+                var twin = new StateNode { Title = "Playing", ParentId = game.Round.Id };
+                game.Graph.AddNode(twin);
+
+                var choices = ActivatorNodeChoices.Get(game.Graph);
+
+                Assert.That(choices.Single(choice => choice.Value == "Round › Playing").Key, Is.EqualTo(game.Playing.Id));
+                Assert.That(choices.Single(choice => choice.Value == "Round › Playing (2)").Key, Is.EqualTo(twin.Id));
+            }
+            finally
+            {
+                Object.DestroyImmediate(game.Graph);
+            }
+        }
+
+        [Test]
+        public void DropdownLabels_NumberRepeats_WithoutClashingWithExistingLabels()
+        {
+            Assert.That(DropdownLabels.MakeUnique(new[] { "State", "Playing", "State", "State (2)", "State" }),
+                Is.EqualTo(new[] { "State", "Playing", "State (3)", "State (2)", "State (4)" }));
+            Assert.That(DropdownLabels.MakeUnique(new[] { "(missing)", "(unnamed)", "(unnamed)" }),
+                Is.EqualTo(new[] { "(missing)", "(unnamed)", "(unnamed) (2)" }));
+            Assert.That(DropdownLabels.MakeUnique(new string[0]), Is.Empty);
+        }
+
+        [Test]
         public void EditorFieldNames_Exist()
         {
             const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;

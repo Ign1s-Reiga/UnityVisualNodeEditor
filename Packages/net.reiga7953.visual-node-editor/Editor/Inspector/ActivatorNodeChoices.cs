@@ -17,22 +17,24 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         public static bool IsChoosable(NodeData node) =>
             node != null && !(node is EntryNode) && !(node is EventNode) && !(node is ContainerEntryNode) && !(node is ContainerExitNode) && !(node is NoteNode);
 
-        /// <summary>選べるノードと、その表示（場所付き）。表示の順（同じならグラフの中の順）。</summary>
+        /// <summary>
+        /// 選べるノードと、その表示（場所付き）。表示の順（同じならグラフの中の順）。
+        /// 同じ表示のノードには番号を付ける（例: <c>Round › State</c>, <c>Round › State (2)</c>。ドロップダウンで別のノードとして選べるように）。
+        /// </summary>
         public static List<KeyValuePair<string, string>> Get(NodeGraphAsset graph)
         {
-            var choices = new List<KeyValuePair<string, string>>();
             if (graph == null)
             {
-                return choices;
+                return new List<KeyValuePair<string, string>>();
             }
 
             var query = new GraphQuery(graph);
-            foreach (var node in graph.Nodes.Where(IsChoosable))
-            {
-                choices.Add(new KeyValuePair<string, string>(node.Id, GetLabel(query, node)));
-            }
-
-            return choices.OrderBy(choice => choice.Value, System.StringComparer.Ordinal).ToList();
+            var sorted = graph.Nodes.Where(IsChoosable)
+                .Select(node => new KeyValuePair<string, string>(node.Id, GetLabel(query, node)))
+                .OrderBy(choice => choice.Value, System.StringComparer.Ordinal)
+                .ToList();
+            var labels = DropdownLabels.MakeUnique(sorted.Select(choice => choice.Value));
+            return sorted.Select((choice, i) => new KeyValuePair<string, string>(choice.Key, labels[i])).ToList();
         }
 
         /// <summary>ノードの表示（入っているコンテナを外側から並べ、最後にノード。例: <c>Round › Playing</c>）。</summary>

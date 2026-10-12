@@ -938,7 +938,9 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 ### ゲーム向けのコンポーネントのインスペクタ
 
 - Graph Node Activator（`GraphNodeActivatorEditor`）: ノードは、グラフの待機ノードとコンテナから選ぶドロップダウン（場所付き。例: `Round › Playing`）。
-  通過ノード（Entry・Event・コンテナの Entry / Exit）と Note は出さない。グラフが無い・ノードが無い（消した）・`Targets` が空・自分や親を指すときは HelpBox で直し方を出す
+  通過ノード（Entry・Event・コンテナの Entry / Exit）と Note は出さない。グラフが無い・ノードが無い（消した）・`Targets` が空・自分や親を指すときは HelpBox で直し方を出す。
+  同じ表示のノードが 2 つ以上あれば `Playing (2)` のように番号を付ける（`DropdownField` は表示の文字で選んだ位置を決めるので、同じ文字だと最初のものを選んでしまう。
+  Set Parameter のパラメータ・Event の条件のパラメータのドロップダウンも同じ）
 - Graph Parameter Text（`GraphParameterTextEditor`）: グラフを決めればパラメータを Blackboard から選ぶドロップダウン、決めなければ名前の入力欄。
   テキストのコンポーネントが無い・パラメータがグラフに無いときは HelpBox
 - Graph Event Key（`GraphEventKeyEditor`）: イベント名は Graph Event Button と同じドロップダウン（`EventNameChoices` を共有する）。グラフに無い名前は HelpBox
