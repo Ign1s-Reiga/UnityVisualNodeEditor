@@ -56,7 +56,7 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             saveRow.Add(_loadButton);
             Add(saveRow);
 
-            // ゲーム側のセーブ・オートセーブでできた・消えたスロットも、ノードを移らないうちにボタンに出す（パネルを出している間だけ動く）
+            // ゲーム側のセーブ・オートセーブでできた・消えたスロットも、ノードを移らないうちにボタンに出す（パネルがウィンドウにある間動く。Runner が動いていなければディスクを見ない）
             schedule.Execute(CheckDebugSlot).Every(DebugSlotCheckInterval);
         }
 
@@ -97,11 +97,30 @@ namespace Reiga.VisualNodeEditor.Editor.Debugging
             Refresh();
         }
 
-        private void LoadDebugSlot()
+        /// <summary>
+        /// スロット debug から再開する（Load のボタン）。ボタンの表示は 1 秒ごとにしか直さないので、その間に消えたスロットでも押せる。
+        /// 読めなければ警告を出し、ボタンを直す。
+        /// </summary>
+        internal void LoadDebugSlot()
         {
             if (_runner != null)
             {
-                GraphSaveSlots.Load(_runner, DebugSlot);
+                string problem;
+                try
+                {
+                    problem = GraphSaveSlots.Load(_runner, DebugSlot) ? null : "there is no save there (or its node is gone)";
+                }
+                catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
+                {
+                    problem = exception.Message;
+                }
+
+                if (problem != null)
+                {
+                    UnityEngine.Debug.LogWarning($"[VisualNodeEditor] Could not load slot '{DebugSlot}' for '{_runner.Graph.name}': {problem}");
+                    CheckDebugSlot();
+                }
+
                 Refresh();
             }
         }
