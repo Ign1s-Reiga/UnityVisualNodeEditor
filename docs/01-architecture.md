@@ -186,7 +186,8 @@ ADV は、ひな形のグラフを作る ADV Starter で用意する（「ADV St
 
 - コンテナに着いたら、そのコンテナに入り、中の Entry から続ける（通過ノードとして扱う）
 - Exit ノードに着いたら、そのコンテナから出て、コンテナの出力ポートのうち ID が Exit の `_exitId` と同じものから続ける（親の階層の次のノードへ）
-- 入れ子の深さに制限は無い。今どのコンテナの中にいるかは、現在のノードの `ParentId` の連なりで決まり、`GraphRunner.ContainerPath` で取れる（入るたびに積み、出るたびに下ろすスタックと同じ）
+- 入れ子の深さに制限は無い（コンテナの中のコンテナの中の…と 3〜5 段に重ねても同じように進む。EditMode テストで 5 段を通り抜けて戻ることを確かめる）。
+  今どのコンテナの中にいるかは、現在のノードの `ParentId` の連なりで決まり、`GraphRunner.ContainerPath` で取れる（入るたびに積み、出るたびに下ろすスタックと同じ）
 - データだけで遷移先を引く API を `GraphQuery` に置く: `GetNextNode(nodeId, portId)`（あるポートの先）、`GetContainerEntry(container)`、`GetExitTarget(exitNode)`（Exit から出た先）
 - Exit に対応する出力ポートが繋がっていない場合の扱いは未決事項。**当面は**、出口の無い Event と同じく「どこにも入らず、直前の待機ノードに留まって警告を出す」
 - Entry の無いコンテナ、Entry から 1 本もエッジが出ていないコンテナに着いたときも同じく、入らずに留まって警告を出す
@@ -323,6 +324,49 @@ Runner は最初のシーンに `DontDestroyOnLoad` で残るので、後のシ�
 - 送れなかったとき（Runner が無い・今のノードからその名前の遷移が無い）は、開発ビルドだけ警告を出す
 - グラフにあるイベント名は `GraphEventNames.Collect`（Runtime。空を除き、グラフ内の順で重複なし）で取る。インスペクタのドロップダウンが使う
 
+### ゲーム向けのコンポーネント（画面と入力をコード無しで繋ぐ）
+
+ポーズ・ゲームオーバーのパネル、スコアの表示、キーでのポーズなど、どのゲームにもある「グラフの状態 ↔ 画面・入力」の繋ぎを、コードを書かずに置けるようにする。
+`GraphEventButton` と同じく Runner への参照は持たず、`GraphRunner.FindRunning(graph)` で探す（Runner は最初のシーンに `DontDestroyOnLoad` で残るため）。
+Runner が後から始まっても（シーンを読み込むと、ボタンなどが有効になるのが Runner の開始より先のことがある）`GraphRunner.Started` で繋ぎ直す。
+
+| 型（Add Component > Visual Node Editor） | 役割 |
+|---|---|
+| `GraphNodeActivator`（Graph Node Activator） | グラフが指定したノードにいる間だけ、指定した GameObject（`Targets`）を表示する（`SetActive`）。コンテナを指せば、その中のどこかにいる間。ポーズ・ゲームオーバーのパネルなど |
+| `GraphParameterText`（Graph Parameter Text） | パラメータの値を、同じ GameObject のテキストに書式（`Score: {0}`）で出す |
+| `GraphEventKey`（Graph Event Key） | キーを押したら Raise / Advance する（Esc → `Pause` など） |
+| `GraphInput`（静的クラス） | キー入力の窓口 `GetKeyDown(KeyCode)`。旧 Input Manager でも Input System でも動く。ゲームのコード（Starter が作るスクリプトなど）からも使う |
+
+`GraphNodeActivator`:
+- グラフは必須（ノードはグラフごとの ID で指す。改名しても壊れない）。空なら何もしない（インスペクタで注意を出す）
+- 表示するのは、Runner の今のノードが指したノードのとき、または `ContainerPath` に指したコンテナがあるとき。Runner が無い・止まっているときは隠す
+- 確かめるのは、有効になったとき・Runner がノードに入ったとき（`NodeEntered`）・Runner が始まった・止まったとき（`Started` / `Stopped`）
+- 自分の GameObject とその親は `Targets` にできない（隠すと自分も無効になり、二度と表示できない）。実行時は飛ばし、インスペクタで注意を出す
+- 無効になったときは `Targets` に触らない（そのまま）
+
+`GraphParameterText`:
+- グラフは任意（空なら実行中のどれか）。パラメータは名前で指す（グラフを決めれば Blackboard から選ぶドロップダウン。名前が無ければ注意を出す）
+- テキストは、同じ GameObject の、public な string の `text`（読み書きできるもの）を持つ最初のコンポーネント（uGUI の Text・TextMeshPro・TextMesh）。
+  パッケージを uGUI に依存させないため、`GraphEventButton` の `onClick` と同じく型ではなく名前で探す
+- 書式は `string.Format`（`CultureInfo.InvariantCulture`。`{0}` が値。`{0:0.0}` なども使える）。書式が誤っていれば値だけを出し、1 度だけ警告を出す
+- 書き換えるのは、有効になったとき・そのパラメータが変わったとき（`ParameterChanged`）・Runner が始まったとき。Runner が無ければ書き換えない（シーンに置いた文字のまま）
+
+`GraphEventKey`:
+- グラフは任意（空なら実行中のどれか）、キー（`KeyCode`）、操作（`GraphEventKeyAction`: Raise / Advance）、イベント名（Graph Event Button と同じドロップダウン）
+- 押した（`GraphInput.GetKeyDown`）フレームに 1 回送る。送れなくても（今のノードからその名前の遷移が無い）何も言わない
+  （キーはどの画面でも押せるので、ノードごとに同じキーを別の意味で使えるように。Graph Event Button は開発ビルドで警告を出す）
+- 同じキーの Graph Event Key が 2 つあると、同じフレームにどちらも送る（順は決まらない）。1 つめの遷移の先から 2 つめの遷移が続く組み合わせは避ける（Starter は画面ごとに別のキーを使う）
+
+`GraphInput`:
+- `KeyDownSource`（`Func<KeyCode, bool>`）があればそれを使う。Input System 連携（下）が入れる。テストも差し替える
+- 無ければ、旧 Input Manager が有効（`ENABLE_LEGACY_INPUT_MANAGER`）なら `Input.GetKeyDown`。どちらも無ければ false を返し、1 度だけ警告を出す（Input System パッケージを入れるか、Player 設定の Active Input Handling を確かめる）
+
+Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブリ `Reiga.VisualNodeEditor.InputSystem`）:
+- `com.unity.inputsystem` が入っているときだけコンパイルする（`versionDefines` で `VNE_INPUT_SYSTEM`、`defineConstraints`）。コアのアセンブリから Input System を参照しない
+- Player 設定で Input System が有効（`ENABLE_INPUT_SYSTEM`）なら、`RuntimeInitializeOnLoadMethod(SubsystemRegistration)` で `GraphInput.KeyDownSource` に `Keyboard.current` を読む関数を入れる（両方有効なときも Input System を使う）
+- `KeyCode` → `Key` は名前で対応させ、名前の違うもの（`Alpha1` → `Digit1`、`Return` → `Enter`、`Keypad1` → `Numpad1`、`LeftControl` → `LeftCtrl` など）は表で持つ。マウス・ジョイスティックの `KeyCode` は扱わない（false）
+- 開発用プロジェクトには Input System を入れない（入れると Unity が入力の設定を切り替えて再起動するか尋ねる）。連携は、Input System を足した使い捨てのプロジェクトで EditMode テストを走らせて確かめる
+
 ### 実行中の Runner の一覧
 
 - `GraphRunner.Running`（静的）に実行中の Runner を持ち、`Started` / `Stopped` で通知する。エディタの強調表示が使う
@@ -340,7 +384,10 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 |---|---|
 | `NodeBehaviour` | 抽象基底。`[Serializable]` の純粋な C#（MonoBehaviour でも ScriptableObject でもない）。`OnEnter()` / `OnUpdate(float deltaTime)` / `OnFixedUpdate(float fixedDeltaTime)` / `OnExit()` を必要なものだけ上書きする。`Runner`・`Node`・`Host`（Runner を動かしている `GraphRunnerBehaviour`。コンポーネントを使っていなければ null）を参照できる |
 | `IBehaviourHost` | 振る舞いを持てるノード。`StateNode`・`SceneNode` が実装し、`_behaviours` を `[SerializeReference]` のリストで持つ。独自の待機ノードも実装できる |
+| `BehaviourMenuAttribute` | Add Behaviour メニューのパスと表示名を決める（例: `[BehaviourMenu("Visual Node Editor/Set Parameter")]`）。無ければ名前空間を階層にしたクラス名 |
 
+- `NodeBehaviour.GetIssues(graph, node)`（既定は無し）: 振る舞い自身の設定の問題を返す。検証が、付いているノードの問題として出す（`NodeData.GetIssues` と同じ拡張点）
+- `NodeBehaviour.Describe(graph)`（既定は null）: ノードに出す 1 行の説明（例: `Score = 0`）。null ならクラス名（`BehaviourMenu` があればその名前）を出す
 - `_behaviours` はノードのインスペクタが名前で除外し、専用の UI で出す。`[HideInInspector]` は付けない
   （付けると、その中の振る舞いのフィールドまで `SerializedProperty` 上で非表示扱いになり、編集欄を作れない）
 
@@ -367,7 +414,22 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 - Add Behaviour: `NodeBehaviour` のサブクラス（抽象・ジェネリック・引数なしのコンストラクタが無いものを除く）から選んで追加する
 - Create Script…: 保存先を選ぶと、ファイル名からクラス名を作り、`OnEnter` / `OnUpdate` / `OnFixedUpdate` / `OnExit` の空の骨組みを書き出して IDE で開く。同じ名前のファイルや、同じ名前のクラス（`NodeBehaviour` 以外も含む。骨組みは名前空間の無いクラスなので衝突する）が既にあれば作らない。
   コンパイル（ドメインリロード）後に、そのクラスを元のノードへ自動で追加する（追加待ちは `SessionState` に覚えておく）
-- ノードには、付いている振る舞いのクラス名を 1 行で出す（USS クラス `vne-node__behaviours`）
+- ノードには、付いている振る舞いを 1 行で出す（USS クラス `vne-node__behaviours`。`Describe` があればそれ、無ければクラス名）
+
+### 組み込みの振る舞い
+
+ゲームの流れでよく使う設定を、コードを書かずにノードへ付けられるようにする（処理を組むのではなく、値を 1 つ決めるだけのもの）。
+
+| 型（Add Behaviour のメニュー） | 役割 |
+|---|---|
+| `SetParameterBehaviour`（`Visual Node Editor/Set Parameter`） | ノードに入ったとき、パラメータを変える。変更の一覧 `_changes`（`ParameterChange`: パラメータの ID・操作 `Set` / `Add`・型ごとの値）を上から順に行う。例: ラウンドの始めに `Score = 0`、次のレベルへ進むときに `Level += 1` |
+| `TimeScaleBehaviour`（`Visual Node Editor/Time Scale`） | ノードにいる間 `Time.timeScale` を変え（既定 0 = 止める）、出るとき（`Stop()` でも）入る前の値に戻す。ポーズの State に付ける |
+
+- `ParameterChange` はパラメータを ID で指す（改名しても壊れない。条件と同じ）。`Add` は Int・Float だけ。値は型ごとの欄（`_boolValue` / `_intValue` / `_floatValue` / `_stringValue`）
+- 実行時、無いパラメータ・型に合わない操作は飛ばして警告を出す。検証では Error（`GetIssues`）
+- 値は `SetInt` などで変えるので、`ParameterChanged`・自動遷移の判定・Play 中の Blackboard の表示もふだんどおり動く（自動遷移はノードに入り終えた後に調べるので、入るときに変えた値で判定される）
+- ノードには `Score = 0, Level += 1`・`Time Scale 0` のように出す（`Describe`）
+- エディタ: `ParameterChange` の PropertyDrawer（`ParameterChangeDrawer`）。パラメータは Blackboard から選ぶドロップダウン、操作は型で使えるものだけ、値は型に合った欄
 
 ## 条件付き遷移（Event の条件と自動遷移）
 
@@ -602,6 +664,71 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
     （シーン無しなら Scene ノードのシーンは未設定。検証の Warning と Pick Scene… / Create Scene… のボタンで案内される）
   - Build Settings には入れない（Play が確認してから入れる）。Dialogue System のプレハブが見つからなければ、Story のシーンは Camera だけにして警告を出す
   - どちらかのシーンを作れなければ、作ったシーンを消してエラーを出す（片方だけ残さない。グラフの Scene ノードも空に戻す）。グラフと Yarn のファイルはそのまま使え、グラフは開く
+  - カメラ・EventSystem・Canvas・文字・ボタンの組み立ては、ゲームの Starter と共有する（`StarterScenes`。下の「ゲームの Starter」）
+
+## ゲームの Starter（Snake・スライドパズル）
+
+`Assets > Create > Visual Node Editor > Snake Starter` / `Sliding Puzzle Starter`。ADV Starter と同じく、選んでいるフォルダにひな形を作ってグラフを開き、
+ツールバーの Play だけで最初から遊べるようにする。ゲームの流れ（タイトル・プレイ中・ポーズ・ゲームオーバー・クリア・レベルの進み方・スコア）はグラフと
+「ゲーム向けのコンポーネント」・組み込みの振る舞いで表し、遊びそのもの（蛇の動き・タイルの入れ替え）だけを、作ったゲームのスクリプト（C#）に書く
+（ロジックをノードで組まない。非目的を守る）。スクリプトはユーザーのものとして書き出し、自由に書き換えてよい。
+
+作るもの（`<名前>` はグラフのファイル名。同じ名前があれば番号を付ける。`Snake`・`Snake 1`…）:
+- グラフ `<名前>.asset`（Scene ノードには下のシーンが入っている）
+- ゲームのスクリプト `<クラス名>.cs`（`SnakeGame`・`SlidingPuzzleGame`。グラフ名から作り、同じ名前のファイル・クラスがあれば番号を付ける。名前空間は無し）
+- シーン `<名前> Title.unity`（Main Camera・EventSystem・見出し・Start のボタン・Return / Space で `Start` の Graph Event Key・このグラフの Graph Runner）と
+  `<名前> Game.unity`（Main Camera・EventSystem・Canvas（盤・パラメータの表示・パネル）・キー）
+
+Snake（`Snake.asset`）:
+
+```
+Entry → [Scene: Title] ─(Start)→ [Scene: Game] ─(自動)→ [Container: Round] ─(GameOver)→ [State: Game Over] ─(Retry)→ [Container: Round]
+                                                                           └(Quit)→ [Scene: Title]           └(Title)→ [Scene: Title]
+Round の中: Entry → [State: Ready]（Score = 0）─(Go)→ [State: Playing] ─(Pause)→ [State: Paused]（Time Scale 0）─(Pause)→ [State: Playing]
+                                                       └(Crash)→ Exit (GameOver)              └(Quit)→ Exit (Quit)
+Blackboard: Score（Int、0）、HighScore（Int、0）、Speed（Float、8。1 秒に進むマス）
+```
+
+- Game のシーン: 盤（`Board`。ゲームのスクリプトを付ける）、`Score: {0}`・`Best: {0}` の Graph Parameter Text、
+  Ready（Space で始める案内）・Paused（Resume = `Pause`、Quit）・Game Over（スコア、Retry、Title）のパネルを Graph Node Activator で出す。
+  キー: Space → `Go`、Esc → `Pause`、Return → `Retry`
+- スクリプト: Ready に入ったら（と、シーンが始まったとき）蛇を初めの位置に戻す。Playing の間だけ、矢印キー / WASD（`GraphInput`）で向きを変え、`Speed` の速さで進む。
+  えさを食べたら `Score` を 1 増やし、壁か自分にぶつかったら `HighScore` を更新して `Crash` を Raise する。盤は uGUI の Image で描く
+
+スライドパズル（`Sliding Puzzle.asset`）。コンテナを 2 段に入れ子にする:
+
+```
+Entry → [Scene: Title] ─(Start)→ [Scene: Game]（Level = 1）─(自動)→ [Container: Levels] ─(AllClear)→ [State: All Clear] ─(Title)→ [Scene: Title]
+                                                                                       └(Quit)→ [Scene: Title]
+Levels の中: Entry → [Container: Level] ─(Next)→ [State: Next Level]（Level += 1）─(自動)→ [Container: Level]
+                                        ├(AllClear)→ Exit (AllClear)
+                                        └(Quit)→ Exit (Quit)
+Level の中: Entry → [State: Shuffle]（Moves = 0）─(自動)→ [State: Playing] ─(Pause)→ [State: Paused]（Time Scale 0）─(Pause)→ [State: Playing]
+                                                          │                     ├(Retry)→ [State: Shuffle]
+                                                          │                     └(Quit)→ Exit (Quit)
+                                                          └(Solved)→ [State: Solved] ─(Next, Level >= 3)→ Exit (AllClear)
+                                                                                     └(Next)→ Exit (Next)
+Blackboard: Level（Int、1）、Moves（Int、0）
+```
+
+- Game のシーン: 盤（`Board`）、`Level {0}`・`Moves: {0}` の Graph Parameter Text、Paused（Resume・Retry・Quit）・Solved（Next）・All Clear（Title）のパネル。
+  キー: Esc → `Pause`、Return → `Next`
+- スクリプト: Shuffle に入ったら（と、シーンが始まったとき）、`Level` から盤の大きさ（レベル 1 が 3 × 3、1 つ上がるごとに 1 列・1 行増える）を決め、
+  揃った盤からランダムに 200 回動かして混ぜる（必ず解ける）。Playing の間だけ、空きの隣のタイルのクリック（uGUI の Button）か矢印キーで動かし、
+  `Moves` を 1 増やし、揃ったら `Solved` を Raise する。レベルの数はグラフの条件（`Level >= 3`）で決める
+
+シーンとスクリプトの組み立て:
+- シーンは ADV Starter と同じく、新しいシーンを追加で開いて組み立て、保存して閉じる（`StarterScenes`。今開いているシーンは切り替えない。Build Settings には入れない）。
+  未保存の無題のシーンが開いている・Play 中は、シーン無しで作るか尋ねる。どちらかのシーンを作れなければ、作ったシーンを消してエラーを出し、Scene ノードを空に戻す
+- 作ったばかりのスクリプトは、コンパイルが終わるまでシーンに付けられない。シーンの盤には付けずに保存し、「どのシーンの、どの GameObject に、どのクラスを付け、
+  どのグラフを入れるか」を `SessionState` に覚えておく（`PendingStarterComponents`）。コンパイル後のドメインリロード（`DidReloadScripts`）で、そのシーンを開いて付け、
+  `_graph` にグラフを入れて保存する（シーンが開いていれば、そこに付けて未保存にする。開いていなければ追加で開いて保存して閉じる）。
+  クラスが見つからなければ（コンパイルエラー中など）、ドメインリロードのたびに試し直す（Unity を閉じると忘れるので、付け方を警告に出す）。Play 中なら Play を終えてから付ける
+- スクリプトのひな形は `Starters/Templates/`（`SnakeGameTemplate.cs`・`SlidingPuzzleGameTemplate.cs`）。そのまま C# としてコンパイルできる形で持ち
+  （アセンブリ `Reiga.VisualNodeEditor.Starters.Templates`、エディタだけ。テストを含めるとき（`UNITY_INCLUDE_TESTS`）だけコンパイルする）、
+  書き出すときにクラス名（`SnakeGameTemplate`）だけを置き換える。ひな形がコンパイルできること、遊びの規則（`IsInside`・`HitsBody`・`Slide`・`Shuffle` など）を EditMode テストで確かめる
+- アセンブリ: `Reiga.VisualNodeEditor.Starters.Editor`（`Starters/Editor`。uGUI を使うので `com.unity.ugui` があるときだけ。`versionDefines` で `VNE_UGUI`）。
+  ADV Starter（Yarn 連携のエディタ）もシーンの組み立てにこれを使う
 
 ## Build Settings 連携
 
@@ -807,6 +934,15 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - 設定の問題は、直し方を添えて HelpBox で出す（グラフ未設定、イベント未選択、グラフに無いイベント名、同じ GameObject にボタンが無い）。
   どれを出すかは純粋関数 `GraphEventButtonHints.Get` にし、EditMode テストの対象にする
 - 欄はグラフと操作が変わったときだけ作り直す（名前の入力中に作り直すとフォーカスが外れるため）
+
+### ゲーム向けのコンポーネントのインスペクタ
+
+- Graph Node Activator（`GraphNodeActivatorEditor`）: ノードは、グラフの待機ノードとコンテナから選ぶドロップダウン（場所付き。例: `Round › Playing`）。
+  通過ノード（Entry・Event・コンテナの Entry / Exit）と Note は出さない。グラフが無い・ノードが無い（消した）・`Targets` が空・自分や親を指すときは HelpBox で直し方を出す
+- Graph Parameter Text（`GraphParameterTextEditor`）: グラフを決めればパラメータを Blackboard から選ぶドロップダウン、決めなければ名前の入力欄。
+  テキストのコンポーネントが無い・パラメータがグラフに無いときは HelpBox
+- Graph Event Key（`GraphEventKeyEditor`）: イベント名は Graph Event Button と同じドロップダウン（`EventNameChoices` を共有する）。グラフに無い名前は HelpBox
+- どれを出すかは純粋関数（`GameComponentHints`）にし、EditMode テストの対象にする
 
 ### アセットのインスペクタ（`NodeGraphAssetEditor`）
 
