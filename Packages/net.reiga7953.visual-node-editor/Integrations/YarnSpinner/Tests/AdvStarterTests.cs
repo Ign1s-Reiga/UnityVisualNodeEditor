@@ -3,7 +3,9 @@ using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.YarnSpinner.Editor;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Yarn.Unity;
 
 namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
@@ -104,6 +106,49 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
             }
             finally
             {
+                AssetDatabase.DeleteAsset(Folder);
+            }
+        }
+
+        [Test]
+        public void CreateIn_WithScenes_PutsPlayableScenesIntoTheGraph_WithoutSwitchingTheOpenScene()
+        {
+            AssetDatabase.CreateFolder("Assets", "__VneAdvStarterTemp");
+            try
+            {
+                // Yarn Spinner の Dialogue System は TextMesh Pro の読み込みのウィンドウを開くので、同じ作りの代わりのプレハブを使う
+                AdvStarterScenes.DialogueSystemPrefabOverride = TestDialogueSystemPrefab.Create(Folder + "/Dialogue System.prefab");
+
+                // 無題のシーンが開いていると、Unity は追加でシーンを作れないので、保存したシーンを開いておく
+                var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                EditorSceneManager.SaveScene(host, Folder + "/Host.unity");
+                Assert.That(AdvStarterScenes.GetProblem(), Is.Null);
+
+                var graph = AdvStarter.CreateIn(Folder, withScenes: true);
+
+                var title = graph.Nodes.OfType<SceneNode>().Single(node => node.Title == AdvStarterScenes.TitleSceneNode);
+                var story = graph.Nodes.OfType<SceneNode>().Single(node => node.Title == AdvStarterScenes.StorySceneNode);
+                Assert.That(title.Scene.Path, Is.EqualTo(Folder + "/ADV Title.unity"));
+                Assert.That(story.Scene.Path, Is.EqualTo(Folder + "/ADV Story.unity"));
+                Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(title.Scene.Path), Is.Not.Null);
+                Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(story.Scene.Path), Is.Not.Null);
+                Assert.That(SceneManager.sceneCount, Is.EqualTo(1), "the new scenes are closed again");
+                Assert.That(SceneManager.GetActiveScene().path, Is.EqualTo(Folder + "/Host.unity"), "the open scene is not switched");
+
+                // 保存したシーンにも、組み立てたものが入っている
+                var titleScene = EditorSceneManager.OpenScene(title.Scene.Path, OpenSceneMode.Additive);
+                var runner = titleScene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<GraphRunnerBehaviour>(true)).Single();
+                Assert.That(runner.Graph, Is.SameAs(graph));
+                EditorSceneManager.CloseScene(titleScene, true);
+                var storyScene = EditorSceneManager.OpenScene(story.Scene.Path, OpenSceneMode.Additive);
+                var bridge = storyScene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<YarnGraphBridge>(true)).Single();
+                Assert.That(bridge.Graph, Is.SameAs(graph));
+                EditorSceneManager.CloseScene(storyScene, true);
+            }
+            finally
+            {
+                AdvStarterScenes.DialogueSystemPrefabOverride = null;
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
                 AssetDatabase.DeleteAsset(Folder);
             }
         }

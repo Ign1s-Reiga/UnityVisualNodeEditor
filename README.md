@@ -33,13 +33,13 @@ UPM パッケージ `net.reiga7953.visual-node-editor` として開発してい�
 
 1. ゲームのプロジェクトに Yarn Spinner for Unity 3.x（`dev.yarnspinner.unity`）を入れる。入れると、このパッケージの Yarn Spinner 連携
    （`Integrations/YarnSpinner`）が有効になる（入れていなければコンパイルされず、影響しない）
-2. `Assets > Create > Visual Node Editor > ADV Starter` で、ひな形（グラフ・Yarn スクリプト・Yarn プロジェクト）を作る
-3. Title と Story のシーンを作り、グラフの Scene ノードに入れる
-4. Story のシーン: `GameObject > Yarn Spinner > Dialogue System` を置き、その Dialogue Runner の Yarn Project に作ったプロジェクトを入れ、
-   同じ GameObject に `Add Component > Visual Node Editor > Yarn Graph Bridge` を足す（Yarn の変数を Blackboard と共有する
-   Graph Variable Storage も自動で設定される）。セーブ用に Auto Save Slot（例: `auto`）を入れてもよい
-5. Title のシーン: ボタンに Graph Event Button を付け、「はじめから」は Raise `NewGame`、「続きから」は Load（スロット `auto`）
-6. グラフのツールバーの Play で動かす
+2. `Assets > Create > Visual Node Editor > ADV Starter` で、ひな形（グラフ・Yarn スクリプト・Yarn プロジェクト・Title と Story のシーン）を作る
+   - `ADV Title`: 「New Game」（Raise `NewGame`）と「Continue」（スロット `auto` から Load）のボタンと、このグラフの Graph Runner
+   - `ADV Story`: Yarn Spinner の Dialogue System（Yarn Project・Yarn Graph Bridge・Yarn の変数を Blackboard と共有する Graph Variable Storage 入り。オートセーブはスロット `auto`）
+3. グラフのツールバーの Play で動かす（シーンを Build Settings に入れ、Title を先頭に置くかを尋ねてから Play に入る）
+
+自分のシーンで組むときは、Dialogue Runner と同じ GameObject に `Add Component > Visual Node Editor > Yarn Graph Bridge` を足す
+（Graph Variable Storage も自動で設定される）。タイトルのボタンには Graph Event Button を付ける。
 
 | グラフでできること | 使うもの |
 |---|---|
