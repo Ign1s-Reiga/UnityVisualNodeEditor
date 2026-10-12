@@ -191,10 +191,10 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void SavingAgain_WhenTheOldSaveIsGoneAndMovingFails_KeepsTheNewSaveInTheTemporaryFile()
+        public void SavingAgain_WhenTheOldSaveIsGoneAndMovingFails_KeepsTheNewSaveReadable()
         {
             // 古いセーブが退けられた後で、新しいセーブを移すのにも失敗した（ここでは、スロットの名前のフォルダがあって移せない）。
-            // 一時ファイルが新しいセーブの唯一の写しなので、消さずに残す
+            // 一時ファイルが新しいセーブの唯一の写しなので、消さずに残し、スロットとして読む。消すときは一緒に消す
             GraphSaveSlots.Save(_runner, "slot1");
             _runner.Raise("Start");
             var path = GraphSaveSlots.GetPath(_graph, "slot1");
@@ -207,7 +207,24 @@ namespace Reiga.VisualNodeEditor.Tests
             }, () => Assert.Throws<IOException>(() => GraphSaveSlots.Save(_runner, "slot1")));
 
             Assert.That(File.Exists(path + ".tmp"), Is.True);
-            Assert.That(GraphRunnerState.FromJson(File.ReadAllText(path + ".tmp")).NodeId, Is.EqualTo(_game.Id));
+            Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.True);
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1").NodeId, Is.EqualTo(_game.Id));
+
+            Assert.That(GraphSaveSlots.Delete(_graph, "slot1"), Is.True);
+            Assert.That(File.Exists(path + ".tmp"), Is.False);
+            Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.False);
+        }
+
+        [Test]
+        public void ATemporaryFileCutOffMidWrite_IsNotASave()
+        {
+            // 書いている途中で落ちた一時ファイルは読めないので、スロットとしては扱わない
+            var path = GraphSaveSlots.GetPath(_graph, "slot1");
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            File.WriteAllText(path + ".tmp", "{\"_version\":1,\"_nod");
+
+            Assert.That(GraphSaveSlots.Exists(_graph, "slot1"), Is.False);
+            Assert.That(GraphSaveSlots.Read(_graph, "slot1"), Is.Null);
         }
 
         private static void WithReplaceFile(Action<string, string> replace, Action action)
