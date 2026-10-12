@@ -82,7 +82,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             return builder.Graph;
         }
 
-        internal override RectTransform BuildGame(Scene scene, NodeGraphAsset graph)
+        internal override GameObject BuildGame(Scene scene, NodeGraphAsset graph)
         {
             StarterScenes.AddCamera(scene);
             StarterScenes.AddEventSystem(scene);
@@ -113,11 +113,16 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             StarterScenes.AddActivator(canvas.gameObject, graph, GameOverNode, gameOverPanel.gameObject);
 
             // キー: Space で始める、Esc でポーズ（もう一度で戻る）、Enter でやり直す。画面ごとに別のキーにして、1 回の押下で 2 つ進まないようにする
-            var keys = StarterScenes.CreateRoot(scene, "Keys");
+            AddKeys(StarterScenes.CreateRoot(scene, "Keys"), graph);
+            return board.gameObject;
+        }
+
+        /// <summary>Game のキー（uGUI 版と UI Toolkit 版で同じ）: Space で始める、Esc でポーズ（もう一度で戻る）、Enter でやり直す。</summary>
+        internal static void AddKeys(GameObject keys, NodeGraphAsset graph)
+        {
             StarterScenes.AddKey(keys, graph, KeyCode.Space, GoEvent);
             StarterScenes.AddKey(keys, graph, KeyCode.Escape, PauseEvent);
             StarterScenes.AddKey(keys, graph, KeyCode.Return, RetryEvent);
-            return board;
         }
     }
 }

@@ -99,6 +99,27 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             Assert.That(IsSolvable(cells, size), Is.True);
         }
 
+        [Test]
+        public void ToolkitTemplates_PlayByTheSameRules()
+        {
+            // UI Toolkit 版は描き方だけが違い、遊びの規則は uGUI 版と同じ
+            var body = new List<Vector2Int> { new Vector2Int(2, 2), new Vector2Int(2, 1), new Vector2Int(1, 1), new Vector2Int(1, 2) };
+            Assert.That(SnakeGameToolkitTemplate.IsInside(new Vector2Int(19, 0), 20, 20), Is.True);
+            Assert.That(SnakeGameToolkitTemplate.IsReverse(Vector2Int.down, Vector2Int.up), Is.True);
+            Assert.That(SnakeGameToolkitTemplate.HitsBody(body, new Vector2Int(1, 2), false), Is.False);
+            Assert.That(SnakeGameToolkitTemplate.HitsBody(body, new Vector2Int(1, 2), true), Is.True);
+            Assert.That(SnakeGameToolkitTemplate.PlaceFood(body, 2, 2, new System.Random(1)), Is.Not.EqualTo(new Vector2Int(1, 1)).And.Not.EqualTo(new Vector2Int(2, 2)));
+
+            var cells = new[] { 1, 2, 3, 4, 0, 5, 6, 7, 8 };
+            Assert.That(SlidingPuzzleGameToolkitTemplate.FindCellToSlide(cells, 3, Vector2Int.up), Is.EqualTo(7));
+            Assert.That(SlidingPuzzleGameToolkitTemplate.Slide(cells, 3, 5), Is.True);
+            Assert.That(cells, Is.EqualTo(new[] { 1, 2, 3, 4, 5, 0, 6, 7, 8 }));
+            var shuffled = SlidingPuzzleGameToolkitTemplate.CreateSolved(4);
+            SlidingPuzzleGameToolkitTemplate.Shuffle(shuffled, 4, 200, new System.Random(4));
+            Assert.That(SlidingPuzzleGameToolkitTemplate.IsSolved(shuffled), Is.False);
+            Assert.That(IsSolvable(shuffled, 4), Is.True);
+        }
+
         // 15 パズルが解ける並びか（転倒数の偶奇と、隙間の行で決まる）
         private static bool IsSolvable(int[] cells, int size)
         {

@@ -40,8 +40,19 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// <summary>ひな形のグラフ（まだアセットとして保存していない）。Scene ノードは <see cref="TitleSceneNode"/> と <see cref="GameSceneNode"/>。</summary>
         internal abstract NodeGraphAsset BuildGraph();
 
-        /// <summary>Game のシーンを組み立て、ゲームのスクリプトを付ける盤を返す。</summary>
-        internal abstract RectTransform BuildGame(Scene scene, NodeGraphAsset graph);
+        /// <summary>Game のシーンを組み立て、ゲームのスクリプトを付ける GameObject（uGUI 版は盤、UI Toolkit 版は画面の UIDocument）を返す。</summary>
+        internal abstract GameObject BuildGame(Scene scene, NodeGraphAsset graph);
+
+        /// <summary>Title のシーンを組み立てる。既定は uGUI（<see cref="StarterScenes.BuildGameTitle"/>）。</summary>
+        internal virtual void BuildTitle(Scene scene, NodeGraphAsset graph) => StarterScenes.BuildGameTitle(scene, graph, Controls, StartEvent);
+
+        /// <summary>
+        /// シーンより先に、画面に要るアセットを作る（UI Toolkit 版の UXML・USS・Panel Settings。uGUI 版は無し）。
+        /// 作ったものは <paramref name="created"/> に足す（シーンを作れなかったときに一緒に消す）。
+        /// </summary>
+        internal virtual void CreateScreenAssets(NodeGraphAsset graph, string folder, List<string> created)
+        {
+        }
 
         /// <summary>
         /// メニューから: シーンを作れないとき（未保存の無題のシーン・Play 中）は、シーン無しで作るか尋ねる。作ったらグラフを開く。
@@ -132,19 +143,22 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             return AssetDatabase.IsValidFolder(path) ? path : Path.GetDirectoryName(path)?.Replace('\\', '/') ?? "Assets";
         }
 
-        // Title と Game のシーンを作ってグラフに入れ、Game のシーンのパスと盤のパスを返す。どちらかを作れなければ、作ったものを消して例外
+        // 画面のアセットと Title・Game のシーンを作ってグラフに入れ、Game のシーンのパスと、スクリプトを付ける GameObject のパスを返す。
+        // どれかを作れなければ、作ったものを消して例外
         private (string scenePath, string boardPath) CreateScenes(NodeGraphAsset graph, string folder)
         {
             var created = new List<string>();
             try
             {
+                CreateScreenAssets(graph, folder, created);
+
                 var titlePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Title.unity");
-                StarterScenes.CreateScene(titlePath, scene => StarterScenes.BuildGameTitle(scene, graph, Controls, StartEvent), StarterName);
+                StarterScenes.CreateScene(titlePath, scene => BuildTitle(scene, graph), StarterName);
                 created.Add(titlePath);
 
                 var gamePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Game.unity");
                 string boardPath = null;
-                StarterScenes.CreateScene(gamePath, scene => boardPath = StarterScenes.GetPath(BuildGame(scene, graph)), StarterName);
+                StarterScenes.CreateScene(gamePath, scene => boardPath = StarterScenes.GetPath(BuildGame(scene, graph).transform), StarterName);
                 created.Add(gamePath);
 
                 StarterScenes.SetScene(graph, TitleSceneNode, titlePath);
@@ -155,9 +169,10 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             }
             catch
             {
-                foreach (var path in created)
+                // 作った順の逆に消す（UXML より先に、それが読む USS を消すと、UXML の読み込み直しでエラーが出る）
+                for (var i = created.Count - 1; i >= 0; i--)
                 {
-                    AssetDatabase.DeleteAsset(path);
+                    AssetDatabase.DeleteAsset(created[i]);
                 }
 
                 // グラフを保存するところで失敗したときも、消したシーンを指したまま残さない
