@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.0] - 2026-10-12
+- 追加: ゲームの Starter。`Assets > Create > Visual Node Editor > Snake Starter`（スネークゲーム）/ `Sliding Puzzle Starter`（15 パズル。3 × 3 → 4 × 4 → 5 × 5）で、グラフ・Title と Game のシーン・書き換えてよいゲームのスクリプトを作る。スクリプトはコンパイル後に Game のシーンの盤へ自動で付き、ツールバーの Play だけで最初から遊べる（uGUI が必要）
+  - 遊び（蛇の動き・タイルの入れ替え）はスクリプトに、タイトル・プレイ中・ポーズ・ゲームオーバー・クリア・レベル・スコアはグラフとコンポーネントに置く
+  - スライドパズルは、コンテナを 2 段に入れ子にしている（Levels › Level）
+- 追加: コード無しで画面と入力をグラフに繋ぐコンポーネント（`Add Component > Visual Node Editor`）
+  - Graph Node Activator: グラフが指定したノード（コンテナなら、その中のどこか）にいる間だけ GameObject を表示する（ポーズ・ゲームオーバーのパネル）
+  - Graph Parameter Text: パラメータの値を `Score: {0}` のような書式でテキスト（uGUI の Text・TextMeshPro）に出す
+  - Graph Event Key: キーで Raise / Advance する（Esc → Pause）。`GraphInput.GetKeyDown` で、旧 Input Manager でも Input System でも読める
+- 追加: Input System 連携（`Integrations/InputSystem`。`com.unity.inputsystem` が入っているときだけコンパイルし、Player 設定で Input System が有効ならキーをそれで読む）
+- 追加: 組み込みの振る舞い Set Parameter（ノードに入ったら `Score = 0`・`Level += 1` などを行う）と Time Scale（ノードにいる間 `Time.timeScale` を変える）
+- 追加: 振る舞いの拡張点 `BehaviourMenuAttribute`（Add Behaviour のメニューの名前）、`NodeBehaviour.GetIssues`（検証に問題を出す）、`NodeBehaviour.Describe`（ノードに出す説明）
+- 変更: Graph Event Button のイベント名の欄を、Graph Event Key と共有する。ADV Starter のシーンの組み立てを、ゲームの Starter と共有する
+- テスト: コンテナを 5 段に入れ子にしても、入って出られること
+
 ## [0.14.3] - 2026-10-12
 - 修正: 保存の後で、前に残った `.bak` をほかのプロセスが開いていて消せないと、新しいセーブはもうスロットに入っているのに保存を失敗にし、`GraphSaveSlots.SlotChanged` も知らせなかった。消せなくても成功にして知らせる（`.bak` は次の保存か `Delete` で消す）
 - 修正: Load のボタンが押せないようにしたコンポーネントを覚えておらず、戻すときに選び直していたので、ほかで押せないようにしたコンポーネントを点けることがあった。押せないようにしたものだけを戻す
