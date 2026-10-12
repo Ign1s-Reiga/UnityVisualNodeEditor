@@ -27,7 +27,7 @@ namespace Reiga.VisualNodeEditor.Tests
             var guid = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(second));
             WriteKeysWithoutChecking(guid, first, second);
 
-            GraphSaveKeySync.CheckAll();
+            GraphSaveKeySync.CheckAll(McpTempGraphs.Folder);
 
             Assert.That(second.SaveKey, Is.EqualTo(guid));
             Assert.That(first.SaveKey, Is.Not.Empty.And.Not.EqualTo(guid));
@@ -43,7 +43,7 @@ namespace Reiga.VisualNodeEditor.Tests
             WriteKeysWithoutChecking(original.SaveKey, copy);
             var key = original.SaveKey;
 
-            GraphSaveKeySync.CheckAll();
+            GraphSaveKeySync.CheckAll(McpTempGraphs.Folder);
 
             Assert.That(original.SaveKey, Is.EqualTo(key), "the first by name keeps the key");
             Assert.That(copy.SaveKey, Is.EqualTo(AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(copy))), "the copy's new key is its GUID");
@@ -55,10 +55,10 @@ namespace Reiga.VisualNodeEditor.Tests
         {
             // 何もしなかったときは、エディタを開いたときの確かめを済んだことにしない（CheckAll の戻り値）
             var ran = true;
-            GraphSaveKeySync.WithoutFixing(() => ran = GraphSaveKeySync.CheckAll());
+            GraphSaveKeySync.WithoutFixing(() => ran = GraphSaveKeySync.CheckAll(McpTempGraphs.Folder));
 
             Assert.That(ran, Is.False);
-            Assert.That(GraphSaveKeySync.CheckAll(), Is.True);
+            Assert.That(GraphSaveKeySync.CheckAll(McpTempGraphs.Folder), Is.True);
         }
 
         // Unity の複製は "Main 1"・"Stage 9" の次の "Stage 10"。文字の順では、どちらも複製のほうが先になる
@@ -72,7 +72,7 @@ namespace Reiga.VisualNodeEditor.Tests
             var key = original.SaveKey;
             WriteKeysWithoutChecking(key, copy);
 
-            GraphSaveKeySync.CheckAll();
+            GraphSaveKeySync.CheckAll(McpTempGraphs.Folder);
 
             Assert.That(original.SaveKey, Is.EqualTo(key));
             Assert.That(copy.SaveKey, Is.Not.Empty.And.Not.EqualTo(key));

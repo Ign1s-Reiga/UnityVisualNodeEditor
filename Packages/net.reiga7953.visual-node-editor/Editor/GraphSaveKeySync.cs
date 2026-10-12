@@ -34,8 +34,11 @@ namespace Reiga.VisualNodeEditor.Editor
         /// <summary>新しいセーブキー。</summary>
         internal static string NewKey() => Guid.NewGuid().ToString("N");
 
-        /// <summary>全部のグラフで、キーの重なりを直す。<see cref="WithoutFixing"/> の中なら何もせず false。</summary>
-        internal static bool CheckAll()
+        /// <summary>
+        /// 全部のグラフで、キーの重なりを直す。<paramref name="folder"/> を指定すると、そのフォルダの中のグラフだけを入れ直す
+        /// （ほかのグラフのキーとも比べる。テストで、プロジェクトのグラフを書き換えないように）。<see cref="WithoutFixing"/> の中なら何もせず false。
+        /// </summary>
+        internal static bool CheckAll(string folder = null)
         {
             if (_suspended > 0)
             {
@@ -43,7 +46,7 @@ namespace Reiga.VisualNodeEditor.Editor
             }
 
             _keys = null;
-            Resolve(FindAllGraphs(), true);
+            Resolve(FindAllGraphs(folder), true);
             return true;
         }
 
@@ -192,8 +195,11 @@ namespace Reiga.VisualNodeEditor.Editor
             return keys;
         }
 
-        private static List<string> FindAllGraphs() =>
-            AssetDatabase.FindAssets("t:" + nameof(NodeGraphAsset))
+        // 全部のグラフのパス（folder を指定すると、その中のものだけ）
+        private static List<string> FindAllGraphs(string folder = null) =>
+            (folder == null
+                ? AssetDatabase.FindAssets("t:" + nameof(NodeGraphAsset))
+                : AssetDatabase.FindAssets("t:" + nameof(NodeGraphAsset), new[] { folder }))
                 .Select(AssetDatabase.GUIDToAssetPath)
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
