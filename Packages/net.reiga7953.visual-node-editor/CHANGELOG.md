@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.16.0] - 2026-10-13
+- 追加: UI Toolkit の画面を、コード無しでグラフに繋ぐコントロール（UI Builder の Library に出る。`[UxmlElement]`）
+  - `GraphButton`: クリックで Raise / Advance / Save / Load（Graph Event Button と同じ。Load は再開できないうちは押せない）
+  - `GraphParameterLabel`: パラメータを `Score: {0}` のような書式で出す
+  - `GraphNodePanel`: グラフが指定したノード（`Paused`・`Round/Paused` のようにタイトルを `/` で並べる。コンテナなら中のどこか）にいる間だけ、中の要素を出す
+  - `graph` 属性を入れると、UI Builder のインスペクタでイベント名・パラメータ・ノードをグラフから選べる（空なら実行中のグラフ）。UI Builder の中では隠したり書き換えたりしない
+- 追加: Scene ノードのインスペクタの Screen の行。Edit Screen でそのシーンの UXML を UI Builder で開く。無ければ Create Screen… で UXML・UIDocument・Panel Settings を作って開く
+- 追加: `Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)`。画面を UXML / USS で作る（グラフ・キーは uGUI 版と同じ。UI Builder で直せる）
+- 変更: Graph Event Button の送る処理を、UI Toolkit の Graph Button と共有する（動きは変わらない）
+
 ## [0.15.1] - 2026-10-12
 - 修正: 同じ表示のノード・パラメータが 2 つあると、ドロップダウンで 2 つ目を選んでも 1 つ目になった（Graph Node Activator のノード、Set Parameter と Event の条件のパラメータ）。2 つ目以降に番号を付ける（`Round › Playing (2)`）
 - 修正: Graph Parameter Text が、値を読んでいた Runner が止まった後もそれを聞き続けていた（止まった Runner を持ち続ける）。止まったらほかの実行中の Runner を探し直し、無ければ外れる
