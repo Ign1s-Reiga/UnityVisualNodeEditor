@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3] - 2026-10-12
+- 修正: 保存の後で、前に残った `.bak` をほかのプロセスが開いていて消せないと、新しいセーブはもうスロットに入っているのに保存を失敗にし、`GraphSaveSlots.SlotChanged` も知らせなかった。消せなくても成功にして知らせる（`.bak` は次の保存か `Delete` で消す）
+- 修正: Load のボタンが押せないようにしたコンポーネントを覚えておらず、戻すときに選び直していたので、ほかで押せないようにしたコンポーネントを点けることがあった。押せないようにしたものだけを戻す
+- 修正: Disable Without Save を切った・Load 以外の操作にした・Graph Event Button が無効になった（GameObject を隠した・壊したときも）とき、押せないようにしたボタンがそのまま残った。戻す（有効な間に Graph・Action・Slot・DisableWithoutSave を変えると、すぐ確かめ直す）
+- 修正: 大文字・小文字だけが違うスロット名（`Slot1` と `slot1`）への保存・削除で、Load のボタンが確かめ直さなかった（Windows・macOS では同じファイル）。区別せずに比べる
+- 修正: Load 以外の Graph Event Button も、セーブのたびにコンポーネントを探していた。Load で Disable Without Save のボタンだけが確かめる
+
 ## [0.14.2] - 2026-10-12
 - 修正: Load のボタンの Disable Without Save（0.14.1）が、グラフの欄が空だと効かなかった（ボタンが有効になる時点では Graph Runner がまだ始まっていない）。Runner が始まったときにも確かめる
 - 修正: Load のボタンが出ている間にセーブ・削除しても、押せる・押せないが変わらなかった（ポーズメニューなど）。`GraphSaveSlots.SlotChanged` で知らせ、確かめ直す
