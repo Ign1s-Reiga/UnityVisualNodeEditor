@@ -393,15 +393,18 @@ UI Toolkit のランタイムは UnityEngine のモジュールなので、コ�
   （`GraphRunnerFollower` に共通化する: グラフ（空なら実行中のどれか）の Runner を探し、`Started` / `Stopped` で探し直し、今の Runner のノードの出入り・パラメータの変化を伝える）
 - 送る処理（Runner を探す・Raise / Advance / Save / Load・警告）は Graph Event Button と同じもの（`GraphEventSender` に共通化する）。
   Load で `disable-without-save` なら、再開できないうちは押せないようにし（`SetEnabled(false)`）、戻すのは自分が押せないようにしたときだけ（Graph Event Button と同じ規則）
-- `GraphNodePanel` は、いないとき `style.display = None`、いるとき `Flex`。Runner が無ければ隠す
+- `GraphNodePanel` は、いないとき `style.display = None`、いるとき `Flex`。Runner が無ければ隠す。
+  隠すとき、中の要素がキーボードのフォーカスを持っていれば外す（UI Toolkit のボタンはフォーカス中に Enter / Space でも押されるので、隠れたボタンがキーで送らないように）
 - UI Builder のインスペクタ: `event-name`・`parameter`・`node` は、`graph` が入っていればグラフから選ぶドロップダウン（`[EventName]`・`[GraphParameterName]`・`[GraphNodePath]` の PropertyDrawer。
-  同じ並びの `graph` の値を見る）。入っていない・見つからなければ入力欄
+  同じ並びの `graph` の値を見る）。入っていない・見つからなければ入力欄。▾ で選んだ値は入力欄に入れる（入力したのと同じ変更として UI Builder が UXML に書く）
 
 Scene ノードの画面（`SceneScreens`）:
-- Scene ノードのインスペクタに Screen の行を出す。シーンが使っている UXML（シーンの依存のうち `.uxml`）があれば **Edit Screen**（UI Builder で開く。2 つ以上ならメニュー）
+- Scene ノードのインスペクタに Screen の行を出す。シーンが使っている UXML（シーンの依存のうち `.uxml`。シーンが開いていれば、その中の UIDocument の画面も。
+  保存前のものも見つける）があれば **Edit Screen**（UI Builder で開く。2 つ以上ならメニュー）。Scene の欄を変えたら行を作り直す（ボタンは押したときのシーンを使う）
 - 無ければ **Create Screen…**: シーンの隣に `<シーン名>.uxml`（見出しだけの画面）を作り、Panel Settings（プロジェクトにあればそれ。無ければシーンの隣に
   `Panel Settings.asset` と、その既定のテーマ `Runtime Theme.tss`（`@import url("unity-theme://default");`）を作る）を使う UIDocument（GameObject `UI`）をシーンに足して、UI Builder で開く。
-  シーンが開いていればそこに足して未保存にし、開いていなければ追加で開いて保存して閉じる。未保存の無題のシーンが開いている・Play 中は作らず、理由を出す
+  シーンが開いていればそこに足して未保存にし、開いていなければ追加で開いて保存して閉じる。Play 中・（シーンを追加で開くときに）未保存の無題のシーンが開いているときは、
+  何も作らずに理由を出す。ファイルは確かめ終えてから書き、シーンに足せなければ作った UXML を消す
 
 ### 実行中の Runner の一覧
 

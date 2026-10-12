@@ -128,6 +128,63 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void CreateScreen_WritesNothing_WhenTheSceneCannotBeOpened()
+        {
+            // 保存したシーンを作ってから、無題のシーンだけを開く（Unity は追加でシーンを開けない）
+            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EditorSceneManager.SaveScene(host, Folder + "/Level.unity");
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            Assert.That(SceneScreens.CreateScreen(Folder + "/Level.unity", out var problem), Is.Null);
+
+            Assert.That(problem, Is.Not.Null);
+            Assert.That(File.Exists(Folder + "/Level.uxml"), Is.False, "no file is written before the checks pass");
+        }
+
+        [Test]
+        public void AScreenAddedToAnOpenScene_IsFoundBeforeTheSceneIsSaved()
+        {
+            // 開いているシーンに足した画面は、保存するまでシーンのファイルの依存に入らない。それでも Edit Screen に出す（2 つ目を作らないように）
+            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EditorSceneManager.SaveScene(host, Folder + "/Level.unity");
+
+            var uxml = SceneScreens.CreateScreen(Folder + "/Level.unity", out var problem);
+
+            Assert.That(problem, Is.Null);
+            Assert.That(SceneManager.GetActiveScene().isDirty, Is.True, "left unsaved for the user");
+            Assert.That(SceneScreens.FindScreens(Folder + "/Level.unity"), Is.EqualTo(new[] { uxml }));
+        }
+
+        [Test]
+        public void TheScreenRow_ReadsTheSceneWhenItIsUsed()
+        {
+            // 行を作った後で Scene の欄を変えても、Create Screen… は今のシーンに作る
+            // シーンを先に作る（新しいシーンを開くと、使われていない保存前のグラフは消される）
+            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            EditorSceneManager.SaveScene(host, Folder + "/A.unity");
+            EditorSceneManager.SaveScene(host, Folder + "/B.unity");
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            var node = new SceneNode();
+            graph.AddNode(node);
+            try
+            {
+                var serializedGraph = new SerializedObject(graph);
+                var scene = serializedGraph.FindProperty("_nodes").GetArrayElementAtIndex(0).FindPropertyRelative(Reiga.VisualNodeEditor.Editor.Inspector.SceneScreenField.ScenePropertyName);
+                var row = new Reiga.VisualNodeEditor.Editor.Inspector.SceneScreenField(scene);
+                Assert.That(row.ScenePath, Is.Empty);
+                Assert.That(row.ButtonText, Is.Empty, "no scene yet: no button");
+
+                node.Scene = new SceneReference(AssetDatabase.AssetPathToGUID(Folder + "/B.unity"), Folder + "/B.unity");
+                Assert.That(row.ScenePath, Is.EqualTo(Folder + "/B.unity"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(graph);
+            }
+        }
+
+
+        [Test]
         public void PanelSettings_AreMadeWithTheDefaultTheme()
         {
             var settings = ScreenAssets.CreatePanelSettings(Folder + "/Panel Settings.asset");
