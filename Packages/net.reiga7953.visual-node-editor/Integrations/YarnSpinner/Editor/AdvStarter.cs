@@ -129,7 +129,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             return nearestFirst.FirstOrDefault(containsStarter) ?? nearestFirst.FirstOrDefault();
         }
 
-        // その Yarn プロジェクトにノードがあるか（スクリプトにエラーがあってプログラムが無ければ false）
+        // その Yarn プロジェクトにノードがあるか。読めなければ（スクリプトにエラーがあってプログラムが無いなど）、理由を警告に出して false
         private static bool ProjectHasNode(string projectPath, string node)
         {
             var project = AssetDatabase.LoadAssetAtPath<YarnProject>(projectPath);
@@ -137,8 +137,10 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             {
                 return project != null && Array.IndexOf(project.NodeNames, node) >= 0;
             }
-            catch (Exception)
+            catch (Exception exception)
             {
+                Debug.LogWarning($"[VisualNodeEditor] ADV Starter could not read the nodes of the Yarn project '{projectPath}' ({exception.Message}), " +
+                                 "so it may not be the one the Story scene uses. Check the Yarn project for errors.");
                 return false;
             }
         }

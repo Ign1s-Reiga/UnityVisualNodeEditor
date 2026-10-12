@@ -84,6 +84,9 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
                     AssetDatabase.DeleteAsset(path);
                 }
 
+                // グラフを保存するところで失敗したときも、消したシーンを指したまま残さない（Scene ノードは空のまま）
+                ClearScene(graph, TitleSceneNode);
+                ClearScene(graph, StorySceneNode);
                 throw;
             }
         }
@@ -161,6 +164,14 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Editor
             foreach (var node in graph.Nodes.OfType<SceneNode>().Where(node => node.Title == nodeTitle))
             {
                 node.Scene = new SceneReference(AssetDatabase.AssetPathToGUID(scenePath), scenePath);
+            }
+        }
+
+        private static void ClearScene(NodeGraphAsset graph, string nodeTitle)
+        {
+            foreach (var node in graph.Nodes.OfType<SceneNode>().Where(node => node.Title == nodeTitle))
+            {
+                node.Scene = new SceneReference();
             }
         }
 

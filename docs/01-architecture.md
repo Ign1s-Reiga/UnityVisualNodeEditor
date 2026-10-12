@@ -591,7 +591,7 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
   - 未保存の無題のシーンが開いている・Play 中は、Unity が追加でシーンを作れないので、理由を出して「シーン無しで作る」か取り消すかを尋ねる
     （シーン無しなら Scene ノードのシーンは未設定。検証の Warning と Pick Scene… / Create Scene… のボタンで案内される）
   - Build Settings には入れない（Play が確認してから入れる）。Dialogue System のプレハブが見つからなければ、Story のシーンは Camera だけにして警告を出す
-  - どちらかのシーンを作れなければ、作ったシーンを消してエラーを出す（片方だけ残さない）。グラフと Yarn のファイルはそのまま使え、グラフは開く
+  - どちらかのシーンを作れなければ、作ったシーンを消してエラーを出す（片方だけ残さない。グラフの Scene ノードも空に戻す）。グラフと Yarn のファイルはそのまま使え、グラフは開く
 
 ## Build Settings 連携
 
