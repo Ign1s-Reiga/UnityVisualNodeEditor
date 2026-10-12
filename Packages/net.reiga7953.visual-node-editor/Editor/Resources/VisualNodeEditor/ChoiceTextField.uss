@@ -1,0 +1,18 @@
+/* A text field with a "▾" menu of choices (ChoiceTextField), used for UXML attributes in UI Builder */
+
+.vne-choice-text-field {
+  flex-direction: row;
+  align-items: center;
+}
+
+.vne-choice-text-field__text {
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
+.vne-choice-text-field__pick {
+  width: 20px;
+  margin-left: 2px;
+  margin-right: 0;
+  flex-shrink: 0;
+}
