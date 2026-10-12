@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -64,7 +62,6 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         {
             serializedObject.Update();
             _eventField.Clear();
-            var eventName = serializedObject.FindProperty(EventNamePropertyName);
             var action = (GraphEventButtonAction)serializedObject.FindProperty(ActionPropertyName).enumValueIndex;
             if (action == GraphEventButtonAction.Save || action == GraphEventButtonAction.Load)
             {
@@ -87,32 +84,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             }
 
             var graph = serializedObject.FindProperty(GraphPropertyName).objectReferenceValue as NodeGraphAsset;
-            var choices = graph != null ? GraphEventNames.CollectRaisable(graph) : null;
-            if (choices == null || choices.Count == 0)
-            {
-                // 一覧が作れないときは名前を直接入力する
-                var text = new PropertyField(eventName, "Event");
-                text.Bind(serializedObject);
-                _eventField.Add(text);
-                return;
-            }
-
-            // 今の値がグラフに無ければ、それも選択肢に残して（警告を出しつつ）消さない
-            var current = eventName.stringValue;
-            if (!string.IsNullOrEmpty(current) && !choices.Contains(current))
-            {
-                choices.Add(current);
-            }
-
-            var dropdown = new DropdownField("Event", choices, string.IsNullOrEmpty(current) ? -1 : choices.IndexOf(current));
-            dropdown.AddToClassList(BaseField<string>.alignedFieldUssClassName);
-            dropdown.RegisterValueChangedCallback(evt =>
-            {
-                serializedObject.Update();
-                serializedObject.FindProperty(EventNamePropertyName).stringValue = evt.newValue;
-                serializedObject.ApplyModifiedProperties();
-            });
-            _eventField.Add(dropdown);
+            _eventField.Add(EventNameChoices.CreateField(serializedObject, EventNamePropertyName, graph));
         }
 
         private void RefreshHints()
