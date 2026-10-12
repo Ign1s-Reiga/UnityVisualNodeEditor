@@ -112,9 +112,11 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             "    </ui:VisualElement>\n" +
             "</ui:UXML>\n";
 
-        /// <summary>イベントを Raise する Graph Button（1 行）。</summary>
+        /// <summary>
+        /// イベントを Raise する Graph Button（1 行）。フォーカスを取らない（同じキーを Graph Event Key で送るので、フォーカスしたボタンが Enter / Space でもう一度送らないように）。
+        /// </summary>
         internal static string Button(string name, string text, string eventName) =>
-            $"<vne:GraphButton name=\"{Escape(name)}\" text=\"{Escape(text)}\" event-name=\"{Escape(eventName)}\" class=\"vne-starter-button\" />";
+            $"<vne:GraphButton name=\"{Escape(name)}\" text=\"{Escape(text)}\" event-name=\"{Escape(eventName)}\" focusable=\"false\" class=\"vne-starter-button\" />";
 
         /// <summary>パラメータを書式で出す Graph Parameter Label（1 行）。シーンに置く文字は値 0 のときのもの。</summary>
         internal static string ParameterLabel(string name, string parameter, string format, string initial, string cssClass = null) =>

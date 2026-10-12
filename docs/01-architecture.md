@@ -778,9 +778,11 @@ UI Toolkit 版（`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Tool
   シーン（Main Camera・`UI`（UIDocument。その画面と Panel Settings）・Keys・Title には Graph Runner）、ゲームのスクリプト（ひな形 `SnakeGameToolkitTemplate` /
   `SlidingPuzzleGameToolkitTemplate`。Game のシーンの `UI` に、コンパイル後に付ける）
 - 画面の中身は uGUI 版と同じ: Title は見出し・操作の説明・Start の `GraphButton`。Game は `GraphParameterLabel`（`Score: {0}` など）、盤（`name="board"` の VisualElement）、
-  パネル（`GraphNodePanel`。`node="Ready"` など。中に見出しと `GraphButton`）。UXML には `graph` を書かない（実行中のグラフを使う。アセットの参照の書式に頼らない）
+  パネル（`GraphNodePanel`。`node="Ready"` など。中に見出しと `GraphButton`）。UXML には `graph` を書かない（実行中のグラフを使う。アセットの参照の書式に頼らない）。
+  ボタンは `focusable="false"`（同じキーを Graph Event Key で送るので、フォーカスしたボタンが Enter / Space でもう一度送らないように）
 - ゲームのスクリプトは、同じ GameObject の UIDocument の `board` に、マス・タイルを VisualElement で（位置と大きさは盤に対する割合で）描く。遊びの規則は uGUI 版と同じ
 - 作れなければ、作った UXML・USS・Panel Settings・シーンを消す（uGUI 版と同じく片方だけ残さない）
+- シーン無しで作るとき（未保存の無題のシーン・Play 中）も、画面（UXML・USS・Panel Settings）は作る（自分のシーンに UIDocument を置き、その画面を入れて、スクリプトを付ければ動く）
 
 ## Build Settings 連携
 
