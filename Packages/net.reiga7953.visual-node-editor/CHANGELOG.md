@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0] - 2026-10-12
+- 追加: ADV Starter が Title と Story のシーンも作り、グラフの Scene ノードに入れる。ツールバーの Play だけで最初から最後まで遊べる
+  - `ADV Title`: 「New Game」（Raise `NewGame`）と「Continue」（スロット `auto` から Load）のボタン、EventSystem、このグラフの Graph Runner
+  - `ADV Story`: Yarn Spinner の Dialogue System（Yarn プロジェクト・Yarn Graph Bridge（オートセーブ `auto`）・Graph Variable Storage 入り）
+  - 今開いているシーンは切り替えない。未保存の無題のシーンが開いている・Play 中は、シーン無しで作るか尋ねる
+- 修正: Yarn Spinner の Dialogue System のプレハブ（`GameObject > Yarn Spinner > Dialogue System`）に Yarn Graph Bridge を足しても、プレハブに最初から入っている In Memory Variable Storage が残り、Yarn の変数（`$Affection` など）がグラフのパラメータに届かなかった。Yarn の既定の In Memory Variable Storage は Graph Variable Storage に置き換える（ユーザーが選んだものは残す）
+
 ## [0.13.8] - 2026-10-12
 - 修正: 保存の失敗でセーブの唯一の写しが一時ファイル（`.json.tmp`）に残っているとき、次の保存がその一時ファイルに上書きし、書くのに失敗すると消してしまっていた。上書きする前にスロットへ移す（移せなければ触らずに失敗する）
 - 修正: 一時ファイル（新しいセーブ）と `.bak`（退けた古いセーブ）が両方残っているとき、古いほうを読んでいた。一時ファイルを先に読む
