@@ -74,7 +74,7 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
         /// </summary>
         public static SceneAsset CreateScene(string suggestedName = null)
         {
-            var problem = GetCreateProblem(GetLoadedScenePaths(), EditorApplication.isPlayingOrWillChangePlaymode);
+            var problem = GetCreateProblem();
             if (problem != null)
             {
                 EditorUtility.DisplayDialog(CreateSceneLabel, problem, "OK");
@@ -88,12 +88,22 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
                 return null;
             }
 
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Additive);
+            return CreateSceneFile(path, NewSceneSetup.DefaultGameObjects, null) ? AssetDatabase.LoadAssetAtPath<SceneAsset>(path) : null;
+        }
+
+        /// <summary>
+        /// 新しいシーンを追加で開き、<paramref name="build"/> で組み立てて <paramref name="path"/> に保存し、閉じる（今開いているシーンは切り替えない）。
+        /// 保存できたら true。作れるかは先に <see cref="GetCreateProblem()"/> で確かめること。Create Scene… と ADV Starter が使う。
+        /// </summary>
+        internal static bool CreateSceneFile(string path, NewSceneSetup setup, Action<Scene> build)
+        {
+            var scene = EditorSceneManager.NewScene(setup, NewSceneMode.Additive);
             try
             {
+                build?.Invoke(scene);
                 if (!EditorSceneManager.SaveScene(scene, path))
                 {
-                    return null;
+                    return false;
                 }
             }
             finally
@@ -102,8 +112,11 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
             }
 
             AssetDatabase.ImportAsset(path);
-            return AssetDatabase.LoadAssetAtPath<SceneAsset>(path);
+            return true;
         }
+
+        /// <summary>今、新しいシーンを作れない理由（未保存の無題のシーンが開いている・Play 中）。作れるなら null。</summary>
+        public static string GetCreateProblem() => GetCreateProblem(GetLoadedScenePaths(), EditorApplication.isPlayingOrWillChangePlaymode);
 
         /// <summary>
         /// 新しいシーンを作れない理由。作れるなら null。

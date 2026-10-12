@@ -27,6 +27,19 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         }
 
         [Test]
+        public void ChooseProject_PrefersTheNearestProjectThatHasTheStarter()
+        {
+            // Assets/Game の Game.yarnproject と Assets/Game/Adv の Adv.yarnproject の両方がフォルダを含む
+            var projects = new[] { "Assets/Game/Game.yarnproject", "Assets/Game/Adv/Adv.yarnproject" };
+
+            Assert.That(AdvStarter.ChooseProject(projects, _ => true), Is.EqualTo("Assets/Game/Adv/Adv.yarnproject"), "the nearest");
+            Assert.That(AdvStarter.ChooseProject(projects, path => path.StartsWith("Assets/Game/Game")), Is.EqualTo("Assets/Game/Game.yarnproject"),
+                "the nearest one excludes the starter's script, so take the one that has it");
+            Assert.That(AdvStarter.ChooseProject(projects, _ => false), Is.EqualTo("Assets/Game/Adv/Adv.yarnproject"), "none has it yet: still the nearest");
+            Assert.That(AdvStarter.ChooseProject(new string[0], _ => true), Is.Null);
+        }
+
+        [Test]
         public void Graph_HasNoErrors()
         {
             var graph = AdvStarter.BuildGraph();
@@ -84,6 +97,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         [Test]
         public void CreateIn_WritesAGraphAndAYarnProjectThatCompiles()
         {
+            AssetDatabase.DeleteAsset(Folder); // 前に止めたテストの残り
             AssetDatabase.CreateFolder("Assets", "__VneAdvStarterTemp");
             try
             {
@@ -113,6 +127,7 @@ namespace Reiga.VisualNodeEditor.YarnSpinner.Tests
         [Test]
         public void CreateIn_WithScenes_PutsPlayableScenesIntoTheGraph_WithoutSwitchingTheOpenScene()
         {
+            AssetDatabase.DeleteAsset(Folder); // 前に止めたテストの残り
             AssetDatabase.CreateFolder("Assets", "__VneAdvStarterTemp");
             try
             {
