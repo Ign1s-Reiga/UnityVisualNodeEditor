@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.1] - 2026-10-13
+- 修正: Scene ノードの Screen の行が、インスペクタを開いたときのシーンのままだった（シーンを入れても「Assign a scene first.」のまま、変えると前のシーンに Create Screen… した）。Scene の欄を変えたら作り直し、押したときのシーンを使う
+- 修正: 開いているシーンに Create Screen… すると、保存するまで Edit Screen に出ず、もう一度押すと 2 つ目の UXML と `UI` ができた。開いているシーンの UIDocument の画面も探す
+- 修正: Play 中に Create Screen… すると、再生中のシーンに `UI` を足し、例外で止まり、作った UXML が残った。Play 中は何も作らずに理由を出す（ファイルは確かめ終えてから書き、シーンに置けなければ消す）
+- 修正: UI Toolkit のボタンは、フォーカス中に Enter / Space でも押されるので、隠れたパネルのボタンがキーで送ることがあった（UI Toolkit 版の Starter で、Resume をクリックした後の Space でポーズする）。隠れたパネルからフォーカスを外し、Starter の画面のボタンはフォーカスを取らない
+- 修正: UI Builder で ▾ から選んだ値を、入力欄を通さずに書いていた（UXML に書かれないことがあった）。入力欄に入れる
+- 修正: UI Toolkit 版の Starter を「シーン無しで作る」と、画面（UXML・USS・Panel Settings）も作らなかった。作る
+- 修正: UI Toolkit のコントロールが、画面に付いたときにセーブを 2 回確かめていた。公開の引数なしのコンストラクタにドキュメントコメントを付ける
+
 ## [0.16.0] - 2026-10-13
 - 追加: UI Toolkit の画面を、コード無しでグラフに繋ぐコントロール（UI Builder の Library に出る。`[UxmlElement]`）
   - `GraphButton`: クリックで Raise / Advance / Save / Load（Graph Event Button と同じ。Load は再開できないうちは押せない）
