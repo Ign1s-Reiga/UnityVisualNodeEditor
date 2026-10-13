@@ -27,10 +27,12 @@ namespace Reiga.VisualNodeEditor
         private bool _connected;
         private bool _warnedFormat;
 
+        /// <summary>文字の無いラベル（UXML と UI Builder が使う）。<see cref="Parameter"/> と <see cref="Format"/> を決めて使う。</summary>
         public GraphParameterLabel() : this(string.Empty)
         {
         }
 
+        /// <summary>Runner が無いうちは <paramref name="text"/> を出しておくラベル。</summary>
         /// <param name="text">Runner が無いときに出しておく文字。</param>
         public GraphParameterLabel(string text) : base(text)
         {
@@ -47,8 +49,8 @@ namespace Reiga.VisualNodeEditor
             set
             {
                 _graph = value;
+                // 画面に出ていれば、追う Runner を探し直して文字を直す（出ていなければ何もしない）
                 _follower.Graph = value;
-                Refresh();
             }
         }
 
@@ -99,7 +101,6 @@ namespace Reiga.VisualNodeEditor
             _connected = true;
             _follower.Graph = _graph;
             _follower.Start();
-            Refresh();
         }
 
         /// <summary>外れたとき: 追うのをやめる（文字はそのまま）。</summary>

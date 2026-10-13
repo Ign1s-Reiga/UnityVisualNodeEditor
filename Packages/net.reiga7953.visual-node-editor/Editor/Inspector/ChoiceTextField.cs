@@ -48,12 +48,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 foreach (var item in items)
                 {
                     var value = item;
-                    menu.AddItem(new GUIContent(value.Replace("/", "∕")), value == property.stringValue, () =>
-                    {
-                        property.serializedObject.Update();
-                        property.stringValue = value;
-                        property.serializedObject.ApplyModifiedProperties();
-                    });
+                    // 入力欄に入れる（打ったのと同じ変更になるので、UI Builder もそれを UXML に書く）
+                    menu.AddItem(new GUIContent(value.Replace("/", "∕")), value == text.value, () => text.value = value);
                 }
 
                 menu.DropDown(pick.worldBound);

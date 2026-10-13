@@ -116,6 +116,23 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             Assert.That(graph.Nodes.OfType<SceneNode>().All(node => string.IsNullOrEmpty(node.Scene.Path)), Is.True);
         }
 
+        [Test]
+        public void WithoutScenes_TheScreenFilesAreStillMade()
+        {
+            // シーンを作れないとき（無題のシーン・Play 中）も、画面は作る。自分のシーンに UIDocument を置いて入れれば、スクリプトをそのまま使える
+            var graph = SlidingPuzzleToolkitStarter.Instance.CreateIn(Folder, withScenes: false, writeScript: false);
+
+            foreach (var file in new[] { "Sliding Puzzle.uss", "Sliding Puzzle Title.uxml", "Sliding Puzzle Game.uxml", "Sliding Puzzle Panel Settings.asset", "Runtime Theme.tss" })
+            {
+                Assert.That(File.Exists($"{Folder}/{file}"), Is.True, file);
+            }
+
+            Assert.That(File.Exists($"{Folder}/Sliding Puzzle Game.unity"), Is.False);
+            Assert.That(graph.Nodes.OfType<SceneNode>().All(node => string.IsNullOrEmpty(node.Scene.Path)), Is.True);
+            var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>($"{Folder}/Sliding Puzzle Game.uxml").Instantiate();
+            Assert.That(screen.Q("board"), Is.Not.Null);
+        }
+
         // パネルはノードごとに 1 つで、どれもグラフのノードの場所を指す
         private static void AssertPanels(NodeGraphAsset graph, VisualElement screen, params string[] nodes)
         {
@@ -133,6 +150,9 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
         {
             Assert.That(screen.Query<GraphButton>().ToList().Select(button => button.EventName).Distinct(), Is.SubsetOf(GraphEventNames.CollectRaisable(graph)));
             Assert.That(screen.Query<GraphParameterLabel>().ToList().Select(label => label.Parameter).Distinct(), Is.SubsetOf(GraphParameterNameDrawer.GetChoices(graph)));
+
+            // 同じキーを Graph Event Key で送るので、ボタンはフォーカスを取らない（フォーカスしたボタンが Enter / Space でもう一度送らないように）
+            Assert.That(screen.Query<GraphButton>().ToList().All(button => !button.focusable), Is.True);
         }
 
         // Scene ノードのシーンを開き、その UIDocument（UI）の画面を作って渡す

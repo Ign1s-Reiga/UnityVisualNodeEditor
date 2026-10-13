@@ -15,7 +15,10 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
     /// </summary>
     public static class SceneScreens
     {
-        /// <summary>シーンが使っている UXML（シーンの依存のうち <c>.uxml</c>。パスの順）。シーンが無ければ空。</summary>
+        /// <summary>
+        /// シーンが使っている UXML（パスの順）。保存したシーンの依存のうち <c>.uxml</c> と、シーンが開いていれば、その中の UIDocument の画面
+        /// （保存前に足したものも見つける）。シーンが無ければ空。
+        /// </summary>
         public static List<string> FindScreens(string scenePath)
         {
             if (string.IsNullOrEmpty(scenePath) || AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
@@ -23,10 +26,19 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
                 return new List<string>();
             }
 
-            return AssetDatabase.GetDependencies(scenePath, false)
-                .Where(path => path.EndsWith(".uxml", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(path => path, StringComparer.Ordinal)
-                .ToList();
+            var screens = AssetDatabase.GetDependencies(scenePath, false)
+                .Where(path => path.EndsWith(".uxml", StringComparison.OrdinalIgnoreCase));
+            var scene = SceneManager.GetSceneByPath(scenePath);
+            if (scene.IsValid() && scene.isLoaded)
+            {
+                screens = screens.Concat(scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<UIDocument>(true))
+                    .Where(document => document.visualTreeAsset != null)
+                    .Select(document => AssetDatabase.GetAssetPath(document.visualTreeAsset))
+                    .Where(path => !string.IsNullOrEmpty(path)));
+            }
+
+            return screens.Distinct().OrderBy(path => path, StringComparer.Ordinal).ToList();
         }
 
         /// <summary>UXML を開く（Unity の既定では UI Builder で開く）。</summary>
@@ -43,6 +55,7 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
         /// <paramref name="scenePath"/> のシーンの画面を作る: シーンの隣に <c>&lt;シーン名&gt;.uxml</c>（見出しだけ）を作り、Panel Settings（プロジェクトにあればそれ、無ければシーンの隣に作る）
         /// で出す UIDocument（GameObject <c>UI</c>）をシーンに置く。シーンが開いていればそこに置いて未保存にし、開いていなければ追加で開いて保存して閉じる。
         /// 作った UXML のパスを返す。作れなければ null と理由（<paramref name="problem"/>）。
+        /// Play 中・（シーンを追加で開くときに）未保存の無題のシーンが開いているときは、何も作らない。シーンに足せなければ、作った UXML を消して例外にする。
         /// </summary>
         public static string CreateScreen(string scenePath, out string problem)
         {
@@ -53,11 +66,18 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
                 return null;
             }
 
+            // Play 中はシーンを書き換えない（開いていれば、足した物は Play を終えると消える）
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                problem = "Unity is in Play mode. Stop playing first";
+                return null;
+            }
+
             var scene = SceneManager.GetSceneByPath(scenePath);
             var opened = !scene.IsValid() || !scene.isLoaded;
             if (opened)
             {
-                // 未保存の無題のシーンが開いている・Play 中は、シーンを追加で開けない
+                // 未保存の無題のシーンが開いていると、シーンを追加で開けない
                 problem = ScenePicker.GetCreateProblem();
                 if (problem != null)
                 {
@@ -65,36 +85,50 @@ namespace Reiga.VisualNodeEditor.Editor.Scenes
                 }
             }
 
+            // ファイルは確かめ終えてから書く
             var folder = Path.GetDirectoryName(scenePath)?.Replace('\\', '/') ?? "Assets";
             var sceneName = Path.GetFileNameWithoutExtension(scenePath);
             var uxmlPath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{sceneName}.uxml");
             File.WriteAllText(uxmlPath, BuildDefaultScreen(sceneName));
             AssetDatabase.ImportAsset(uxmlPath);
-            var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxmlPath);
-            var settings = ScreenAssets.FindOrCreatePanelSettings(folder);
-
-            if (opened)
-            {
-                scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
-            }
-
+            var placed = false;
             try
             {
-                ScreenAssets.AddDocument(scene, settings, tree);
+                var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxmlPath);
+                var settings = ScreenAssets.FindOrCreatePanelSettings(folder);
                 if (opened)
                 {
-                    EditorSceneManager.SaveScene(scene);
+                    scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Additive);
                 }
-                else
+
+                try
                 {
-                    EditorSceneManager.MarkSceneDirty(scene);
+                    ScreenAssets.AddDocument(scene, settings, tree);
+                    if (opened)
+                    {
+                        EditorSceneManager.SaveScene(scene);
+                    }
+                    else
+                    {
+                        EditorSceneManager.MarkSceneDirty(scene);
+                    }
+
+                    placed = true;
+                }
+                finally
+                {
+                    if (opened && scene.IsValid())
+                    {
+                        EditorSceneManager.CloseScene(scene, true);
+                    }
                 }
             }
             finally
             {
-                if (opened)
+                // シーンに置けなければ、どこからも使われない UXML を残さない
+                if (!placed)
                 {
-                    EditorSceneManager.CloseScene(scene, true);
+                    AssetDatabase.DeleteAsset(uxmlPath);
                 }
             }
 

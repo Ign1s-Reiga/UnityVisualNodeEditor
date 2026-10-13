@@ -24,6 +24,7 @@ namespace Reiga.VisualNodeEditor
         private readonly GraphRunnerFollower _follower;
         private bool _connected;
 
+        /// <summary>空のパネル（UXML と UI Builder が使う）。<see cref="Graph"/> と <see cref="Node"/> を決めて、中に要素を置く。</summary>
         public GraphNodePanel()
         {
             AddToClassList(GraphNodePanelUssClassName);
@@ -39,8 +40,8 @@ namespace Reiga.VisualNodeEditor
             set
             {
                 _graph = value;
+                // 画面に出ていれば、追う Runner を探し直して表示を直す（出ていなければ何もしない）
                 _follower.Graph = value;
-                Refresh();
             }
         }
 
@@ -68,15 +69,27 @@ namespace Reiga.VisualNodeEditor
 
             IsInNode = GraphNodePath.IsAt(_follower.Runner, _node);
             style.display = IsInNode ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!IsInNode)
+            {
+                ReleaseFocus();
+            }
         }
 
-        /// <summary>ゲームの画面に付いたとき: Runner を追い始め、表示を直す（テストからも呼ぶ）。</summary>
+        // 中の要素がキーボードのフォーカスを持っていれば外す（UI Toolkit のボタンはフォーカス中に Enter / Space でも押されるので、隠れたボタンが送らないように）
+        private void ReleaseFocus()
+        {
+            if (focusController?.focusedElement is VisualElement focused && (focused == this || Contains(focused)))
+            {
+                focused.Blur();
+            }
+        }
+
+        /// <summary>ゲームの画面に付いたとき: Runner を追い始め、表示を直す（追い始めると表示を直す。テストからも呼ぶ）。</summary>
         internal void Connect()
         {
             _connected = true;
             _follower.Graph = _graph;
             _follower.Start();
-            Refresh();
         }
 
         /// <summary>外れたとき: 追うのをやめる。</summary>

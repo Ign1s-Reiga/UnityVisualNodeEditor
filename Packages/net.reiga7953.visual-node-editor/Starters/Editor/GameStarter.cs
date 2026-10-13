@@ -115,6 +115,21 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                                    $"Pick or create the scenes for the Scene nodes (the issue list has buttons for it), then add {className} to a board in your scene.");
                 }
             }
+            else
+            {
+                // シーン無しでも、画面（UI Toolkit 版の UXML・USS・Panel Settings）は作る。自分のシーンに置けば、スクリプトをそのまま使える
+                var created = new List<string>();
+                try
+                {
+                    CreateScreenAssets(graph, folder, created);
+                }
+                catch (Exception exception)
+                {
+                    DeleteInReverse(created);
+                    Debug.LogException(exception);
+                    Debug.LogError($"[VisualNodeEditor] {StarterName} created the graph, but could not create the screen files.");
+                }
+            }
 
             if (script != null)
             {
@@ -169,16 +184,21 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             }
             catch
             {
-                // 作った順の逆に消す（UXML より先に、それが読む USS を消すと、UXML の読み込み直しでエラーが出る）
-                for (var i = created.Count - 1; i >= 0; i--)
-                {
-                    AssetDatabase.DeleteAsset(created[i]);
-                }
+                DeleteInReverse(created);
 
                 // グラフを保存するところで失敗したときも、消したシーンを指したまま残さない
                 StarterScenes.ClearScene(graph, TitleSceneNode);
                 StarterScenes.ClearScene(graph, GameSceneNode);
                 throw;
+            }
+        }
+
+        // 作った順の逆に消す（UXML より先に、それが読む USS を消すと、UXML の読み込み直しでエラーが出る）
+        private static void DeleteInReverse(List<string> created)
+        {
+            for (var i = created.Count - 1; i >= 0; i--)
+            {
+                AssetDatabase.DeleteAsset(created[i]);
             }
         }
     }

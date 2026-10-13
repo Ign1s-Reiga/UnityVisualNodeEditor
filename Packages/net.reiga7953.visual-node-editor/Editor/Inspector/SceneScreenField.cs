@@ -1,6 +1,7 @@
 using System.IO;
 using Reiga.VisualNodeEditor.Editor.Scenes;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -8,25 +9,47 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
 {
     /// <summary>
     /// Scene ノードのインスペクタの Screen の行。シーンが使っている UI Toolkit の画面（UXML）を UI Builder で開く（Edit Screen。2 つ以上ならメニュー）。
-    /// 無ければ Create Screen… で作って開く（<see cref="SceneScreens"/>）。見た目は NodeGraphEditor.uss（.vne-scene-screen）。
+    /// 無ければ Create Screen… で作って開く（<see cref="SceneScreens"/>）。Scene の欄を変えたら作り直し、ボタンは押したときのシーンを使う。
+    /// 見た目は NodeGraphEditor.uss（.vne-scene-screen）。
     /// </summary>
     public sealed class SceneScreenField : VisualElement
     {
+        /// <summary>Scene ノードのシーンのフィールド名（EditMode テストで存在を検証している）。</summary>
+        internal const string ScenePropertyName = "_scene";
+
         internal const string EditLabel = "Edit Screen";
         internal const string CreateLabel = "Create Screen…";
 
-        private readonly SceneNode _node;
+        private readonly SerializedProperty _sceneProperty;
 
-        /// <param name="node">表示する Scene ノード（シーンは押したときに読む）。</param>
-        public SceneScreenField(SceneNode node)
+        /// <param name="sceneProperty">Scene ノードの <c>_scene</c>（<see cref="SceneReference"/>）。</param>
+        public SceneScreenField(SerializedProperty sceneProperty)
         {
-            _node = node;
+            _sceneProperty = sceneProperty;
             AddToClassList("vne-scene-screen");
             var label = new Label("Screen") { tooltip = "The UI Toolkit screen (UXML) shown in this scene. Lay it out in UI Builder." };
             label.AddToClassList("vne-scene-screen__label");
             Add(label);
             Rebuild();
+
+            // Scene の欄を変えたら（Pick… / Create Scene… / Undo も）、そのシーンの画面で作り直す
+            this.TrackPropertyValue(sceneProperty, _ => Rebuild());
         }
+
+        /// <summary>今のシーンのパス（GUID から引き直す。シーンが無ければ空）。</summary>
+        internal string ScenePath
+        {
+            get
+            {
+                _sceneProperty.serializedObject.Update();
+                var guid = _sceneProperty.FindPropertyRelative(SceneReferenceDrawer.GuidPropertyName)?.stringValue;
+                var path = string.IsNullOrEmpty(guid) ? null : AssetDatabase.GUIDToAssetPath(guid);
+                return !string.IsNullOrEmpty(path) && AssetDatabase.LoadAssetAtPath<SceneAsset>(path) != null ? path : string.Empty;
+            }
+        }
+
+        /// <summary>今の行のボタン（テストが確かめる）。シーンが無ければ空。</summary>
+        internal string ButtonText => this.Q<Button>()?.text ?? string.Empty;
 
         private void Rebuild()
         {
@@ -35,8 +58,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 RemoveAt(childCount - 1);
             }
 
-            var scenePath = _node.Scene.Path;
-            if (string.IsNullOrEmpty(scenePath) || AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePath) == null)
+            var scenePath = ScenePath;
+            if (scenePath.Length == 0)
             {
                 var none = new Label("Assign a scene first.");
                 none.AddToClassList("vne-scene-screen__none");
@@ -49,7 +72,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             {
                 Add(CreateButton(CreateLabel, "Create a UXML screen for this scene and open it in UI Builder", () =>
                 {
-                    var created = SceneScreens.CreateScreen(scenePath, out var problem);
+                    var created = SceneScreens.CreateScreen(ScenePath, out var problem);
                     if (created == null)
                     {
                         EditorUtility.DisplayDialog("Create Screen", $"Could not create the screen: {problem}.", "OK");
