@@ -148,6 +148,14 @@ Starter に UI Toolkit 版を足す。「2D の画面エディタ」は Unity �
 - [x] Starter の UI Toolkit 版（Snake・スライドパズル）
 - [x] README・Wiki
 
+画面はシーンではない（ユーザーの指摘: タイトル画面・設定画面はシーンとは別）。決めたこと（ユーザーの回答）: 画面をノード（State・Scene・Container）に付け、
+Graph Screen Host が今の場所の画面を重ねて出す（コンテナの HUD の上にノードの画面）。UI Toolkit 版の Starter はシーン 1 つにして、Title と Game を画面にする。
+
+- [x] ランタイム: `IHasScreen`（State・Scene・Container の `_screen`）、`GraphScreenHost`・`GraphScreens`・`ScreenStack`
+- [x] エディタ: ノードのインスペクタの Screen の欄と Create Screen… / Edit Screen、Play で Runner を置くときに Graph Screen Host も置く（既にある Runner には尋ねてから付ける）。Scene ノードの画面（`SceneScreens`）をやめる
+- [x] Starter の UI Toolkit 版をシーン 1 つ・ノードの画面にする
+- [x] README・Wiki
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）

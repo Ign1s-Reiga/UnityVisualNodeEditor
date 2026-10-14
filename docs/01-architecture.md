@@ -398,13 +398,32 @@ UI Toolkit のランタイムは UnityEngine のモジュールなので、コ�
 - UI Builder のインスペクタ: `event-name`・`parameter`・`node` は、`graph` が入っていればグラフから選ぶドロップダウン（`[EventName]`・`[GraphParameterName]`・`[GraphNodePath]` の PropertyDrawer。
   同じ並びの `graph` の値を見る）。入っていない・見つからなければ入力欄。▾ で選んだ値は入力欄に入れる（入力したのと同じ変更として UI Builder が UXML に書く）
 
-Scene ノードの画面（`SceneScreens`）:
-- Scene ノードのインスペクタに Screen の行を出す。シーンが使っている UXML（シーンの依存のうち `.uxml`。シーンが開いていれば、その中の UIDocument の画面も。
-  保存前のものも見つける）があれば **Edit Screen**（UI Builder で開く。2 つ以上ならメニュー）。Scene の欄を変えたら行を作り直す（ボタンは押したときのシーンを使う）
-- 無ければ **Create Screen…**: シーンの隣に `<シーン名>.uxml`（見出しだけの画面）を作り、Panel Settings（プロジェクトにあればそれ。無ければシーンの隣に
-  `Panel Settings.asset` と、その既定のテーマ `Runtime Theme.tss`（`@import url("unity-theme://default");`）を作る）を使う UIDocument（GameObject `UI`）をシーンに足して、UI Builder で開く。
-  シーンが開いていればそこに足して未保存にし、開いていなければ追加で開いて保存して閉じる。Play 中・（シーンを追加で開くときに）未保存の無題のシーンが開いているときは、
-  何も作らずに理由を出す。ファイルは確かめ終えてから書き、シーンに足せなければ作った UXML を消す
+ノードの画面（Screen）:
+
+画面（タイトル画面・設定画面・ポーズ画面・HUD）は Unity のシーンとは別のもの。シーンは重い中身（レベル・3D の世界）の単位で、画面はグラフのノードに付ける。
+タイトル・設定のように画面だけが替わるところは State ノードにし、シーンを分けない（画面の切り替えにシーンの読み込みは要らない）。
+
+| 型 | 役割 |
+|---|---|
+| `IHasScreen` | 画面（`VisualTreeAsset`）を持てるノード。`StateNode`・`SceneNode`・`ContainerNode` が実装する（`_screen`） |
+| `GraphScreenHost`（Add Component > Visual Node Editor > Graph Screen Host） | 同じ GameObject の UIDocument に、グラフの今の場所の画面を出す。Graph Runner と同じ GameObject に置く（Runner と一緒にシーンをまたいで残る） |
+
+- 出す画面は、今の場所に沿って重ねる: 入っているコンテナの画面を外側から、最後に今のノードの画面（無い所は飛ばす）。後のものほど上
+  （例: コンテナ `Round` の HUD の上に、`Paused` のポーズ画面）。並びは純粋関数 `GraphScreens.At(runner)`
+- 画面は UXML から一度だけ作って覚え、場所が替わっても同じ画面なら作り直さない（HUD の文字・盤の中身がそのまま残る）。外した画面は UIDocument から外すだけ
+  （中の Graph Button などはパネルから外れたときに聞くのをやめ、また付けば聞き直す）。重ねる処理は `ScreenStack`
+- 画面の根（`TemplateContainer`）は UIDocument いっぱいに広げ、クリックを受けない（`pickingMode = Ignore`）。中の要素だけがクリックを受ける（下の画面のボタンも押せる）
+- UIDocument 自身の画面（`visualTreeAsset`）があれば、いつも一番下に出る
+- グラフは任意（空なら実行中のどれか）。Runner が無い・止まっているときは何も出さない
+- ノードのインスペクタ: **Screen** の欄（UXML）と、空なら **Create Screen…**（グラフの隣に `<グラフ名> <ノード名>.uxml`（見出しだけ）を作って入れ、UI Builder で開く）、
+  入っていれば **Edit Screen**（UI Builder で開く）。入れたことは Undo できる（作った UXML は残る）。グラフを保存していなければ作らない。ノードには画面の名前を出さない（欄で分かる）
+- 新しい画面の UXML は、画面いっぱいの枠（`screen`。クリックを受けない）の中央に見出しだけ。下の画面のボタンを押せるようにするため
+- ツールバーの Play で Graph Runner を置くとき、グラフのどこかに画面があれば、Runner の GameObject に UIDocument（Panel Settings はプロジェクトにあればそれ。
+  無ければグラフの隣に `Panel Settings.asset` と既定のテーマ `Runtime Theme.tss`（`@import url("unity-theme://default");`）を作る）と Graph Screen Host も置く。
+  既にある Runner に Graph Screen Host が無ければ（シーンにこのグラフか、グラフが空の Graph Screen Host が無ければ）、Play のときに付けて保存してよいか尋ねる
+  （「付けない」を選んだら、そのセッションの間はそのグラフについて尋ねない。コードで画面を出しているときなど）。インスペクタの Screen の欄の下にも書いておく
+- `GraphNodePanel` は、1 つの画面の中で一部だけを出し分けるときに使う（画面ごと替えるならノードの画面）
+- 0.16 の「Scene ノードの画面」（シーンの UIDocument の UXML を開く・シーンに UIDocument を足す `SceneScreens`）はやめる（画面はシーンでなくノードに付けるため）
 
 ### 実行中の Runner の一覧
 
@@ -772,17 +791,24 @@ Blackboard: Level（Int、1）、Moves（Int、0）
 - アセンブリ: `Reiga.VisualNodeEditor.Starters.Editor`（`Starters/Editor`。uGUI を使うので `com.unity.ugui` があるときだけ。`versionDefines` で `VNE_UGUI`）。
   ADV Starter（Yarn 連携のエディタ）もシーンの組み立てにこれを使う
 
-UI Toolkit 版（`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)`）:
-- グラフ・キー（Graph Event Key）・Title の Graph Runner は uGUI 版と同じ。画面だけを UI Toolkit にする
-- 作るもの: グラフ、`<名前> Title.uxml` / `<名前> Game.uxml` / `<名前>.uss`（画面）、Panel Settings（`<名前> Panel Settings.asset` と `Runtime Theme.tss`。1920 × 1080 を基準に拡大縮小）、
-  シーン（Main Camera・`UI`（UIDocument。その画面と Panel Settings）・Keys・Title には Graph Runner）、ゲームのスクリプト（ひな形 `SnakeGameToolkitTemplate` /
-  `SlidingPuzzleGameToolkitTemplate`。Game のシーンの `UI` に、コンパイル後に付ける）
-- 画面の中身は uGUI 版と同じ: Title は見出し・操作の説明・Start の `GraphButton`。Game は `GraphParameterLabel`（`Score: {0}` など）、盤（`name="board"` の VisualElement）、
-  パネル（`GraphNodePanel`。`node="Ready"` など。中に見出しと `GraphButton`）。UXML には `graph` を書かない（実行中のグラフを使う。アセットの参照の書式に頼らない）。
-  ボタンは `focusable="false"`（同じキーを Graph Event Key で送るので、フォーカスしたボタンが Enter / Space でもう一度送らないように）
-- ゲームのスクリプトは、同じ GameObject の UIDocument の `board` に、マス・タイルを VisualElement で（位置と大きさは盤に対する割合で）描く。遊びの規則は uGUI 版と同じ
-- 作れなければ、作った UXML・USS・Panel Settings・シーンを消す（uGUI 版と同じく片方だけ残さない）
-- シーン無しで作るとき（未保存の無題のシーン・Play 中）も、画面（UXML・USS・Panel Settings）は作る（自分のシーンに UIDocument を置き、その画面を入れて、スクリプトを付ければ動く）
+UI Toolkit 版（`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)`）。シーンは 1 つにし、画面をノードに付ける（上の「ノードの画面」）:
+
+```
+Snake:  Entry → [Scene: Main] ─(自動)→ [State: Title]（画面 Title）─(Start)→ [Container: Round]（画面 Game: スコアと盤）─(GameOver)→ [State: Game Over]（画面 Game Over）
+        Round の中は uGUI 版と同じ。Ready・Paused に、上に重ねる画面（Ready・Paused）。Game Over から Retry → Round、Title → Title。Round の Quit → Title
+Puzzle: Entry → [Scene: Main] ─(自動)→ [State: Title]（画面 Title、Level = 1）─(Start)→ [Container: Levels]（画面 Game: Level・Moves と盤）─(AllClear)→ [State: All Clear]（画面 All Clear）
+        Levels・Level の中は uGUI 版と同じ。Paused・Solved に、上に重ねる画面。All Clear から Title → Title。Levels の Quit → Title
+```
+
+- 作るもの: グラフ、画面（`<名前> Title.uxml`・`<名前> Game.uxml` と、ほかの画面（Snake: Ready・Paused・Game Over、Puzzle: Paused・Solved・All Clear。`<名前> Paused.uxml` など）、`<名前>.uss`）、
+  Panel Settings（`<名前> Panel Settings.asset` と `Runtime Theme.tss`。1920 × 1080 を基準に拡大縮小）、シーン `<名前>.unity`（Main Camera・
+  Graph Runner（UIDocument・Graph Screen Host 付き）・Keys）、ゲームのスクリプト（ひな形 `SnakeGameToolkitTemplate` / `SlidingPuzzleGameToolkitTemplate`。Graph Runner の GameObject に、コンパイル後に付ける）
+- 画面は uGUI 版と同じ中身（見出し・`GraphParameterLabel`・`GraphButton`・盤（`name="board"`））。パネルの出し分けは要らない（ノードの画面がそれ）。
+  Ready・Paused・Solved は Game の上に重なる（Paused・Solved は下を暗くしてふさぐ。Ready は案内だけで、クリックを受けない）。Game Over・All Clear はコンテナの外なので、盤の代わりに出る。
+  UXML には `graph` を書かない（実行中のグラフを使う）。ボタンは `focusable="false"`（同じキーを Graph Event Key で送るので、Enter / Space でもう一度送らないように）
+- キー: Title で Return → `Start`（Space は使わない。Title から Round の Ready へ同じフレームで進んだ後、Ready の Space → `Go` が続けて送らないように）。ほかは uGUI 版と同じ
+- ゲームのスクリプトは、UIDocument の中の `board`（Game の画面が出たときに現れる）を探し、そこにマス・タイルを VisualElement で描く。画面は作り直されないので、盤の中身は残る
+- 作れなければ、作った画面・Panel Settings・シーンを消し、ノードからも外す（ノードに入れるのはファイルがそろってから）。シーン無しで作るときも、画面と Panel Settings は作り、グラフのノードに入れる（自分のシーンの Graph Runner に UIDocument と Graph Screen Host を足せば動く）
 
 ## Build Settings 連携
 
@@ -802,6 +828,7 @@ UI Toolkit 版（`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Tool
    （エディタの Play はどちらでも動くので「並びはそのまま」も選べる。選んだらそのセッションの間は尋ねない）
 3. そのシーンを開く（未保存のシーンがあれば Unity の保存確認を出す）。グラフにシーンが無ければ今開いているシーンを使う
 4. そのシーンにこのグラフの Graph Runner が無ければ、「Graph Runner (グラフ名)」という GameObject を追加してシーンを保存してよいか尋ねる
+   （ノードに画面があれば UIDocument と Graph Screen Host も付ける）。Runner があっても、ノードに画面があるのに Graph Screen Host が無ければ、付けるか尋ねる（上の「ノードの画面」）
 5. Play に入る。Play 中はボタンが「Stop」になり、押すと Play を終える
 
 あわせて、Scene ノードを持つグラフなのに有効な Build Settings のシーンのどれにもこのグラフの Graph Runner が無ければ、検証の Warning を出す
