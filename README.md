@@ -80,17 +80,21 @@ Yarn はノードの途中から再開できないので、会話の途中でセ
 
 ランタイムの UI Toolkit（UIDocument・UXML・USS）でも、コードを書かずに画面をグラフに繋げられる。画面の配置は Unity の UI Builder で行う。
 
+- 画面（タイトル・設定・ポーズ・HUD）は Unity のシーンではなく、グラフのノードに付ける。State・Scene・Container ノードのインスペクタの **Screen** に UXML を入れる。
+  空なら **Create Screen…** で、グラフの隣に `<グラフ名> <ノード名>.uxml` を作って入れ、UI Builder で開く。入っていれば **Edit Screen** で開く
+- Graph Runner に付けた **Graph Screen Host**（UIDocument と一緒に付ける）が、今の場所の画面を出す。入っているコンテナの画面の上に、今のノードの画面を重ねる
+  （例: コンテナ `Round` の HUD の上に、`Paused` のポーズ画面）。ツールバーの Play で Graph Runner を置くとき、ノードに画面があれば一緒に付く
+- タイトル・設定のように画面だけが替わるところは State ノードにすればよく、シーンを分けなくてよい
 - UI Builder の Library に、グラフに繋がるコントロールが出る:
 
   | コントロール | すること（uGUI のコンポーネント版） |
   |---|---|
   | `GraphButton` | クリックで Raise / Advance / Save / Load（Graph Event Button） |
   | `GraphParameterLabel` | パラメータを `Score: {0}` のような書式で出す（Graph Parameter Text） |
-  | `GraphNodePanel` | グラフが指定したノード（`Paused`・`Round/Paused`、コンテナなら中のどこか）にいる間だけ、中の要素を出す（Graph Node Activator） |
+  | `GraphNodePanel` | グラフが指定したノード（`Paused`・`Round/Paused`、コンテナなら中のどこか）にいる間だけ、中の要素を出す（Graph Node Activator）。画面の一部だけを出し分けるときに使う |
 
   `graph` 属性を入れると、イベント名・パラメータ・ノードを UI Builder のインスペクタでグラフから選べる（空なら実行中のグラフを使う）
-- Scene ノードのインスペクタの **Edit Screen** で、そのシーンの UXML を UI Builder で開く。まだ無ければ **Create Screen…** で、UXML と、それを出す UIDocument・Panel Settings を作って開く
-- `Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、画面を UXML / USS で作る Starter（グラフとキーは uGUI 版と同じ）
+- `Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、1 つのシーンで、Title・Game・ポーズなどの画面をノードに付けた Starter（遊びとキーは uGUI 版と同じ）
 
 ## AI エージェントから使う（MCP）
 

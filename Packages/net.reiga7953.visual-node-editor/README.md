@@ -76,17 +76,19 @@ public class PlayerMovement : NodeBehaviour
 
 `Assets > Create > Visual Node Editor > Snake Starter` / `Sliding Puzzle Starter` で、グラフ・Title と Game のシーン・ゲームのスクリプトを作る。
 スクリプトはコンパイル後に Game のシーンの盤へ自動で付き、ツールバーの Play ですぐ遊べる（uGUI が必要）。書き出したスクリプトは自由に書き換えてよい。
-`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、画面を UI Toolkit（UXML / USS。UI Builder で直せる）で作る。
+`Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、1 つのシーンで、画面を UI Toolkit（UXML / USS。UI Builder で直せる）にしてノードに付ける。
 
 ## UI Toolkit の画面（UI Builder）
+
+画面はシーンではなく、State・Scene・Container ノードに付ける（インスペクタの Screen。Create Screen… で作って UI Builder で開き、Edit Screen で開く）。
+Graph Runner に付けた `Graph Screen Host`（UIDocument と一緒に）が、入っているコンテナの画面の上に、今のノードの画面を重ねて出す。
+ツールバーの Play で Graph Runner を置くとき、ノードに画面があれば一緒に付く。
 
 UI Builder の Library に、グラフに繋がるコントロールが出る（コード無し）。`graph` 属性を入れると、イベント名などをグラフから選べる（空なら実行中のグラフ）。
 
 - `GraphButton`: クリックで Raise / Advance / Save / Load
 - `GraphParameterLabel`: パラメータを `Score: {0}` のような書式で出す
-- `GraphNodePanel`: グラフが指定したノード（`node="Round/Paused"` のようにタイトルを `/` で並べる。コンテナなら中のどこか）にいる間だけ、中の要素を出す
-
-Scene ノードのインスペクタの Edit Screen / Create Screen… で、そのシーンの UXML を UI Builder で開く・作る。
+- `GraphNodePanel`: グラフが指定したノード（`node="Round/Paused"` のようにタイトルを `/` で並べる。コンテナなら中のどこか）にいる間だけ、中の要素を出す（画面の一部だけを出し分けるとき）
 
 ## コンテナ（入れ子）
 
