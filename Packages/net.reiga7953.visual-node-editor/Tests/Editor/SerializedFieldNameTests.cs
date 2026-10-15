@@ -38,11 +38,30 @@ namespace Reiga.VisualNodeEditor.Tests
         public void SceneReferenceFieldsAreReachable()
         {
             var scene = _serializedObject.FindProperty(NodeInspectorView.NodesPropertyName)
-                .GetArrayElementAtIndex(0).FindPropertyRelative("_scene");
+                .GetArrayElementAtIndex(0).FindPropertyRelative(NodeInspectorView.ScenePropertyName);
 
             Assert.That(scene, Is.Not.Null);
             Assert.That(scene.FindPropertyRelative(SceneReferenceDrawer.GuidPropertyName), Is.Not.Null);
             Assert.That(scene.FindPropertyRelative(SceneReferenceDrawer.PathPropertyName), Is.Not.Null);
+        }
+
+        [TestCase(typeof(StateNode))]
+        [TestCase(typeof(SceneNode))]
+        [TestCase(typeof(ContainerNode))]
+        public void ScreenFieldIsReachable(System.Type nodeType)
+        {
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            try
+            {
+                graph.AddNode((NodeData)System.Activator.CreateInstance(nodeType));
+                var node = new SerializedObject(graph).FindProperty(NodeInspectorView.NodesPropertyName).GetArrayElementAtIndex(0);
+
+                Assert.That(node.FindPropertyRelative(NodeScreenField.ScreenPropertyName)?.propertyType, Is.EqualTo(SerializedPropertyType.ObjectReference));
+            }
+            finally
+            {
+                Object.DestroyImmediate(graph);
+            }
         }
     }
 }

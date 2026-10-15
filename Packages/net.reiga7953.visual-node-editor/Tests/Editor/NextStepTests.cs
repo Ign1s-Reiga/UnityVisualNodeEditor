@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Reiga.VisualNodeEditor.Editor.Build;
@@ -141,11 +142,14 @@ namespace Reiga.VisualNodeEditor.Tests
             var inspector = new NodeInspectorView();
 
             inspector.Show(_graph, scene.Id);
-            Assert.That(inspector.Q<Label>(className: "vne-inspector-view__note")?.text, Is.EqualTo(NodeInspectorView.SceneReloadNote));
+            Assert.That(Notes(inspector), Does.Contain(NodeInspectorView.SceneReloadNote));
 
             inspector.Show(_graph, state.Id);
-            Assert.That(inspector.Q<Label>(className: "vne-inspector-view__note"), Is.Null);
+            Assert.That(Notes(inspector), Does.Not.Contain(NodeInspectorView.SceneReloadNote));
         }
+
+        private static List<string> Notes(VisualElement inspector) =>
+            inspector.Query<Label>(className: "vne-inspector-view__note").ToList().Select(label => label.text).ToList();
 
         private static GraphIssue Issue(GraphIssueKind kind, string nodeId = null) =>
             new GraphIssue(GraphIssueSeverity.Warning, "message", nodeId, kind);

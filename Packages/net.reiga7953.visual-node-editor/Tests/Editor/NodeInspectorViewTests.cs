@@ -26,12 +26,13 @@ namespace Reiga.VisualNodeEditor.Tests
 
             inspector.Show(_graph, node.Id);
 
-            // Description のみ（Title はヘッダー、Id / Position は HideInInspector、振る舞いは専用の一覧）
+            // Description と Screen のみ（Title はヘッダー、Id / Position は HideInInspector、振る舞いは専用の一覧）。Screen は Create Screen… の付いた欄
             Assert.That(inspector.NodeId, Is.EqualTo(node.Id));
             var fields = inspector.Query<PropertyField>().ToList()
                 .Where(f => f.GetFirstAncestorOfType<NodeBehaviourListView>() == null).ToList();
-            Assert.That(fields, Has.Count.EqualTo(1));
-            Assert.That(fields[0].label, Is.EqualTo("Description"));
+            Assert.That(fields.Select(f => f.label), Is.EqualTo(new[] { "Description", "Screen" }));
+            Assert.That(fields[1].GetFirstAncestorOfType<NodeScreenField>(), Is.Not.Null);
+            Assert.That(inspector.Q<NodeScreenField>().ButtonText, Is.EqualTo(NodeScreenField.CreateLabel));
         }
 
         [Test]

@@ -1,16 +1,20 @@
 using System;
+using System.IO;
 using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Build;
+using Reiga.VisualNodeEditor.Editor.Scenes;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 namespace Reiga.VisualNodeEditor.Editor.Play
 {
     /// <summary>
     /// ワンクリック Play。グラフのシーンを Build Settings に入れ、グラフが始まるシーンを開き、そこにこのグラフの Graph Runner が無ければ
     /// （確認してから）追加して保存し、Play に入る。シーンや Build Settings の並びを変える前には必ず確認する。
+    /// ノードに画面（<see cref="IHasScreen"/>）があれば、Runner にそれを出す <see cref="GraphScreenHost"/>（と UIDocument）も付ける。
     /// </summary>
     public static class PlaySetup
     {
@@ -19,6 +23,7 @@ namespace Reiga.VisualNodeEditor.Editor.Play
 
         private const string DialogTitle = "Play";
         private const string KeepOrderKeyPrefix = "Reiga.VisualNodeEditor.KeepBuildOrder.";
+        private const string SkipScreenHostKeyPrefix = "Reiga.VisualNodeEditor.SkipScreenHost.";
 
         /// <summary>
         /// Play の準備をして Play に入る。すでに Play 中なら Play を終える。
@@ -96,7 +101,8 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             }
 
             var scene = SceneManager.GetActiveScene();
-            if (FindRunner(scene, graph) == null)
+            var runner = FindRunner(scene, graph);
+            if (runner == null)
             {
                 if (!EditorUtility.DisplayDialog(DialogTitle,
                         $"'{scene.name}' has no Graph Runner for '{graph.name}', so nothing would run.\n\n" +
@@ -108,9 +114,38 @@ namespace Reiga.VisualNodeEditor.Editor.Play
 
                 AddRunner(scene, graph);
                 EditorSceneManager.SaveScene(scene);
+                return true;
             }
 
-            return true;
+            return PrepareScreenHost(graph, graphPath, scene, runner);
+        }
+
+        // 前からある Runner には Graph Screen Host が付いていないことがある。ノードに画面があるのに出すものが無ければ、付けるか尋ねる。
+        // 「付けない」を選んだら、このセッションの間はそのグラフについて尋ねない（コードで出しているなど）
+        private static bool PrepareScreenHost(NodeGraphAsset graph, string graphPath, Scene scene, GraphRunnerBehaviour runner)
+        {
+            var skipKey = SkipScreenHostKeyPrefix + AssetDatabase.AssetPathToGUID(graphPath);
+            if (!GraphScreens.AnyIn(graph) || FindScreenHost(scene, graph) != null || SessionState.GetBool(skipKey, false))
+            {
+                return true;
+            }
+
+            switch (EditorUtility.DisplayDialogComplex(DialogTitle,
+                        $"Nodes of '{graph.name}' have screens, but nothing in '{scene.name}' shows them.\n\n" +
+                        $"Add a Graph Screen Host (with a UI Document) to '{runner.gameObject.name}' and save the scene?",
+                        "Add", "Cancel", "Don't Add"))
+            {
+                case 0:
+                    AddScreenHost(runner.gameObject, graph, true);
+                    EditorSceneManager.MarkSceneDirty(scene);
+                    EditorSceneManager.SaveScene(scene);
+                    return true;
+                case 2:
+                    SessionState.SetBool(skipKey, true);
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         /// <summary>シーンの中で、<paramref name="graph"/> を動かす Graph Runner。無ければ null。</summary>
@@ -131,8 +166,9 @@ namespace Reiga.VisualNodeEditor.Editor.Play
         }
 
         /// <summary>
-        /// シーンに、<paramref name="graph"/> を動かす Graph Runner の GameObject を作る。Undo にも残さず、未保存の印も付けない
-        /// （<see cref="AddRunner"/> と、組み立ててすぐ保存して閉じるシーン（ADV Starter）が使う）。
+        /// シーンに、<paramref name="graph"/> を動かす Graph Runner の GameObject を作る。ノードに画面があれば、Graph Screen Host も付ける
+        /// （<see cref="AddScreenHost"/>）。Undo にも残さず、未保存の印も付けない
+        /// （<see cref="AddRunner"/> と、組み立ててすぐ保存して閉じるシーン（Starter）が使う）。
         /// </summary>
         internal static GraphRunnerBehaviour CreateRunner(Scene scene, NodeGraphAsset graph)
         {
@@ -142,7 +178,58 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             var serializedRunner = new SerializedObject(runner);
             serializedRunner.FindProperty(RunnerGraphPropertyName).objectReferenceValue = graph;
             serializedRunner.ApplyModifiedPropertiesWithoutUndo();
+            if (GraphScreens.AnyIn(graph))
+            {
+                AddScreenHost(gameObject, graph, false);
+            }
+
             return runner;
+        }
+
+        /// <summary>シーンの中で、<paramref name="graph"/> の画面を出す Graph Screen Host（グラフが空のものも含む）。無ければ null。</summary>
+        internal static GraphScreenHost FindScreenHost(Scene scene, NodeGraphAsset graph) =>
+            !scene.IsValid() || !scene.isLoaded
+                ? null
+                : scene.GetRootGameObjects()
+                    .SelectMany(root => root.GetComponentsInChildren<GraphScreenHost>(true))
+                    .FirstOrDefault(host => host.Graph == graph || host.Graph == null);
+
+        /// <summary>
+        /// <paramref name="gameObject"/> に、<paramref name="graph"/> のノードの画面を出す UIDocument と Graph Screen Host を付ける（あれば使う）。
+        /// UIDocument に Panel Settings が無ければ、プロジェクトのもの（無ければグラフの隣に作る）を入れる。<paramref name="undo"/> なら Undo に残す。
+        /// </summary>
+        internal static GraphScreenHost AddScreenHost(GameObject gameObject, NodeGraphAsset graph, bool undo)
+        {
+            if (!gameObject.TryGetComponent<UIDocument>(out var document))
+            {
+                document = undo ? Undo.AddComponent<UIDocument>(gameObject) : gameObject.AddComponent<UIDocument>();
+            }
+
+            if (document.panelSettings == null)
+            {
+                var graphPath = graph != null ? AssetDatabase.GetAssetPath(graph) : null;
+                var folder = string.IsNullOrEmpty(graphPath) ? "Assets" : Path.GetDirectoryName(graphPath)?.Replace('\\', '/') ?? "Assets";
+                var settings = ScreenAssets.FindOrCreatePanelSettings(folder);
+                if (undo)
+                {
+                    Undo.RecordObject(document, "Add Graph Screen Host");
+                }
+
+                document.panelSettings = settings;
+            }
+
+            if (!gameObject.TryGetComponent<GraphScreenHost>(out var host))
+            {
+                host = undo ? Undo.AddComponent<GraphScreenHost>(gameObject) : gameObject.AddComponent<GraphScreenHost>();
+            }
+
+            if (undo)
+            {
+                Undo.RecordObject(host, "Add Graph Screen Host");
+            }
+
+            host.Graph = graph;
+            return host;
         }
 
         /// <summary>追加する Graph Runner の GameObject の名前。</summary>
