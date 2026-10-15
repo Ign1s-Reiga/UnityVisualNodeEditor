@@ -38,6 +38,9 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         internal override string ScenesName => "the game's scene";
 
+        // 盤は Game の画面の中にあり、それを出すのは Graph Runner の UIDocument（Graph Screen Host が画面を入れる）
+        internal override string ScriptTarget => "the Graph Runner in your scene (give it a UI Document and a Graph Screen Host, which shows the screens on the nodes)";
+
         /// <summary>
         /// Title 以外の画面: (ファイル名の後ろの名前, 画面を付けるノードのタイトル, UXML)。<paramref name="styleFile"/> は同じフォルダの USS のファイル名。
         /// </summary>
