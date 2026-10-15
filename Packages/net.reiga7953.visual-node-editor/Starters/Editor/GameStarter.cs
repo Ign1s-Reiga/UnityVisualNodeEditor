@@ -37,6 +37,9 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// <summary>作るシーンの呼び方（メッセージに使う。例: "the Title and Game scenes"）。</summary>
         internal virtual string ScenesName => "the Title and Game scenes";
 
+        /// <summary>シーン無しのとき、ゲームのスクリプトを自分で付ける先（メッセージに使う）。既定は uGUI の盤。</summary>
+        internal virtual string ScriptTarget => "a board in your scene";
+
         /// <summary>Title に出す操作の説明。</summary>
         internal abstract string Controls { get; }
 
@@ -68,7 +71,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             var problem = ScenePicker.GetCreateProblem();
             if (problem != null && !EditorUtility.DisplayDialog(StarterName,
                     $"{problem}\n\nCreate the graph and the game script without {ScenesName}? " +
-                    "You can pick or create the scenes for the Scene nodes later, and add the script to a board in your own scene.",
+                    $"You can pick or create the scenes for the Scene nodes later, and add the script to {ScriptTarget}.",
                     "Create Without Scenes", "Cancel"))
             {
                 return;
@@ -118,7 +121,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                 {
                     Debug.LogException(exception);
                     Debug.LogError($"[VisualNodeEditor] {StarterName} created the graph, but could not create {ScenesName}. " +
-                                   $"Pick or create the scenes for the Scene nodes (the issue list has buttons for it), then add {className} to a board in your scene.");
+                                   $"Pick or create the scenes for the Scene nodes (the issue list has buttons for it), then add {className} to {ScriptTarget}.");
                 }
             }
             else

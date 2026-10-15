@@ -114,7 +114,7 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             File.WriteAllText($"{Folder}/Snake Game.uxml", "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\" />");
             AssetDatabase.ImportAsset($"{Folder}/Snake Game.uxml");
             LogAssert.Expect(LogType.Exception, new Regex("already exists"));
-            LogAssert.Expect(LogType.Error, new Regex("could not create the game's scene"));
+            LogAssert.Expect(LogType.Error, new Regex("could not create the game.s scene.*to the Graph Runner in your scene"));
 
             var graph = SnakeToolkitStarter.Instance.CreateIn(Folder, withScenes: true, writeScript: false);
 

@@ -106,7 +106,8 @@ namespace Reiga.VisualNodeEditor.Editor.Play
             {
                 if (!EditorUtility.DisplayDialog(DialogTitle,
                         $"'{scene.name}' has no Graph Runner for '{graph.name}', so nothing would run.\n\n" +
-                        $"Add one (a new GameObject named '{GetRunnerObjectName(graph)}') and save the scene?",
+                        $"Add one (a new GameObject named '{GetRunnerObjectName(graph)}') and save the scene?" +
+                        (GraphScreens.AnyIn(graph) ? "\n\n" + DescribeScreenHost(graph, "It also gets") : string.Empty),
                         addButtonLabel, "Cancel"))
                 {
                     return false;
@@ -132,7 +133,7 @@ namespace Reiga.VisualNodeEditor.Editor.Play
 
             switch (EditorUtility.DisplayDialogComplex(DialogTitle,
                         $"Nodes of '{graph.name}' have screens, but nothing in '{scene.name}' shows them.\n\n" +
-                        $"Add a Graph Screen Host (with a UI Document) to '{runner.gameObject.name}' and save the scene?",
+                        $"Let '{runner.gameObject.name}' show them, and save the scene? {DescribeScreenHost(graph, "It gets")}",
                         "Add", "Cancel", "Don't Add"))
             {
                 case 0:
@@ -185,6 +186,16 @@ namespace Reiga.VisualNodeEditor.Editor.Play
 
             return runner;
         }
+
+        /// <summary>
+        /// 確認のダイアログに書く、Graph Screen Host を付けるときに足すもの。Panel Settings がプロジェクトに無ければ作ることも書く
+        /// （作ったアセットは Undo では消えないので、先に知らせる）。
+        /// </summary>
+        internal static string DescribeScreenHost(NodeGraphAsset graph, string lead) =>
+            $"{lead} a UI Document and a Graph Screen Host, which show the screens on the nodes." +
+            (ScreenAssets.FindPanelSettings() == null
+                ? $" The project has no Panel Settings, so 'Panel Settings.asset' (and a runtime theme) is created next to '{(graph != null ? graph.name : "the graph")}'."
+                : string.Empty);
 
         /// <summary>シーンの中で、<paramref name="graph"/> の画面を出す Graph Screen Host（グラフが空のものも含む）。無ければ null。</summary>
         internal static GraphScreenHost FindScreenHost(Scene scene, NodeGraphAsset graph) =>
