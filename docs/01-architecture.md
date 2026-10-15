@@ -412,6 +412,9 @@ UI Toolkit のランタイムは UnityEngine のモジュールなので、コ�
   （例: コンテナ `Round` の HUD の上に、`Paused` のポーズ画面）。並びは純粋関数 `GraphScreens.At(runner)`
 - 画面は UXML から一度だけ作って覚え、場所が替わっても同じ画面なら作り直さない（HUD の文字・盤の中身がそのまま残る）。外した画面は UIDocument から外すだけ
   （中の Graph Button などはパネルから外れたときに聞くのをやめ、また付けば聞き直す）。重ねる処理は `ScreenStack`
+- 並びが替わっても、下から同じところまでの画面は付けたままにし、違うところから上だけを外して付け直す（Paused を重ねる・外すときに Game の画面は外れない。
+  中のコントロールが聞き直したり、フォーカスが外れたりしない）。ほかの要素が上に足されたなど、並びが崩れていれば全部を付け直す
+- UIDocument の根がまだ無い（Panel Settings が無い・UIDocument が無効）ときは、出せるようになるまでフレームごとに試す
 - 画面の根（`TemplateContainer`）は UIDocument いっぱいに広げ、クリックを受けない（`pickingMode = Ignore`）。中の要素だけがクリックを受ける（下の画面のボタンも押せる）
 - UIDocument 自身の画面（`visualTreeAsset`）があれば、いつも一番下に出る
 - グラフは任意（空なら実行中のどれか）。Runner が無い・止まっているときは何も出さない
@@ -422,8 +425,12 @@ UI Toolkit のランタイムは UnityEngine のモジュールなので、コ�
   無ければグラフの隣に `Panel Settings.asset` と既定のテーマ `Runtime Theme.tss`（`@import url("unity-theme://default");`）を作る）と Graph Screen Host も置く。
   既にある Runner に Graph Screen Host が無ければ（シーンにこのグラフか、グラフが空の Graph Screen Host が無ければ）、Play のときに付けて保存してよいか尋ねる
   （「付けない」を選んだら、そのセッションの間はそのグラフについて尋ねない。コードで画面を出しているときなど）。インスペクタの Screen の欄の下にも書いておく
+- Graph Runner を足す確認・Graph Screen Host を付ける確認では、UIDocument と Graph Screen Host も付くこと、Panel Settings がプロジェクトに無ければ作ることを書く
+  （作ったアセットは Undo では消えないので、先に知らせる）
 - `GraphNodePanel` は、1 つの画面の中で一部だけを出し分けるときに使う（画面ごと替えるならノードの画面）
-- 0.16 の「Scene ノードの画面」（シーンの UIDocument の UXML を開く・シーンに UIDocument を足す `SceneScreens`）はやめる（画面はシーンでなくノードに付けるため）
+- 0.16 の「Scene ノードの画面」（シーンの UIDocument の UXML を開く・シーンに UIDocument を足す `SceneScreens`）はやめる（画面はシーンでなくノードに付けるため）。
+  0.16 で作った画面は、シーンの UIDocument（`UI`）にそのまま残って出る。ノードに移すには、その UXML をノードの Screen に入れ、シーンの `UI` を消す
+  （残すと、Graph Screen Host の画面と 2 枚重なる）。移し方は CHANGELOG と README に書く
 
 ### 実行中の Runner の一覧
 
@@ -809,6 +816,7 @@ Puzzle: Entry → [Scene: Main] ─(自動)→ [State: Title]（画面 Title、L
 - キー: Title で Return → `Start`（Space は使わない。Title から Round の Ready へ同じフレームで進んだ後、Ready の Space → `Go` が続けて送らないように）。ほかは uGUI 版と同じ
 - ゲームのスクリプトは、UIDocument の中の `board`（Game の画面が出たときに現れる）を探し、そこにマス・タイルを VisualElement で描く。画面は作り直されないので、盤の中身は残る
 - 作れなければ、作った画面・Panel Settings・シーンを消し、ノードからも外す（ノードに入れるのはファイルがそろってから）。シーン無しで作るときも、画面と Panel Settings は作り、グラフのノードに入れる（自分のシーンの Graph Runner に UIDocument と Graph Screen Host を足せば動く）
+- シーン無しで作るか尋ねるとき・シーンを作れなかったときのメッセージは、スクリプトを付ける先を Starter ごとに書く（uGUI 版は「盤」、UI Toolkit 版は「UIDocument と Graph Screen Host の付いた Graph Runner」。盤に付けると画面が出ない）
 
 ## Build Settings 連携
 
