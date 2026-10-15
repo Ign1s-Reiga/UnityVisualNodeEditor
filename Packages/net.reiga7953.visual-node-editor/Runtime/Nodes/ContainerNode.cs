@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Reiga.VisualNodeEditor
 {
@@ -12,13 +13,17 @@ namespace Reiga.VisualNodeEditor
     /// </summary>
     [Serializable]
     [NodeMenu("Flow/Container")]
-    public class ContainerNode : NodeData
+    public class ContainerNode : NodeData, IHasScreen
     {
         /// <summary>入力ポートの ID。</summary>
         public const string InputPortId = "in";
 
         // 出口の一覧はエディタの専用 UI で編集する（生のリストの「+」は出口の ID ごと複製してしまうため隠す）
         [SerializeField, HideInInspector] private List<ContainerExit> _exits = new();
+
+        // インスペクタでは専用の欄（Create Screen… / Edit Screen 付き）で編集する（NodeInspectorView が名前で除外する）
+        [Tooltip("The UI Toolkit screen (UXML) shown while the graph is anywhere inside this container, under the screens of the nodes inside.")]
+        [SerializeField] private VisualTreeAsset _screen;
 
         public ContainerNode()
         {
@@ -31,6 +36,13 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>出口（出力ポートの並び順）。</summary>
         public IReadOnlyList<ContainerExit> Exits => _exits;
+
+        /// <inheritdoc />
+        public VisualTreeAsset Screen
+        {
+            get => _screen;
+            set => _screen = value;
+        }
 
         /// <summary>作成時に作る出口の名前。既定は <c>{ "Next" }</c>。サブクラスで上書きできる。</summary>
         protected virtual IEnumerable<string> DefaultExitNames => new[] { "Next" };

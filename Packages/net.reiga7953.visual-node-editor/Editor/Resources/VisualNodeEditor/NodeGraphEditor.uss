@@ -480,22 +480,14 @@
   white-space: normal;
 }
 
-/* The Screen row of a Scene node: open or create its UI Toolkit screen in UI Builder (SceneScreenField) */
-.vne-scene-screen {
+/* The Screen field of State / Scene / Container nodes: Create Screen… or Edit Screen (UI Builder) under it (NodeScreenField) */
+.vne-node-screen__actions {
   flex-direction: row;
-  align-items: center;
-  margin: 4px 3px 2px 3px;
+  justify-content: flex-end;
+  margin-top: 2px;
 }
 
-.vne-scene-screen__label {
-  flex-grow: 1;
-}
-
-.vne-scene-screen__none {
-  color: #8a8a8a;
-}
-
-.vne-scene-screen__button {
+.vne-node-screen__button {
   margin-left: 2px;
   margin-right: 0;
 }

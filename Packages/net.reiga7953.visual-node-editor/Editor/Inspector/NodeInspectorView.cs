@@ -17,6 +17,9 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         internal const string IdPropertyName = "_id";
         internal const string TitlePropertyName = "_title";
 
+        /// <summary>Scene ノードのシーンのフィールド名（EditMode テストで存在を検証している）。</summary>
+        internal const string ScenePropertyName = "_scene";
+
         /// <summary>Scene ノードのインスペクタに出す、同じシーンへ戻ったときの動き（ランタイムはアクティブなシーンと同じなら読み込まない）。</summary>
         internal const string SceneReloadNote =
             "Coming back to this scene while it is still loaded does not load it again, so its objects keep their state.";
@@ -80,26 +83,28 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     // イベント名はグラフにある名前から選べる欄にする
                     content.Add(new EventNameField(child.Copy(), asset));
                 }
+                else if (child.name == NodeScreenField.ScreenPropertyName && asset.Nodes[_index] is IHasScreen)
+                {
+                    // 画面は、作って UI Builder で開くボタンの付いた欄にする
+                    content.Add(new NodeScreenField(child.Copy(), asset, nodeId));
+                }
                 else if (child.name != TitlePropertyName && child.name != NodeBehaviourListView.BehavioursPropertyName
                          && !(child.name == ConditionListView.ConditionsPropertyName && asset.Nodes[_index] is EventNode))
                 {
                     var field = new PropertyField(child.Copy(), NodeDisplay.GetFieldLabel(child.name));
                     field.AddToClassList("vne-inspector-view__field");
                     content.Add(field);
+
+                    // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので、シーンの欄の下に書いておく
+                    if (child.name == ScenePropertyName && asset.Nodes[_index] is SceneNode)
+                    {
+                        var note = new Label(SceneReloadNote);
+                        note.AddToClassList("vne-inspector-view__note");
+                        content.Add(note);
+                    }
                 }
 
                 hasChild = child.NextVisible(false);
-            }
-
-            // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので書いておく
-            if (asset.Nodes[_index] is SceneNode)
-            {
-                var note = new Label(SceneReloadNote);
-                note.AddToClassList("vne-inspector-view__note");
-                content.Add(note);
-
-                // そのシーンの UI Toolkit の画面を UI Builder で開く・作る
-                content.Add(new SceneScreenField(nodeProperty.FindPropertyRelative(SceneScreenField.ScenePropertyName)));
             }
 
             // 出口はポートとエッジに関わるので、PropertyField ではなく専用の UI で編集する

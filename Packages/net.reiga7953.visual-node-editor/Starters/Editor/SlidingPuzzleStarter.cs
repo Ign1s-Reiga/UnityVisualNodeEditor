@@ -63,21 +63,39 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         internal override NodeGraphAsset BuildGraph()
         {
             var builder = new StarterGraphBuilder();
-            var level = builder.AddParameter(new GraphParameter(LevelParameter, GraphParameterType.Int) { IntValue = 1 });
-            var moves = builder.AddParameter(new GraphParameter(MovesParameter, GraphParameterType.Int));
+            var level = AddLevelParameter(builder);
 
             // ルート: Title → Game（シーン。Level = 1）→ Levels → All Clear → Title
             var title = builder.Add(new SceneNode { Title = TitleSceneNode }, 250f, 0f);
             var game = builder.Add(new SceneNode { Title = GameSceneNode }, 750f, 0f);
             builder.SetOnEnter(game, new ParameterChange(level.Id) { IntValue = 1 });
-            var levels = builder.AddContainer(LevelsContainer, 1250f, 0f, null, AllClearExit, QuitExit);
-            var allClear = builder.Add(new StateNode { Title = AllClearNode, Description = "Every level is solved." }, 1500f, -100f);
             builder.Connect(builder.Entry, title);
             builder.Connect(title, builder.AddEvent(StartEvent, 500f, 0f), game);
+            var levels = AddLevels(builder, level, title, 1250f);
             builder.Connect(game, builder.AddEvent(string.Empty, 1000f, 0f, automatic: true), levels);
+            return builder.Graph;
+        }
+
+        /// <summary>パラメータ（Level・Moves）を足し、Level を返す（uGUI 版と UI Toolkit 版で同じ）。</summary>
+        internal static GraphParameter AddLevelParameter(StarterGraphBuilder builder)
+        {
+            var level = builder.AddParameter(new GraphParameter(LevelParameter, GraphParameterType.Int) { IntValue = 1 });
+            builder.AddParameter(new GraphParameter(MovesParameter, GraphParameterType.Int));
+            return level;
+        }
+
+        /// <summary>
+        /// ルートの <paramref name="x"/> から右へ、Levels（中身ごと）と All Clear（Title で <paramref name="title"/>）を足し、Levels を返す。
+        /// Levels の Quit も <paramref name="title"/> へ戻る（uGUI 版と UI Toolkit 版で同じ）。
+        /// </summary>
+        internal static ContainerNode AddLevels(StarterGraphBuilder builder, GraphParameter level, NodeData title, float x)
+        {
+            var moves = builder.Graph.FindParameterByName(MovesParameter);
+            var levels = builder.AddContainer(LevelsContainer, x, 0f, null, AllClearExit, QuitExit);
+            var allClear = builder.Add(new StateNode { Title = AllClearNode, Description = "Every level is solved." }, x + 250f, -100f);
             builder.ConnectExit(levels, AllClearExit, allClear);
             builder.ConnectExit(levels, QuitExit, title);
-            builder.Connect(allClear, builder.AddEvent(TitleEvent, 1750f, -100f), title);
+            builder.Connect(allClear, builder.AddEvent(TitleEvent, x + 500f, -100f), title);
 
             // Levels の中: 1 つのレベル（Level）を解くたびに Level を 1 増やして、また Level に入る
             var levelContainer = builder.AddContainer(LevelContainer, 250f, 0f, levels, NextExit, AllClearExit, QuitExit);
@@ -111,7 +129,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             toAllClear.AddCondition(new TransitionCondition(level.Id, ConditionOperator.GreaterOrEqual) { IntValue = LastLevel });
             builder.Connect(solved, toAllClear, builder.AddExit(levelContainer, AllClearExit, 1750f, 100f));
             builder.Connect(solved, builder.AddEvent(NextEvent, 1500f, 220f, levelContainer), builder.AddExit(levelContainer, NextExit, 1750f, 220f));
-            return builder.Graph;
+            return levels;
         }
 
         internal override GameObject BuildGame(Scene scene, NodeGraphAsset graph)

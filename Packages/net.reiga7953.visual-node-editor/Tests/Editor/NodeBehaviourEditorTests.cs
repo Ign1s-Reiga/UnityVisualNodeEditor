@@ -187,7 +187,7 @@ namespace Reiga.VisualNodeEditor.Tests
 
             // リストそのものは生の PropertyField として出さない（専用の一覧だけ）
             var outsideList = inspector.Query<PropertyField>().ToList().Where(f => f.GetFirstAncestorOfType<NodeBehaviourListView>() == null);
-            Assert.That(outsideList.Select(f => f.label), Is.EqualTo(new[] { "Description" }));
+            Assert.That(outsideList.Select(f => f.label), Is.EqualTo(new[] { "Description", "Screen" }));
         }
 
         [Test]

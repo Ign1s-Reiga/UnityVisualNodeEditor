@@ -10,8 +10,8 @@ using UnityEngine.SceneManagement;
 namespace Reiga.VisualNodeEditor.Starters.Editor
 {
     /// <summary>
-    /// ゲームの Starter（Snake・スライドパズル）の共通の流れ。選んでいるフォルダに、グラフ・ゲームのスクリプト・Title と Game のシーンを作り、
-    /// スクリプトのコンパイルが終わったら Game のシーンの盤に付ける（<see cref="PendingStarterComponents"/>）。ツールバーの Play だけで最初から遊べる。
+    /// ゲームの Starter（Snake・スライドパズル）の共通の流れ。選んでいるフォルダに、グラフ・ゲームのスクリプト・Title と Game のシーン（UI Toolkit 版は 1 つのシーン）を作り、
+    /// スクリプトのコンパイルが終わったら Game のシーンの盤（UI Toolkit 版は Graph Runner）に付ける（<see cref="PendingStarterComponents"/>）。ツールバーの Play だけで最初から遊べる。
     /// 遊び（蛇の動き・タイルの入れ替え）はスクリプトに、流れ・画面の出し分け・スコア・レベルはグラフとゲーム向けのコンポーネントに置く。
     /// </summary>
     internal abstract class GameStarter
@@ -34,13 +34,19 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// <summary>スクリプトのひな形のクラス名（<c>Starters/Templates</c> のファイル名と同じ）。</summary>
         internal abstract string TemplateClass { get; }
 
+        /// <summary>作るシーンの呼び方（メッセージに使う。例: "the Title and Game scenes"）。</summary>
+        internal virtual string ScenesName => "the Title and Game scenes";
+
         /// <summary>Title に出す操作の説明。</summary>
         internal abstract string Controls { get; }
 
         /// <summary>ひな形のグラフ（まだアセットとして保存していない）。Scene ノードは <see cref="TitleSceneNode"/> と <see cref="GameSceneNode"/>。</summary>
         internal abstract NodeGraphAsset BuildGraph();
 
-        /// <summary>Game のシーンを組み立て、ゲームのスクリプトを付ける GameObject（uGUI 版は盤、UI Toolkit 版は画面の UIDocument）を返す。</summary>
+        /// <summary>
+        /// Game のシーン（UI Toolkit 版は、ただ 1 つのシーン）を組み立て、ゲームのスクリプトを付ける GameObject
+        /// （uGUI 版は盤、UI Toolkit 版は画面を出す Graph Runner）を返す。
+        /// </summary>
         internal abstract GameObject BuildGame(Scene scene, NodeGraphAsset graph);
 
         /// <summary>Title のシーンを組み立てる。既定は uGUI（<see cref="StarterScenes.BuildGameTitle"/>）。</summary>
@@ -61,7 +67,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         {
             var problem = ScenePicker.GetCreateProblem();
             if (problem != null && !EditorUtility.DisplayDialog(StarterName,
-                    $"{problem}\n\nCreate the graph and the game script without the Title and Game scenes? " +
+                    $"{problem}\n\nCreate the graph and the game script without {ScenesName}? " +
                     "You can pick or create the scenes for the Scene nodes later, and add the script to a board in your own scene.",
                     "Create Without Scenes", "Cancel"))
             {
@@ -87,7 +93,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         /// <summary>
         /// <paramref name="folder"/> にグラフと（<paramref name="writeScript"/> なら）ゲームのスクリプトを作り、保存したグラフを返す。
-        /// <paramref name="withScenes"/> なら Title と Game のシーンも作ってグラフの Scene ノードに入れ、スクリプトのコンパイルが終わったら盤に付ける。
+        /// <paramref name="withScenes"/> ならシーン（<see cref="BuildScenes"/>）も作ってグラフの Scene ノードに入れ、スクリプトのコンパイルが終わったら盤に付ける。
         /// シーンを作れなければ、作ったシーンを消してエラーを出す（グラフとスクリプトはそのまま使える）。
         /// スクリプトのひな形は何かを作る前に読む（読めなければ、何も作らずに例外。作りかけの物を残さない）。
         /// </summary>
@@ -111,7 +117,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                 catch (Exception exception)
                 {
                     Debug.LogException(exception);
-                    Debug.LogError($"[VisualNodeEditor] {StarterName} created the graph, but could not create the Title and Game scenes. " +
+                    Debug.LogError($"[VisualNodeEditor] {StarterName} created the graph, but could not create {ScenesName}. " +
                                    $"Pick or create the scenes for the Scene nodes (the issue list has buttons for it), then add {className} to a board in your scene.");
                 }
             }
@@ -126,9 +132,14 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
                 catch (Exception exception)
                 {
                     DeleteInReverse(created);
+                    Unassign(graph);
                     Debug.LogException(exception);
                     Debug.LogError($"[VisualNodeEditor] {StarterName} created the graph, but could not create the screen files.");
                 }
+
+                // 画面をノードに入れていれば、それも保存する
+                EditorUtility.SetDirty(graph);
+                AssetDatabase.SaveAssetIfDirty(graph);
             }
 
             if (script != null)
@@ -158,7 +169,37 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             return AssetDatabase.IsValidFolder(path) ? path : Path.GetDirectoryName(path)?.Replace('\\', '/') ?? "Assets";
         }
 
-        // 画面のアセットと Title・Game のシーンを作ってグラフに入れ、Game のシーンのパスと、スクリプトを付ける GameObject のパスを返す。
+        /// <summary>
+        /// シーンを作ってグラフの Scene ノードに入れ、スクリプトを付けるシーンのパスと、その中の GameObject のパスを返す。作ったシーンは <paramref name="created"/> に足す。
+        /// 既定は Title と Game の 2 つ（<see cref="BuildTitle"/> / <see cref="BuildGame"/>）。
+        /// </summary>
+        internal virtual (string scenePath, string boardPath) BuildScenes(NodeGraphAsset graph, string folder, List<string> created)
+        {
+            var titlePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Title.unity");
+            StarterScenes.CreateScene(titlePath, scene => BuildTitle(scene, graph), StarterName);
+            created.Add(titlePath);
+
+            var gamePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Game.unity");
+            string boardPath = null;
+            StarterScenes.CreateScene(gamePath, scene => boardPath = StarterScenes.GetPath(BuildGame(scene, graph).transform), StarterName);
+            created.Add(gamePath);
+
+            StarterScenes.SetScene(graph, TitleSceneNode, titlePath);
+            StarterScenes.SetScene(graph, GameSceneNode, gamePath);
+            return (gamePath, boardPath);
+        }
+
+        /// <summary>
+        /// 作ったものを消したとき、グラフがそれを指したまま残らないよう外す（<see cref="BuildScenes"/> と <see cref="CreateScreenAssets"/> が入れたもの）。
+        /// 既定は Title と Game の Scene ノードを空にする。
+        /// </summary>
+        internal virtual void Unassign(NodeGraphAsset graph)
+        {
+            StarterScenes.ClearScene(graph, TitleSceneNode);
+            StarterScenes.ClearScene(graph, GameSceneNode);
+        }
+
+        // 画面のアセットとシーンを作ってグラフに入れ、スクリプトを付けるシーンのパスと、その中の GameObject のパスを返す。
         // どれかを作れなければ、作ったものを消して例外
         private (string scenePath, string boardPath) CreateScenes(NodeGraphAsset graph, string folder)
         {
@@ -166,29 +207,19 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             try
             {
                 CreateScreenAssets(graph, folder, created);
-
-                var titlePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Title.unity");
-                StarterScenes.CreateScene(titlePath, scene => BuildTitle(scene, graph), StarterName);
-                created.Add(titlePath);
-
-                var gamePath = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{graph.name} Game.unity");
-                string boardPath = null;
-                StarterScenes.CreateScene(gamePath, scene => boardPath = StarterScenes.GetPath(BuildGame(scene, graph).transform), StarterName);
-                created.Add(gamePath);
-
-                StarterScenes.SetScene(graph, TitleSceneNode, titlePath);
-                StarterScenes.SetScene(graph, GameSceneNode, gamePath);
+                var result = BuildScenes(graph, folder, created);
                 EditorUtility.SetDirty(graph);
                 AssetDatabase.SaveAssetIfDirty(graph);
-                return (gamePath, boardPath);
+                return result;
             }
             catch
             {
                 DeleteInReverse(created);
 
-                // グラフを保存するところで失敗したときも、消したシーンを指したまま残さない
-                StarterScenes.ClearScene(graph, TitleSceneNode);
-                StarterScenes.ClearScene(graph, GameSceneNode);
+                // グラフを保存するところで失敗したときも、消したシーン・画面を指したまま残さない
+                Unassign(graph);
+                EditorUtility.SetDirty(graph);
+                AssetDatabase.SaveAssetIfDirty(graph);
                 throw;
             }
         }

@@ -50,22 +50,39 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         internal override NodeGraphAsset BuildGraph()
         {
             var builder = new StarterGraphBuilder();
-            var score = builder.AddParameter(new GraphParameter(ScoreParameter, GraphParameterType.Int));
-            builder.AddParameter(new GraphParameter(HighScoreParameter, GraphParameterType.Int));
-            builder.AddParameter(new GraphParameter(SpeedParameter, GraphParameterType.Float) { FloatValue = 8f });
+            var score = AddParameters(builder);
 
             // ルート: Title → Game（シーン）→ Round → Game Over → Retry / Title
             var title = builder.Add(new SceneNode { Title = TitleSceneNode }, 250f, 0f);
             var game = builder.Add(new SceneNode { Title = GameSceneNode }, 750f, 0f);
-            var round = builder.AddContainer(RoundContainer, 1250f, 0f, null, GameOverExit, QuitExit);
-            var gameOver = builder.Add(new StateNode { Title = GameOverNode, Description = "The game over panel shows the score, Retry and Title." }, 1500f, 0f);
             builder.Connect(builder.Entry, title);
             builder.Connect(title, builder.AddEvent(StartEvent, 500f, 0f), game);
+            var round = AddRound(builder, score, title, 1250f);
             builder.Connect(game, builder.AddEvent(string.Empty, 1000f, 0f, automatic: true), round);
+            return builder.Graph;
+        }
+
+        /// <summary>パラメータ（Score・HighScore・Speed）を足し、Score を返す（uGUI 版と UI Toolkit 版で同じ）。</summary>
+        internal static GraphParameter AddParameters(StarterGraphBuilder builder)
+        {
+            var score = builder.AddParameter(new GraphParameter(ScoreParameter, GraphParameterType.Int));
+            builder.AddParameter(new GraphParameter(HighScoreParameter, GraphParameterType.Int));
+            builder.AddParameter(new GraphParameter(SpeedParameter, GraphParameterType.Float) { FloatValue = 8f });
+            return score;
+        }
+
+        /// <summary>
+        /// ルートの <paramref name="x"/> から右へ、Round（中身ごと）と Game Over（Retry で Round、Title で <paramref name="title"/>）を足し、Round を返す。
+        /// Round の Quit も <paramref name="title"/> へ戻る（uGUI 版と UI Toolkit 版で同じ）。
+        /// </summary>
+        internal static ContainerNode AddRound(StarterGraphBuilder builder, GraphParameter score, NodeData title, float x)
+        {
+            var round = builder.AddContainer(RoundContainer, x, 0f, null, GameOverExit, QuitExit);
+            var gameOver = builder.Add(new StateNode { Title = GameOverNode, Description = "Shows the score, Retry and Title." }, x + 250f, 0f);
             builder.ConnectExit(round, GameOverExit, gameOver);
             builder.ConnectExit(round, QuitExit, title);
-            builder.Connect(gameOver, builder.AddEvent(RetryEvent, 1750f, -100f), round);
-            builder.Connect(gameOver, builder.AddEvent(TitleEvent, 1750f, 100f), title);
+            builder.Connect(gameOver, builder.AddEvent(RetryEvent, x + 500f, -100f), round);
+            builder.Connect(gameOver, builder.AddEvent(TitleEvent, x + 500f, 100f), title);
 
             // Round の中: Ready（Space で始める）→ Playing ⇄ Paused、ぶつかったら Game Over へ
             var ready = builder.Add(new StateNode { Title = ReadyNode, Description = "A new round: the snake goes back to the start. Press Space." }, 250f, 0f, round);
@@ -79,7 +96,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             builder.Connect(paused, builder.AddEvent(PauseEvent, 1000f, -300f, round), playing);
             builder.Connect(paused, builder.AddEvent(QuitEvent, 1500f, -150f, round), builder.AddExit(round, QuitExit, 1750f, -150f));
             builder.Connect(playing, builder.AddEvent(CrashEvent, 1000f, 150f, round), builder.AddExit(round, GameOverExit, 1250f, 150f));
-            return builder.Graph;
+            return round;
         }
 
         internal override GameObject BuildGame(Scene scene, NodeGraphAsset graph)

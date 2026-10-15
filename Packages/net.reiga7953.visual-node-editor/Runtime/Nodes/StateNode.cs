@@ -1,15 +1,20 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Reiga.VisualNodeEditor
 {
     /// <summary>ゲームステート（タイトル / プレイ中 / ポーズ など）。<see cref="NodeBehaviour"/> を付けると、このステートにいる間の処理を書ける。</summary>
     [Serializable]
     [NodeMenu("State/State")]
-    public sealed class StateNode : NodeData, IBehaviourHost
+    public sealed class StateNode : NodeData, IBehaviourHost, IHasScreen
     {
         [SerializeField, TextArea] private string _description;
+
+        // インスペクタでは専用の欄（Create Screen… / Edit Screen 付き）で編集する（NodeInspectorView が名前で除外する）
+        [Tooltip("The UI Toolkit screen (UXML) shown while the graph is on this node.")]
+        [SerializeField] private VisualTreeAsset _screen;
 
         // インスペクタでは専用の一覧で編集する（NodeInspectorView が名前で除外する）。
         // [HideInInspector] を付けると、振る舞いの中のフィールドまでインスペクタから見えなくなるので付けない
@@ -19,6 +24,13 @@ namespace Reiga.VisualNodeEditor
         {
             get => _description;
             set => _description = value;
+        }
+
+        /// <inheritdoc />
+        public VisualTreeAsset Screen
+        {
+            get => _screen;
+            set => _screen = value;
         }
 
         /// <inheritdoc />

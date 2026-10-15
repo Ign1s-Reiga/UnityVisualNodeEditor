@@ -6,9 +6,10 @@ using UnityEngine.UIElements;
 /// <summary>
 /// Snake for UI Toolkit, made by the Snake Starter (UI Toolkit) of Visual Node Editor. Change it freely: it is your game's code now.
 /// <para>
-/// The graph decides the flow (Ready → Playing ⇄ Paused → Game Over → Retry or Title), resets Score when a round starts,
-/// and turns keys into events. The screen (UXML) shows the score and the panels with Graph Parameter Label and Graph Node Panel.
-/// This script only plays the game: it draws the snake inside the "board" element of the UI Document on this GameObject,
+/// The graph decides the flow (Title → Ready → Playing ⇄ Paused → Game Over → Retry or Title), resets Score when a round starts,
+/// and turns keys into events. The screens (UXML) are on the graph's nodes: the Graph Screen Host on this GameObject shows the Game screen
+/// (the score and the board) while the graph is in Round, with the Ready and Paused screens over it.
+/// This script only plays the game: it draws the snake inside the "board" element of the Game screen,
 /// moves it while the graph is on the Playing node, adds to Score when the snake eats, and raises Crash when it hits a wall or itself.
 /// </para>
 /// </summary>
@@ -66,15 +67,10 @@ public class SnakeGameToolkitTemplate : MonoBehaviour
     private float _stepTimer;
     private GraphRunner _runner;
     private bool _warnedNoRunner;
+    private bool _warnedNoBoard;
 
     private void Start()
     {
-        _board = GetComponent<UIDocument>().rootVisualElement?.Q(_boardElement);
-        if (_board == null)
-        {
-            Debug.LogWarning($"[{GetType().Name}] The screen has no element named '{_boardElement}' to draw the snake in.", this);
-        }
-
         ConnectRunner();
         ResetBoard();
     }
@@ -92,6 +88,11 @@ public class SnakeGameToolkitTemplate : MonoBehaviour
         if (_runner == null || !_runner.IsRunning)
         {
             ConnectRunner();
+        }
+
+        if (_board == null)
+        {
+            FindBoard();
         }
 
         if (!IsPlaying())
@@ -320,7 +321,23 @@ public class SnakeGameToolkitTemplate : MonoBehaviour
         }
     }
 
-    // The Graph Runner lives in the Title scene and stays when this scene loads. Find it, and follow the graph's nodes
+    // The board is in the Game screen, which the Graph Screen Host adds to the UI Document only when the graph gets to Round.
+    // Once found, it is the same element every time the screen comes back
+    private void FindBoard()
+    {
+        _board = GetComponent<UIDocument>().rootVisualElement?.Q(_boardElement);
+        if (_board != null)
+        {
+            Redraw();
+        }
+        else if (IsPlaying() && !_warnedNoBoard)
+        {
+            _warnedNoBoard = true;
+            Debug.LogWarning($"[{GetType().Name}] No screen on the UI Document has an element named '{_boardElement}' to draw the snake in.", this);
+        }
+    }
+
+    // The Graph Runner is on this GameObject (or anywhere else). Find it, and follow the graph's nodes
     private void ConnectRunner()
     {
         var runner = GraphRunner.FindRunning(_graph);
@@ -341,7 +358,7 @@ public class SnakeGameToolkitTemplate : MonoBehaviour
         if (_runner == null && !_warnedNoRunner)
         {
             _warnedNoRunner = true;
-            Debug.LogWarning($"[{GetType().Name}] No Graph Runner is running this game's graph. Start from the Title scene, " +
+            Debug.LogWarning($"[{GetType().Name}] No Graph Runner is running this game's graph. Start from the game's scene, " +
                              "or press Play in the graph's Visual Node Editor window.", this);
         }
     }

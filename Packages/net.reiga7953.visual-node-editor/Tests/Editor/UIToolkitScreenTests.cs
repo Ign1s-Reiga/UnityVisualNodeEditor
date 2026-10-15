@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using Reiga.VisualNodeEditor.Editor.Inspector;
 using Reiga.VisualNodeEditor.Editor.Scenes;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -13,7 +14,7 @@ using UnityEngine.UIElements;
 namespace Reiga.VisualNodeEditor.Tests
 {
     /// <summary>
-    /// UI Toolkit の画面: UXML に書いた属性がコントロールに入ること（UI Builder で置いたものと同じ）と、Scene ノードの Create Screen… / Edit Screen（<see cref="SceneScreens"/>）。
+    /// UI Toolkit の画面: UXML に書いた属性がコントロールに入ること（UI Builder で置いたものと同じ）と、ノードの画面の Create Screen…（<see cref="NodeScreens"/>）と、それを出す Graph Screen Host を Play で付けること。
     /// </summary>
     public sealed class UIToolkitScreenTests
     {
@@ -85,97 +86,41 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
-        public void CreateScreen_PutsAUIDocumentInTheScene_AndEditScreenFindsIt()
+        public void CreateScreen_WritesAUxmlNextToTheGraph_AndTheFieldAssignsIt()
         {
-            // 無題のシーンが開いていると、Unity は追加でシーンを開けないので、保存したシーンを開いておく
-            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            EditorSceneManager.SaveScene(host, Folder + "/Host.unity");
-            var level = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
-            EditorSceneManager.SaveScene(level, Folder + "/Level.unity");
-            EditorSceneManager.CloseScene(level, true);
-            Assert.That(SceneScreens.FindScreens(Folder + "/Level.unity"), Is.Empty);
-
-            var uxml = SceneScreens.CreateScreen(Folder + "/Level.unity", out var problem);
-
-            Assert.That(problem, Is.Null);
-            Assert.That(uxml, Is.EqualTo(Folder + "/Level.uxml"));
-            Assert.That(SceneScreens.FindScreens(Folder + "/Level.unity"), Is.EqualTo(new[] { uxml }), "Edit Screen finds it");
-            Assert.That(SceneManager.sceneCount, Is.EqualTo(1), "the scene was opened, saved and closed again");
-
-            var scene = EditorSceneManager.OpenScene(Folder + "/Level.unity", OpenSceneMode.Additive);
-            try
-            {
-                var document = scene.GetRootGameObjects().Select(root => root.GetComponent<UIDocument>()).Single(found => found != null);
-                Assert.That(AssetDatabase.GetAssetPath(document.visualTreeAsset), Is.EqualTo(uxml));
-                Assert.That(document.panelSettings, Is.Not.Null);
-                Assert.That(document.panelSettings.themeStyleSheet, Is.Not.Null, "default controls are styled");
-            }
-            finally
-            {
-                EditorSceneManager.CloseScene(scene, true);
-            }
-
-            var screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(uxml).Instantiate();
-            Assert.That(screen.Q<Label>("heading").text, Is.EqualTo("Level"));
-        }
-
-        [Test]
-        public void CreateScreen_ExplainsWhyItCannot()
-        {
-            Assert.That(SceneScreens.CreateScreen(Folder + "/Missing.unity", out var problem), Is.Null);
-            Assert.That(problem, Does.Contain("scene"));
-            Assert.That(SceneScreens.FindScreens(string.Empty), Is.Empty);
-        }
-
-        [Test]
-        public void CreateScreen_WritesNothing_WhenTheSceneCannotBeOpened()
-        {
-            // 保存したシーンを作ってから、無題のシーンだけを開く（Unity は追加でシーンを開けない）
-            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            EditorSceneManager.SaveScene(host, Folder + "/Level.unity");
-            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
-            Assert.That(SceneScreens.CreateScreen(Folder + "/Level.unity", out var problem), Is.Null);
-
-            Assert.That(problem, Is.Not.Null);
-            Assert.That(File.Exists(Folder + "/Level.uxml"), Is.False, "no file is written before the checks pass");
-        }
-
-        [Test]
-        public void AScreenAddedToAnOpenScene_IsFoundBeforeTheSceneIsSaved()
-        {
-            // 開いているシーンに足した画面は、保存するまでシーンのファイルの依存に入らない。それでも Edit Screen に出す（2 つ目を作らないように）
-            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            EditorSceneManager.SaveScene(host, Folder + "/Level.unity");
-
-            var uxml = SceneScreens.CreateScreen(Folder + "/Level.unity", out var problem);
-
-            Assert.That(problem, Is.Null);
-            Assert.That(SceneManager.GetActiveScene().isDirty, Is.True, "left unsaved for the user");
-            Assert.That(SceneScreens.FindScreens(Folder + "/Level.unity"), Is.EqualTo(new[] { uxml }));
-        }
-
-        [Test]
-        public void TheScreenRow_ReadsTheSceneWhenItIsUsed()
-        {
-            // 行を作った後で Scene の欄を変えても、Create Screen… は今のシーンに作る
-            // シーンを先に作る（新しいシーンを開くと、使われていない保存前のグラフは消される）
-            var host = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            EditorSceneManager.SaveScene(host, Folder + "/A.unity");
-            EditorSceneManager.SaveScene(host, Folder + "/B.unity");
             var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
-            var node = new SceneNode();
+            var node = new StateNode { Title = "Title" };
             graph.AddNode(node);
+            AssetDatabase.CreateAsset(graph, Folder + "/Game.asset");
+            var property = new SerializedObject(graph).FindProperty("_nodes").GetArrayElementAtIndex(0)
+                .FindPropertyRelative(NodeScreenField.ScreenPropertyName);
+            var field = new NodeScreenField(property, graph, node.Id);
+            Assert.That(field.ButtonText, Is.EqualTo(NodeScreenField.CreateLabel));
+
+            Undo.IncrementCurrentGroup();
+            var screen = field.CreateAndAssign(out var problem);
+
+            Assert.That(problem, Is.Null);
+            Assert.That(AssetDatabase.GetAssetPath(screen), Is.EqualTo(Folder + "/Game Title.uxml"));
+            Assert.That(((StateNode)graph.FindNode(node.Id)).Screen, Is.SameAs(screen));
+            Assert.That(field.ButtonText, Is.EqualTo(NodeScreenField.EditLabel));
+            Assert.That(screen.Instantiate().Q<Label>("heading").text, Is.EqualTo("Title"));
+
+            Undo.PerformUndo();
+            Assert.That(((StateNode)graph.FindNode(node.Id)).Screen, Is.Null, "assigning can be undone");
+        }
+
+        [Test]
+        public void CreateScreen_NeedsASavedGraph()
+        {
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
             try
             {
-                var serializedGraph = new SerializedObject(graph);
-                var scene = serializedGraph.FindProperty("_nodes").GetArrayElementAtIndex(0).FindPropertyRelative(Reiga.VisualNodeEditor.Editor.Inspector.SceneScreenField.ScenePropertyName);
-                var row = new Reiga.VisualNodeEditor.Editor.Inspector.SceneScreenField(scene);
-                Assert.That(row.ScenePath, Is.Empty);
-                Assert.That(row.ButtonText, Is.Empty, "no scene yet: no button");
+                var node = new StateNode();
+                graph.AddNode(node);
 
-                node.Scene = new SceneReference(AssetDatabase.AssetPathToGUID(Folder + "/B.unity"), Folder + "/B.unity");
-                Assert.That(row.ScenePath, Is.EqualTo(Folder + "/B.unity"));
+                Assert.That(NodeScreens.CreateScreen(graph, node, out var problem), Is.Null);
+                Assert.That(problem, Does.Contain("saved"));
             }
             finally
             {
@@ -183,6 +128,53 @@ namespace Reiga.VisualNodeEditor.Tests
             }
         }
 
+        [Test]
+        public void ScreenFileNames_AreTheGraphAndTheNode()
+        {
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            try
+            {
+                graph.name = "Game";
+
+                Assert.That(NodeScreens.GetFileName(graph, new ContainerNode { Title = "Round/Paused" }), Is.EqualTo("Game Round_Paused"));
+                Assert.That(NodeScreens.GetFileName(graph, new SceneNode()), Is.EqualTo("Game Scene"), "untitled nodes use the type's name");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(graph);
+            }
+        }
+
+        [Test]
+        public void ARunner_GetsAScreenHost_OnlyWhenNodesHaveScreens()
+        {
+            // シーンを先に作る（新しいシーンを開くと、保存前のアセットは消される）
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            var node = new StateNode();
+            graph.AddNode(node);
+            AssetDatabase.CreateAsset(graph, Folder + "/Game.asset");
+
+            var plain = Reiga.VisualNodeEditor.Editor.Play.PlaySetup.CreateRunner(scene, graph);
+            Assert.That(plain.GetComponent<GraphScreenHost>(), Is.Null, "no screens: no host");
+            Assert.That(Reiga.VisualNodeEditor.Editor.Play.PlaySetup.FindScreenHost(scene, graph), Is.Null);
+
+            File.WriteAllText(Folder + "/Screen.uxml", NodeScreens.BuildDefaultScreen("Title"));
+            AssetDatabase.ImportAsset(Folder + "/Screen.uxml");
+            node.Screen = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(Folder + "/Screen.uxml");
+            var runner = Reiga.VisualNodeEditor.Editor.Play.PlaySetup.CreateRunner(scene, graph);
+
+            var host = runner.GetComponent<GraphScreenHost>();
+            Assert.That(host, Is.Not.Null);
+            Assert.That(host.Graph, Is.SameAs(graph));
+            Assert.That(runner.GetComponent<UIDocument>().panelSettings, Is.Not.Null);
+            Assert.That(Reiga.VisualNodeEditor.Editor.Play.PlaySetup.FindScreenHost(scene, graph), Is.SameAs(host));
+
+            // 前からある Runner にも付けられる
+            var added = Reiga.VisualNodeEditor.Editor.Play.PlaySetup.AddScreenHost(plain.gameObject, graph, true);
+            Assert.That(plain.GetComponent<GraphScreenHost>(), Is.SameAs(added));
+            Assert.That(plain.GetComponent<UIDocument>().panelSettings, Is.Not.Null);
+        }
 
         [Test]
         public void PanelSettings_AreMadeWithTheDefaultTheme()
