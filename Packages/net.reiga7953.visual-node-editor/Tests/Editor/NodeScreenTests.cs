@@ -160,6 +160,77 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(root.Children(), Is.EqualTo(new[] { other, stack.InstanceOf(_hud) }));
         }
 
+        [Test]
+        public void Show_LeavesTheScreensUnderneathAttached_WhenAnOverlayComesAndGoes()
+        {
+            // 外して付け直すと、中のコントロールが聞き直し、フォーカスも外れる。Paused を重ねる・外すだけなら、Game の画面は付けたまま
+            var settings = ScriptableObject.CreateInstance<PanelSettings>();
+            var gameObject = new GameObject("Screens");
+            try
+            {
+                var document = gameObject.AddComponent<UIDocument>();
+                document.panelSettings = settings;
+                var root = document.rootVisualElement;
+                Assume.That(root?.panel, Is.Not.Null, "the UI Document has a panel in edit mode");
+                var stack = new ScreenStack();
+                stack.Show(root, new[] { _hud });
+                var hud = stack.InstanceOf(_hud);
+                var detached = 0;
+                hud.RegisterCallback<DetachFromPanelEvent>(_ => detached++);
+
+                stack.Show(root, new[] { _hud, _paused });
+                stack.Show(root, new[] { _hud, _title });
+                stack.Show(root, new[] { _hud });
+
+                Assert.That(detached, Is.Zero);
+                Assert.That(stack.InstanceOf(_paused).panel, Is.Null, "the overlays are taken off");
+                Assert.That(stack.InstanceOf(_title).panel, Is.Null);
+                Assert.That(stack.Shown, Is.EqualTo(new[] { _hud }));
+
+                stack.Show(root, new[] { _title });
+                Assert.That(detached, Is.EqualTo(1), "a screen that is no longer wanted is taken off");
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+                Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void Show_PutsBackOnlyFromTheFirstChange()
+        {
+            var root = new VisualElement();
+            var stack = new ScreenStack();
+            stack.Show(root, new[] { _title, _hud, _paused });
+
+            stack.Show(root, new[] { _title, _paused, _hud });
+
+            Assert.That(root.Children(), Is.EqualTo(new[] { stack.InstanceOf(_title), stack.InstanceOf(_paused), stack.InstanceOf(_hud) }));
+            Assert.That(stack.Shown, Is.EqualTo(new[] { _title, _paused, _hud }));
+        }
+
+        [Test]
+        public void TheHost_KeepsTrying_UntilTheUIDocumentHasARoot()
+        {
+            // UIDocument の根が無い（Panel Settings が無い・無効）間に場所が替わっても、根ができたら出す
+            var gameObject = new GameObject("Host");
+            try
+            {
+                var host = gameObject.AddComponent<GraphScreenHost>();
+
+                host.RefreshIn(null);
+                Assert.That(host.NeedsRefresh, Is.True, "tried again next frame");
+
+                host.RefreshIn(new VisualElement());
+                Assert.That(host.NeedsRefresh, Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
         private static VisualTreeAsset CreateScreen(string name)
         {
             var screen = ScriptableObject.CreateInstance<VisualTreeAsset>();

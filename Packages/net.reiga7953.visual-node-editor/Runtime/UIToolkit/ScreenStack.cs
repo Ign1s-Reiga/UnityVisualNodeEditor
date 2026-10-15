@@ -24,8 +24,10 @@ namespace Reiga.VisualNodeEditor
             screen != null && _instances.TryGetValue(screen, out var instance) ? instance : null;
 
         /// <summary>
-        /// <paramref name="root"/> に <paramref name="screens"/> を下から上の順に重ねる。もう出ている画面で、並びも同じなら触らない
-        /// （外して付け直すと、中のコントロールが聞き直すため）。並びが違えば、ここで作った要素を一度外して並べ直す。
+        /// <paramref name="root"/> に <paramref name="screens"/> を下から上の順に重ねる（null と 2 度目のものは飛ばす）。
+        /// 外して付け直すと中のコントロールが聞き直し、フォーカスも外れるので、今の並びと下から同じところまでは付けたままにし、
+        /// 違うところから上だけを付け直す（並びがすべて同じなら何もしない）。根の一番上に今の並びがそろっていなければ
+        /// （UIDocument が根を作り直した・ほかの要素が上に足された）、ここで作った要素を一度外して並べ直す。
         /// </summary>
         public void Show(VisualElement root, IReadOnlyList<VisualTreeAsset> screens)
         {
@@ -34,26 +36,49 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
-            if (IsShowing(root, screens))
-            {
-                return;
-            }
-
-            foreach (var instance in _instances.Values)
-            {
-                instance.RemoveFromHierarchy();
-            }
-
-            _shown.Clear();
+            var wanted = new List<VisualTreeAsset>();
             foreach (var screen in screens)
             {
-                if (screen == null || _shown.Contains(screen))
+                if (screen != null && !wanted.Contains(screen))
                 {
-                    continue;
+                    wanted.Add(screen);
+                }
+            }
+
+            var keep = 0;
+            if (IsStackedOnTop(root))
+            {
+                while (keep < wanted.Count && keep < _shown.Count && wanted[keep] == _shown[keep])
+                {
+                    keep++;
                 }
 
-                root.Add(GetOrCreate(screen));
-                _shown.Add(screen);
+                if (keep == wanted.Count && keep == _shown.Count)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                foreach (var instance in _instances.Values)
+                {
+                    instance.RemoveFromHierarchy();
+                }
+
+                _shown.Clear();
+            }
+
+            // 違うところから上を外して、欲しい並びで付け直す
+            for (var i = _shown.Count - 1; i >= keep; i--)
+            {
+                InstanceOf(_shown[i])?.RemoveFromHierarchy();
+                _shown.RemoveAt(i);
+            }
+
+            for (var i = keep; i < wanted.Count; i++)
+            {
+                root.Add(GetOrCreate(wanted[i]));
+                _shown.Add(wanted[i]);
             }
         }
 
@@ -82,27 +107,18 @@ namespace Reiga.VisualNodeEditor
             _shown.Clear();
         }
 
-        // 同じ画面が同じ並びで、今もその根の一番上に並んでいるか（UIDocument が根を作り直したら、並んでいない）
-        private bool IsShowing(VisualElement root, IReadOnlyList<VisualTreeAsset> screens)
+        // 今出している画面が、出した順のまま、その根の一番上に並んでいるか（UIDocument が根を作り直したら、並んでいない）
+        private bool IsStackedOnTop(VisualElement root)
         {
-            var wanted = new List<VisualTreeAsset>();
-            foreach (var screen in screens)
-            {
-                if (screen != null && !wanted.Contains(screen))
-                {
-                    wanted.Add(screen);
-                }
-            }
-
-            if (wanted.Count != _shown.Count || root.childCount < wanted.Count)
+            if (root.childCount < _shown.Count)
             {
                 return false;
             }
 
-            var first = root.childCount - wanted.Count;
-            for (var i = 0; i < wanted.Count; i++)
+            var first = root.childCount - _shown.Count;
+            for (var i = 0; i < _shown.Count; i++)
             {
-                if (wanted[i] != _shown[i] || root[first + i] != InstanceOf(wanted[i]))
+                if (root[first + i] != InstanceOf(_shown[i]))
                 {
                     return false;
                 }

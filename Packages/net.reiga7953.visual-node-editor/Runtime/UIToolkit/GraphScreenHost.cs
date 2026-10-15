@@ -37,12 +37,24 @@ namespace Reiga.VisualNodeEditor
         /// <summary>今出している画面（下から上の順）。</summary>
         public System.Collections.Generic.IReadOnlyList<VisualTreeAsset> Shown => _stack.Shown;
 
-        /// <summary>今のグラフの場所の画面を、すぐに出し直す（ふだんは場所が替わったフレームの終わりに出し直す）。</summary>
-        public void Refresh()
+        /// <summary>
+        /// 今のグラフの場所の画面を、すぐに出し直す（ふだんは場所が替わったフレームの終わりに出し直す）。
+        /// UIDocument の根がまだ無ければ（Panel Settings が無い・UIDocument が無効）、出せるようになるまでフレームごとに試し直す。
+        /// </summary>
+        public void Refresh() => RefreshIn(Root);
+
+        // root: UIDocument の根（無ければ null。テストからも呼ぶ）
+        internal void RefreshIn(VisualElement root)
         {
-            _dirty = false;
-            _stack.Show(Root, GraphScreens.At(_follower?.Runner));
+            _dirty = root == null;
+            if (root != null)
+            {
+                _stack.Show(root, GraphScreens.At(_follower?.Runner));
+            }
         }
+
+        /// <summary>次のフレームの終わりに出し直すか（テストが確かめる）。</summary>
+        internal bool NeedsRefresh => _dirty;
 
         private VisualElement Root
         {
