@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.17.0] - 2026-10-15
+- 追加: 画面（タイトル・設定・ポーズ・HUD）をノードに付ける。State・Scene・Container ノードのインスペクタの Screen に UXML を入れる
+  - 空なら Create Screen… で、グラフの隣に `<グラフ名> <ノード名>.uxml` を作って入れ、UI Builder で開く（入れたことは Undo できる）。入っていれば Edit Screen で開く
+- 追加: Graph Screen Host（`Add Component > Visual Node Editor > Graph Screen Host`）。Graph Runner に UIDocument と一緒に付け、グラフの今の場所の画面を出す
+  - 入っているコンテナの画面の上に、今のノードの画面を重ねる（例: Round の HUD の上に Paused のポーズ画面）。画面は一度だけ作って使い回すので、HUD の文字や盤の中身が残る
+  - 画面の枠はクリックを受けず、下の画面のボタンも押せる
+- 追加: ツールバーの Play で Graph Runner を置くとき、ノードに画面があれば UIDocument と Graph Screen Host も付ける。前からある Graph Runner に無ければ、付けるか尋ねる
+- 変更: UI Toolkit 版の Starter をシーン 1 つにする。Title・Game・Ready / Paused / Solved（Game の上に重なる）・Game Over / All Clear をノードの画面にする
+  - ゲームのスクリプトは Graph Runner に付き、Game の画面が出たら盤を探す。Title は Enter（か Start のボタン）で始める
+- 削除（破壊的変更）: Scene ノードの Screen の行（シーンの UIDocument の UXML を開く・作る Edit Screen / Create Screen…）と `SceneScreens`。画面はノードの Screen に入れる
+
 ## [0.16.1] - 2026-10-13
 - 修正: Scene ノードの Screen の行が、インスペクタを開いたときのシーンのままだった（シーンを入れても「Assign a scene first.」のまま、変えると前のシーンに Create Screen… した）。Scene の欄を変えたら作り直し、押したときのシーンを使う
 - 修正: 開いているシーンに Create Screen… すると、保存するまで Edit Screen に出ず、もう一度押すと 2 つ目の UXML と `UI` ができた。開いているシーンの UIDocument の画面も探す
