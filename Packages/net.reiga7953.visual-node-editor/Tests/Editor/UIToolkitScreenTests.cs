@@ -186,5 +186,27 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(AssetDatabase.GetAssetPath(settings.themeStyleSheet), Is.EqualTo(Folder + "/Runtime Theme.tss"));
             Assert.That(ScreenAssets.FindOrCreateTheme(Folder), Is.SameAs(settings.themeStyleSheet), "made once per folder");
         }
+
+        [Test]
+        public void ThePlayDialogs_SayWhatTheScreenHostAdds()
+        {
+            // Panel Settings を作ったら Undo では消えないので、作るときは先に書く
+            var graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            try
+            {
+                graph.name = "Game";
+                var text = Reiga.VisualNodeEditor.Editor.Play.PlaySetup.DescribeScreenHost(graph, "It also gets");
+                Assert.That(text, Does.StartWith("It also gets a UI Document and a Graph Screen Host"));
+                Assert.That(text.Contains("Panel Settings.asset"), Is.EqualTo(ScreenAssets.FindPanelSettings() == null));
+
+                ScreenAssets.CreatePanelSettings(Folder + "/Panel Settings.asset");
+                Assert.That(Reiga.VisualNodeEditor.Editor.Play.PlaySetup.DescribeScreenHost(graph, "It gets"), Does.Not.Contain("Panel Settings.asset"),
+                    "the project's Panel Settings are used");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(graph);
+            }
+        }
     }
 }
