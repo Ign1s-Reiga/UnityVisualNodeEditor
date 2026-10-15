@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1] - 2026-10-15
+- 修正: Paused・Solved の画面を重ねる・外すたびに、下の Game の画面まで外して付け直していた（中のコントロールが聞き直し、フォーカスも外れた）。下から変わらないところまでは付けたままにし、変わったところから上だけを付け直す
+- 修正: UIDocument の根がまだ無い（Panel Settings が無い・無効）間に場所が替わると、Graph Screen Host が次に場所が替わるまで画面を出さなかった。出せるようになるまでフレームごとに試す
+- 修正: UI Toolkit 版の Starter をシーン無しで作るとき・シーンを作れなかったときのメッセージが「スクリプトを盤に付ける」と案内していた。UIDocument と Graph Screen Host の付いた Graph Runner に付けるよう案内する
+- 修正: Play で Graph Runner・Graph Screen Host を付ける確認に、UIDocument と Graph Screen Host が付くこと、Panel Settings がプロジェクトに無ければグラフの隣に作ること（Undo では消えない）を書く
+- 文書: 0.16 の Scene ノードの Create Screen… で作った画面の移し方（その UXML をノードの Screen に入れ、シーンの `UI` を消す。残すと 2 枚重なる）を README に書く
+
 ## [0.17.0] - 2026-10-15
 - 追加: 画面（タイトル・設定・ポーズ・HUD）をノードに付ける。State・Scene・Container ノードのインスペクタの Screen に UXML を入れる
   - 空なら Create Screen… で、グラフの隣に `<グラフ名> <ノード名>.uxml` を作って入れ、UI Builder で開く（入れたことは Undo できる）。入っていれば Edit Screen で開く
