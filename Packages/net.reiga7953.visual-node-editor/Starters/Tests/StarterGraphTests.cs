@@ -157,6 +157,50 @@ namespace Reiga.VisualNodeEditor.Starters.Tests
             Assert.That(_runner.GetInt("Level"), Is.EqualTo(1), "the Game scene node starts again from level 1");
         }
 
+        [Test]
+        public void SnakeToolkitGraph_IsOneScene_ThatGoesStraightToTheTitle()
+        {
+            _graph = SnakeToolkitStarter.Instance.BuildGraph();
+            Assert.That(GraphValidator.Validate(_graph).Where(issue => issue.Kind != GraphIssueKind.SceneNotSet).Select(issue => issue.Message), Is.Empty);
+            Assert.That(_graph.Nodes.OfType<SceneNode>().Select(node => node.Title), Is.EqualTo(new[] { "Main" }));
+
+            _runner = new GraphRunner(_graph);
+            _runner.Start();
+            Assert.That(Current, Is.EqualTo("Title"), "the title is a screen in the one scene");
+
+            Assert.That(_runner.Raise("Start"), Is.True);
+            Assert.That(Current, Is.EqualTo("Ready"));
+            Assert.That(Path, Is.EqualTo("Round"));
+            _runner.Raise("Go");
+            _runner.Raise("Crash");
+            Assert.That(Current, Is.EqualTo("Game Over"));
+            Assert.That(_runner.Raise("Title"), Is.True);
+            Assert.That(Current, Is.EqualTo("Title"));
+        }
+
+        [Test]
+        public void PuzzleToolkitGraph_StartsEveryGameAtLevel1_FromTheTitle()
+        {
+            _graph = SlidingPuzzleToolkitStarter.Instance.BuildGraph();
+            Assert.That(GraphValidator.Validate(_graph).Where(issue => issue.Kind != GraphIssueKind.SceneNotSet).Select(issue => issue.Message), Is.Empty);
+
+            _runner = new GraphRunner(_graph);
+            _runner.Start();
+            Assert.That(Current, Is.EqualTo("Title"));
+            _runner.SetInt("Level", 3);
+
+            Assert.That(_runner.Raise("Start"), Is.True);
+            Assert.That(Current, Is.EqualTo("Playing"));
+            Assert.That(Path, Is.EqualTo("Levels › Level"));
+            _runner.Raise("Solved");
+            Assert.That(_runner.Raise("Next"), Is.True);
+            Assert.That(Current, Is.EqualTo("All Clear"), "level 3 is the last");
+
+            Assert.That(_runner.Raise("Title"), Is.True);
+            Assert.That(Current, Is.EqualTo("Title"));
+            Assert.That(_runner.GetInt("Level"), Is.EqualTo(1), "the Title node starts the next game from level 1");
+        }
+
         private string Current => _runner.Current?.Title;
 
         private string Path => string.Join(" › ", _runner.ContainerPath.Select(container => container.Title));

@@ -4,11 +4,11 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 {
     /// <summary>
     /// ゲームの Starter の UI Toolkit 版の画面（UXML と USS）の中身。画面は UI Builder でそのまま開いて直せる、ふつうの UXML / USS として書き出す。
-    /// UXML には <c>graph</c> を書かない（コントロールは実行中のグラフを使う）。
+    /// UXML には <c>graph</c> を書かない（コントロールは実行中のグラフを使う）。画面はグラフのノードに付け、Graph Screen Host が重ねて出す。
     /// </summary>
     internal static class StarterScreens
     {
-        /// <summary>Title と Game の画面が共有する USS（uGUI 版の見た目に合わせる）。</summary>
+        /// <summary>どの画面も共有する USS（uGUI 版の見た目に合わせる）。</summary>
         internal const string Style =
             "/* Screens of a Visual Node Editor starter. Edit them in UI Builder. */\n" +
             "\n" +
@@ -94,20 +94,30 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             "}\n";
 
         /// <summary>
-        /// Title の画面: 見出し（グラフ名）・操作の説明・<paramref name="startEvent"/> を Raise する Start の Graph Button。
+        /// Title の画面: 見出し（グラフ名）・操作の説明・<paramref name="startEvent"/> を Raise する Start の Graph Button・（あれば）キーの案内 <paramref name="hint"/>。
         /// <paramref name="styleFile"/> は同じフォルダの USS のファイル名。
         /// </summary>
-        internal static string Title(string heading, string controls, string startEvent, string styleFile) =>
+        internal static string Title(string heading, string controls, string startEvent, string styleFile, string hint = null) =>
             Screen(styleFile,
                 $"        <ui:Label name=\"heading\" text=\"{Escape(heading)}\" class=\"vne-starter-heading\" />\n" +
                 $"        <ui:Label name=\"controls\" text=\"{Escape(controls)}\" class=\"vne-starter-controls\" />\n" +
-                $"        {Button("start", "Start", startEvent)}\n");
+                $"        {Button("start", "Start", startEvent)}\n" +
+                (hint != null ? $"        {Label(hint, "vne-starter-panel__hint")}\n" : string.Empty));
 
         /// <summary>画面の UXML: USS を読み、<c>screen</c> の要素の中に <paramref name="body"/>（行ごとに字下げ済みの UXML）を置く。</summary>
-        internal static string Screen(string styleFile, string body) =>
+        internal static string Screen(string styleFile, string body) => Document(styleFile, "class=\"vne-starter-screen\"", body);
+
+        /// <summary>
+        /// 下の画面（Game）の上に重ねる画面の UXML: 画面いっぱいの <c>screen</c>（既定は下を暗くする <c>vne-starter-panel</c>）の中に <paramref name="body"/>。
+        /// <paramref name="passClicks"/> なら枠はクリックを受けない（下の画面をふさがない。暗くしない案内だけの画面に使う）。
+        /// </summary>
+        internal static string Overlay(string styleFile, string body, string cssClass = "vne-starter-panel", bool passClicks = false) =>
+            Document(styleFile, $"class=\"{cssClass}\"" + (passClicks ? " picking-mode=\"Ignore\"" : string.Empty), body);
+
+        private static string Document(string styleFile, string screenAttributes, string body) =>
             "<ui:UXML xmlns:ui=\"UnityEngine.UIElements\" xmlns:vne=\"Reiga.VisualNodeEditor\" editor-extension-mode=\"False\">\n" +
             $"    <Style src=\"{Escape(styleFile)}\" />\n" +
-            "    <ui:VisualElement name=\"screen\" class=\"vne-starter-screen\">\n" +
+            $"    <ui:VisualElement name=\"screen\" {screenAttributes}>\n" +
             body +
             "    </ui:VisualElement>\n" +
             "</ui:UXML>\n";
