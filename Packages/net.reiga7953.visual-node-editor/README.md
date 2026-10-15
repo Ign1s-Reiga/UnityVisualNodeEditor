@@ -83,6 +83,7 @@ public class PlayerMovement : NodeBehaviour
 画面はシーンではなく、State・Scene・Container ノードに付ける（インスペクタの Screen。Create Screen… で作って UI Builder で開き、Edit Screen で開く）。
 Graph Runner に付けた `Graph Screen Host`（UIDocument と一緒に）が、入っているコンテナの画面の上に、今のノードの画面を重ねて出す。
 ツールバーの Play で Graph Runner を置くとき、ノードに画面があれば一緒に付く。
+0.16 の Scene ノードの Create Screen… で作った画面（シーンの `UI` の UIDocument）は、その UXML をノードの Screen に入れ、シーンの `UI` を消すと移せる（残すと 2 枚重なる）。
 
 UI Builder の Library に、グラフに繋がるコントロールが出る（コード無し）。`graph` 属性を入れると、イベント名などをグラフから選べる（空なら実行中のグラフ）。
 
