@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0] - 2026-10-16
+ADV・パズル・2D アクションを、このツールで組めるようになった最初の安定版。
+
+- 追加: 2D アクション向けの部品（サンプルは同梱しない）
+  - Graph Trigger 2D: タグの合う物（既定 `Player`）が Collider 2D に触れたら、パラメータを変え（上から順）、イベントを Raise する（ゴール・トゲ・コイン・チェックポイント・扉）。Is Trigger でも、ぶつかるコライダーでも動く。Once・Deactivate（触れたら消す）
+  - Graph Spawn Point 2D: シーンが始まったら、String パラメータ（既定 `SpawnPoint`）が名前を指す地点にプレイヤーを置く（どれも指していなければ Default の地点）。Rigidbody 2D の勢いも消す
+  - Graph Trigger 2D と Graph Spawn Point 2D は、Unity の Physics 2D モジュールがあるときだけコンパイルする（`Integrations/Physics2D`）
+  - Graph Destroy Trigger: この GameObject が壊された・無効になったら、パラメータを変え、イベントを Raise する（敵・ボス）。シーンを閉じるときは起こさない
+  - 振る舞い Timer: ノードにいる間、時間を数え、時間になったらイベントを Raise する。残り時間を Float パラメータに出せる。Keep Counting なら、ポーズを挟んでも制限時間が戻らない
+- 追加: Scene ノードの Reload。同じシーンにいるまま入り直したら、シーンを読み込み直す（やり直し・ミスからの再開）。既定はオフ（これまでと同じ）
+- 追加: `ISceneLoader.ReloadScene`（既定の実装は `LoadScene` を呼ぶので、自前の読み込み方はそのまま動く）、`SceneReference.IsSameSceneAs`
+- 変更: Set Parameter と同じパラメータの変更の欄を、コンポーネント（Graph の欄のグラフ）でも使えるようにする。グラフの中の振る舞いのパラメータ名の欄も、そのグラフから選べる
+
 ## [0.17.1] - 2026-10-15
 - 修正: Paused・Solved の画面を重ねる・外すたびに、下の Game の画面まで外して付け直していた（中のコントロールが聞き直し、フォーカスも外れた）。下から変わらないところまでは付けたままにし、変わったところから上だけを付け直す
 - 修正: UIDocument の根がまだ無い（Panel Settings が無い・無効）間に場所が替わると、Graph Screen Host が次に場所が替わるまで画面を出さなかった。出せるようになるまでフレームごとに試す
