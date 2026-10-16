@@ -1,0 +1,24 @@
+{
+  "name": "Reiga.VisualNodeEditor.Physics2D.Editor",
+  "rootNamespace": "Reiga.VisualNodeEditor.Physics2D.Editor",
+  "references": [
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.Physics2D"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["VNE_PHYSICS2D"],
+  "versionDefines": [
+    {
+      "name": "com.unity.modules.physics2d",
+      "expression": "1.0.0",
+      "define": "VNE_PHYSICS2D"
+    }
+  ],
+  "noEngineReferences": false
+}

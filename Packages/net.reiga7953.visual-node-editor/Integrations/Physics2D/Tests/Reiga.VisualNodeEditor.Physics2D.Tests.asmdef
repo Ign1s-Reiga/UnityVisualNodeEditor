@@ -1,0 +1,27 @@
+{
+  "name": "Reiga.VisualNodeEditor.Physics2D.Tests",
+  "rootNamespace": "Reiga.VisualNodeEditor.Physics2D.Tests",
+  "references": [
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "Reiga.VisualNodeEditor",
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.Physics2D",
+    "Reiga.VisualNodeEditor.Physics2D.Editor"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "VNE_PHYSICS2D"],
+  "versionDefines": [
+    {
+      "name": "com.unity.modules.physics2d",
+      "expression": "1.0.0",
+      "define": "VNE_PHYSICS2D"
+    }
+  ],
+  "noEngineReferences": false
+}
