@@ -76,6 +76,22 @@ Yarn はノードの途中から再開できないので、会話の途中でセ
 コンテナは何段でも入れ子にできる（スライドパズルの Starter は Levels › Level の 2 段）。
 詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「ゲーム向けのコンポーネント」「組み込みの振る舞い」「ゲームの Starter」を参照。
 
+## 2D アクションを作る
+
+プレイヤー・敵の動きはゲームのコードに書き、ゴール・ミス・コイン・ボス・制限時間・チェックポイント・やり直しは、コードを書かずにグラフで扱える（サンプルは同梱しない）。
+
+| やりたいこと | 使うもの |
+|---|---|
+| ゴールに触れたらクリア、トゲでミス、コインで `Coins += 1` | `Graph Trigger 2D`（タグの合う物が Collider 2D に触れたら、パラメータを変えてイベントを Raise。Once・触れたら消す） |
+| 敵・ボスを倒したら `Enemies -= 1`・`BossDefeated` | `Graph Destroy Trigger`（壊された・無効になったら。シーンを閉じるときは数えない） |
+| 制限時間・「Ready… Go!」 | 振る舞い `Timer`（時間になったらイベント。残り時間を Float パラメータに出せる。Keep Counting ならポーズを挟んでも戻らない） |
+| チェックポイント・扉から再開する | `Graph Spawn Point 2D`（String パラメータ `SpawnPoint` が名前を指す地点にプレイヤーを置く）と、Graph Trigger 2D で `SpawnPoint = "Checkpoint 2"` |
+| ミスしたらステージをやり直す | Scene ノードの **Reload**（同じシーンにいるまま入り直したら、シーンを読み込み直す） |
+
+- 変更は先、イベントは後: `Lives -= 1` と `Died` を同じトリガーに入れれば、`Lives <= 0` の条件で Game Over へ分けられる
+- Graph Trigger 2D と Graph Spawn Point 2D は、Unity の Physics 2D モジュールがあるときだけ使える（`Integrations/Physics2D`）
+- 詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「2D アクション向けの部品」
+
 ## UI Toolkit で画面を作る（UI Builder）
 
 ランタイムの UI Toolkit（UIDocument・UXML・USS）でも、コードを書かずに画面をグラフに繋げられる。画面の配置は Unity の UI Builder で行う。
