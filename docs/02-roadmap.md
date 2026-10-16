@@ -156,6 +156,19 @@ Graph Screen Host が今の場所の画面を重ねて出す（コンテナの H
 - [x] Starter の UI Toolkit 版をシーン 1 つ・ノードの画面にする
 - [x] README・Wiki
 
+## 2D アクション向けの部品
+
+ADV・パズルに続いて、2D アクションもこのツールで作れるようにする。遊び（プレイヤー・敵の動き）は C# に書き、ゴール・ミス・コイン・ボス・制限時間・チェックポイント・やり直しをグラフで扱う。
+設計は `docs/01-architecture.md` の「2D アクション向けの部品」。
+
+決めたこと（ユーザーの回答）: サンプル（Starter）は作らない。部品は 4 つすべて: Trigger 2D（タグの合う物が触れたらイベント・パラメータ）、
+壊された・無効になったらイベント・パラメータ、Timer の振る舞い、Spawn Point とチェックポイント。やり直しは Scene ノードの Reload（既定はオフ）。
+
+- [x] コア: `TimerBehaviour`、`GraphDestroyTrigger`（と `GraphReactions`）、Scene ノードの Reload（`ISceneLoader.ReloadScene`）
+- [x] Physics 2D 連携（任意のアセンブリ）: `GraphTrigger2D`・`GraphSpawnPoint2D`、インスペクタの注意
+- [x] `ParameterChangeDrawer` をコンポーネント（`_graph` のグラフ）でも使えるようにする
+- [x] README・Wiki
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
