@@ -61,7 +61,7 @@ public class PlayerMovement : NodeBehaviour
 - グラフはアセットなので、シーンのオブジェクトはフィールドで参照できない。`Host` や `FindFirstObjectByType` から実行時に引く
 - 値は `Start()` のたびにアセットから複製されるので、実行中に書き換えてもアセットには残らない
 - 組み込みの振る舞い（Add Behaviour > Visual Node Editor）: `Set Parameter`（ノードに入ったら `Score = 0`・`Level += 1` などを行う）、
-  `Time Scale`（ノードにいる間 `Time.timeScale` を変える。ポーズ用）
+  `Time Scale`（ノードにいる間 `Time.timeScale` を変える。ポーズ用）、`Timer`（時間になったらイベントを Raise する。残り時間を Float パラメータに出せる）
 
 ## 画面と入力をグラフに繋ぐ（コード無し）
 
@@ -71,6 +71,15 @@ public class PlayerMovement : NodeBehaviour
 - `Graph Parameter Text`: パラメータの値を、同じ GameObject のテキスト（uGUI の Text・TextMeshPro）に `Score: {0}` のような書式で出す
 - `Graph Event Key`: キーを押したら Raise / Advance する（Esc → Pause）。キーは `GraphInput.GetKeyDown(KeyCode)` で読み、旧 Input Manager でも Input System でも動く
 - `Graph Event Button`: ボタンのクリックで Raise / Advance / Save / Load する
+
+## 2D アクション向けの部品
+
+- `Graph Trigger 2D`: タグの合う物（既定 `Player`）が同じ GameObject の Collider 2D に触れたら、パラメータを変え（上から順）、イベントを Raise する（ゴール・トゲ・コイン・チェックポイント）。Once・Deactivate（触れたら消す）
+- `Graph Destroy Trigger`: この GameObject が壊された・無効になったら、パラメータを変え、イベントを Raise する（敵・ボス）。シーンを閉じるときは起こさない
+- `Graph Spawn Point 2D`: シーンが始まったら、String パラメータ（既定 `SpawnPoint`）が名前を指す地点にプレイヤー（タグ `Player`）を置く。どれも指していなければ Default の地点
+- Scene ノードの Reload: 同じシーンにいるまま入り直したら、シーンを読み込み直す（やり直し・ミスからの再開）
+
+パラメータを変えるには、コンポーネントの Graph を決める（Blackboard から選ぶ）。Graph Trigger 2D と Graph Spawn Point 2D は、Unity の Physics 2D モジュールがあるときだけ使える。
 
 ## ゲームの Starter
 

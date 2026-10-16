@@ -925,8 +925,18 @@ namespace Reiga.VisualNodeEditor
             switch (node)
             {
                 case SceneNode sceneNode when !sceneNode.Scene.IsEmpty:
+                    // Reload: このグラフがもうこのシーンにいれば、読み込み直す（開始したときは LastScene が空なので、Play を押したシーンを読み直さない）
+                    var reload = sceneNode.Reload && LastScene.IsSameSceneAs(sceneNode.Scene);
                     LastScene = sceneNode.Scene;
-                    _sceneLoader?.LoadScene(sceneNode.Scene);
+                    if (reload)
+                    {
+                        _sceneLoader?.ReloadScene(sceneNode.Scene);
+                    }
+                    else
+                    {
+                        _sceneLoader?.LoadScene(sceneNode.Scene);
+                    }
+
                     break;
                 case EventNode eventNode:
                     TriggerEvent(eventNode.EventName);

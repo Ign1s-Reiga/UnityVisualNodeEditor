@@ -368,6 +368,65 @@ Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブ
 - `KeyCode` → `Key` は名前で対応させ、名前の違うもの（`Alpha1` → `Digit1`、`Return` → `Enter`、`Keypad1` → `Numpad1`、`LeftControl` → `LeftCtrl` など）は表で持つ。マウス・ジョイスティックの `KeyCode` は扱わない（false）
 - 開発用プロジェクトには Input System を入れない（入れると Unity が入力の設定を切り替えて再起動するか尋ねる）。連携は、Input System を足した使い捨てのプロジェクトで EditMode テストを走らせて確かめる
 
+### 2D アクション向けの部品
+
+2D アクション（横スクロール・見下ろし）の「遊びの出来事 → グラフ」の繋ぎを、コードを書かずに置けるようにする（ゴール → クリア、トゲ → ミス、コイン → `Coins += 1`、
+ボスを倒す → クリア、制限時間、チェックポイント・扉からの再開、やり直しでシーンを戻す）。プレイヤーの動き・敵の動きはゲームのコード（グラフは流れだけ）。サンプルは同梱しない。
+
+| 型 | 役割 | 置き場所 |
+|---|---|---|
+| `GraphTrigger2D`（Add Component > Visual Node Editor > Graph Trigger 2D） | タグの合う物（既定 `Player`）が入った・出たら、パラメータを変え、イベントを Raise する | Physics 2D 連携 |
+| `GraphSpawnPoint2D`（Graph Spawn Point 2D） | シーンが始まったら、String パラメータ（既定 `SpawnPoint`）が名前を指す地点へプレイヤーを置く | Physics 2D 連携 |
+| `GraphDestroyTrigger`（Graph Destroy Trigger） | この GameObject が壊された・無効になったら、パラメータを変え、イベントを Raise する（敵・ボス） | コア |
+| `TimerBehaviour`（Add Behaviour > Visual Node Editor/Timer） | ノードにいる間、時間を数え、時間になったらイベントを Raise する。残り時間を Float パラメータに出せる | コア |
+| Scene ノードの **Reload** | 同じシーンにいるまま、もう一度この Scene ノードに入ったら、シーンを読み込み直す（やり直し・ミスからの再開） | コア |
+
+パラメータの変更とイベント（`GraphTrigger2D`・`GraphDestroyTrigger` 共通。`GraphReactions`）:
+- グラフは任意（空なら実行中のどれか）。ただしパラメータを変えるには、グラフを決める（変更は `ParameterChange` でパラメータを ID で指すため。
+  インスペクタではグラフの Blackboard から選ぶ。Set Parameter の振る舞いと同じ欄）。グラフが無いのに変更があれば、インスペクタで注意を出し、実行時は変更を飛ばして 1 度だけ警告を出す
+- 変更（上から順）を先に行い、その後でイベントを Raise する（`Lives -= 1` の後に `Died` を起こせば、`Lives <= 0` の条件で Game Over へ分けられる）
+- イベント名は空でもよい（パラメータを変えるだけ。コイン）。Raise しても遷移が無ければ何も言わない（Graph Event Key と同じ）。Runner が無ければ何もしない
+
+`GraphTrigger2D`:
+- 同じ GameObject の Collider2D に触れたもの（`OnTriggerEnter2D` と `OnCollisionEnter2D`。`When` が Exit なら出たとき）を、タグ `_tag` で絞る（空なら何でも）。
+  触れた Collider2D の GameObject か、その Rigidbody2D の GameObject のタグを見る（プレイヤーのコライダーが子にあってもよい）。タグは文字列で比べる（未定義のタグでもエラーを出さない）
+- `Once`: 1 度だけ（シーンを読み込み直すと、また 1 度）。`Deactivate`: 起こした後、この GameObject を無効にする（コイン・1 度だけの扉）
+- Collider2D が無い・Trigger でも Rigidbody2D がどちらにも無い、などはインスペクタで注意を出す（判定は物理の決まりどおり）
+
+`GraphDestroyTrigger`:
+- この GameObject が無効になったとき（`OnDisable`。`Destroy` されたときも、その前に呼ばれる。このコンポーネントを切ったときも）に起こす
+- シーンを閉じるとき（Single の読み込み・Play を終える・アプリを終える）の無効化では起こさない（`gameObject.scene.isLoaded` が false、または `Application.quitting` の後）
+- 1 度だけにしない（プールして使い回す敵は、倒すたびに起こす）
+
+`GraphSpawnPoint2D`:
+- 名前 `_pointName`（空なら GameObject の名前）。String パラメータ `_parameter`（既定 `SpawnPoint`、グラフの Blackboard から選ぶ）の値がこの名前なら、
+  シーンが始まったとき（`Start`。Runner がまだ始まっていなければ次のフレームにもう一度）に、タグ `_playerTag`（既定 `Player`）の GameObject をこの位置へ置く
+- `Default`: パラメータがこのシーンのどの Spawn Point も指していない（空・別のシーンの名前）ときは、ここに置く（2 つ以上あれば名前の順で最初のもの。同じシーンの、同じパラメータを見る地点の中で選ぶ）
+- プレイヤーに Rigidbody2D があれば、位置を移し、速度と角速度を 0 にする（落ちている途中の勢いを持ち越さない）
+- チェックポイント・扉は Graph Trigger 2D で作る: `SpawnPoint = "Checkpoint 2"`（ミスしたらそこから）、`SpawnPoint = "FromCave"` と `EnterCave` を Raise（次のシーンの FromCave に出る）。
+  パラメータなので、セーブ・ロードにも残る
+- コードからは `Spawn(GameObject)` で置ける（プレイヤーを後から作るゲーム）
+
+`TimerBehaviour`:
+- `Seconds`（既定 3）、時間になったら Raise するイベント名（空でもよい）、残り時間を出す Float パラメータ（任意。グラフの Blackboard から選ぶ。Graph Parameter Text で表示する）
+- 時間は Runner の `Update` の `deltaTime`（`Time.deltaTime`）で数える（`Time Scale 0` のポーズ中は止まる）。時間になったら 1 度だけ Raise する
+- `Keep Counting`（パラメータを決めたときだけ）: 入るたびに `Seconds` から数え直さず、パラメータの今の値から数え続ける（Playing ⇄ Paused を行き来しても、制限時間が戻らない）。
+  始めの値は、ステージの始めの State の Set Parameter で入れる（`Time = 300`）。値が 0 以下なら、入ったすぐ後の Update で時間になる
+- 例: Ready に `Timer 2 → Go`（Ready… Go!）、Playing に `Timer 300 → TimeUp`（Keep Counting、パラメータ `Time`）
+- ノードには `Timer 3 s → Go` と出す（`Describe`）。イベント名もパラメータも無い・パラメータが無い・Float でないときは検証の問題（`GetIssues`）
+
+Scene ノードの Reload（`SceneNode._reload`）:
+- 既定はオフ（これまでどおり: 同じシーンへ戻っても読み込み直さず、オブジェクトは状態を保つ。ADV・パズルの流れは変わらない）
+- オンなら、Runner が最後に読み込んだシーン（`LastScene`）がこのシーンのとき、もう一度入ると読み込み直す（`ISceneLoader.ReloadScene`）。
+  ゲームの開始（Play を押したシーンが最初の Scene ノードのシーン）では、`LastScene` が空なので読み込み直さない（二重に読み込まない）
+- `ISceneLoader.ReloadScene` は既定の実装を持ち（`LoadScene` と同じ）、前からある自前の読み込み方を壊さない。`SceneManagerSceneLoader` は、同じシーンを読み込み中でなければ読み込む
+- インスペクタの「同じシーンへ戻っても読み込まない」の注意に、Reload で読み込み直せることを書き足す
+
+Physics 2D 連携（任意、`Integrations/Physics2D/`。アセンブリ `Reiga.VisualNodeEditor.Physics2D` / `.Physics2D.Editor` / `.Physics2D.Tests`）:
+- Unity の Physics 2D モジュール（`com.unity.modules.physics2d`）が有効なときだけコンパイルする（`versionDefines` で `VNE_PHYSICS2D`、`defineConstraints`）。
+  コアのアセンブリから Physics 2D を参照しない（ADV だけのプロジェクトでモジュールを切っても動く）
+- 開発用プロジェクトの `Packages/manifest.json` にはモジュールを入れる（連携のテストを走らせるため）
+
 ### UI Toolkit の画面（UI Builder で組む）
 
 ランタイムの UI Toolkit（`UIDocument` と UXML / USS）でも、uGUI と同じことをコード無しでできるようにする。画面の配置は Unity の UI Builder（2D の編集画面）で行い、
@@ -489,6 +548,7 @@ Runner がそのノードにいる間の処理（`Update` / `FixedUpdate` 相当
 |---|---|
 | `SetParameterBehaviour`（`Visual Node Editor/Set Parameter`） | ノードに入ったとき、パラメータを変える。変更の一覧 `_changes`（`ParameterChange`: パラメータの ID・操作 `Set` / `Add`・型ごとの値）を上から順に行う。例: ラウンドの始めに `Score = 0`、次のレベルへ進むときに `Level += 1` |
 | `TimeScaleBehaviour`（`Visual Node Editor/Time Scale`） | ノードにいる間 `Time.timeScale` を変え（既定 0 = 止める）、出るとき（`Stop()` でも）入る前の値に戻す。ポーズの State に付ける |
+| `TimerBehaviour`（`Visual Node Editor/Timer`） | ノードにいる間、時間を数え、時間になったらイベントを Raise する。残り時間を Float パラメータに出せる（上の「2D アクション向けの部品」） |
 
 - `ParameterChange` はパラメータを ID で指す（改名しても壊れない。条件と同じ）。`Add` は Int・Float だけ。値は型ごとの欄（`_boolValue` / `_intValue` / `_floatValue` / `_stringValue`）
 - 実行時、無いパラメータ・型に合わない操作は飛ばして警告を出す。検証では Error（`GetIssues`）
@@ -1014,7 +1074,7 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - Create Scene… は、空のシーン（Camera と Light）を追加で開いて保存し、すぐ閉じる。今開いているシーンは切り替えない。
   未保存の無題のシーンが開いているとき（Unity が追加でシーンを作れない）と Play 中は作らず、理由を出す
 - Scene ノードのインスペクタには「読み込み済みのシーンへ戻っても読み直さない（シーンの中の物は前の状態のまま）」ことを常に小さく出す
-  （ランタイムは、アクティブなシーンと同じシーンへの遷移では読み込まない。`SceneManagerSceneLoader`）
+  （ランタイムは、アクティブなシーンと同じシーンへの遷移では読み込まない。`SceneManagerSceneLoader`）。Reload をオンにすれば読み込み直せることも書く（上の「2D アクション向けの部品」）
 
 ### Graph Event Button のインスペクタ（`GraphEventButtonEditor`）
 

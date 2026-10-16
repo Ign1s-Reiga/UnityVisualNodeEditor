@@ -34,5 +34,24 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>シーンが設定されていないか。</summary>
         public bool IsEmpty => string.IsNullOrEmpty(_guid) && string.IsNullOrEmpty(_path);
+
+        /// <summary>
+        /// <paramref name="other"/> と同じシーンを指すか。どちらにも GUID があれば GUID で、無ければパスで比べる（改名・移動しても GUID は変わらない）。
+        /// どちらかが空なら false。
+        /// </summary>
+        public bool IsSameSceneAs(SceneReference other)
+        {
+            if (other == null || IsEmpty || other.IsEmpty)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(_guid) && !string.IsNullOrEmpty(other._guid))
+            {
+                return _guid == other._guid;
+            }
+
+            return !string.IsNullOrEmpty(_path) && _path == other._path;
+        }
     }
 }

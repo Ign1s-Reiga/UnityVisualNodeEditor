@@ -59,10 +59,15 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
 
         /// <summary>
         /// <paramref name="property"/> と同じ並びにある <c>graph</c>（UI Toolkit のコントロールの属性・コンポーネントのフィールド）のグラフ。
-        /// <c>_graph</c> / <c>graph</c> / <c>Graph</c> の順に探す。無ければ null。
+        /// <c>_graph</c> / <c>graph</c> / <c>Graph</c> の順に探す。グラフのアセットの中（ノードの振る舞いのフィールド）なら、そのグラフ。無ければ null。
         /// </summary>
         public static NodeGraphAsset FindSiblingGraph(SerializedProperty property)
         {
+            if (property.serializedObject.targetObject is NodeGraphAsset owner)
+            {
+                return owner;
+            }
+
             var path = property.propertyPath;
             var dot = path.LastIndexOf('.');
             var parent = dot < 0 ? string.Empty : path.Substring(0, dot + 1);

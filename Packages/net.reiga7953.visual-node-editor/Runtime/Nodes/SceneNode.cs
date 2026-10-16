@@ -12,6 +12,10 @@ namespace Reiga.VisualNodeEditor
     {
         [SerializeField] private SceneReference _scene = new SceneReference();
 
+        [Tooltip("Coming back to this node while the graph is still in this scene loads the scene again (retries, respawns), so its objects start over. " +
+                 "Off: the scene is not loaded again and its objects keep their state.")]
+        [SerializeField] private bool _reload;
+
         // インスペクタでは専用の欄（Create Screen… / Edit Screen 付き）で編集する（NodeInspectorView が名前で除外する）
         [Tooltip("The UI Toolkit screen (UXML) shown while the graph is on this node.")]
         [SerializeField] private VisualTreeAsset _screen;
@@ -29,6 +33,16 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>シーン名。未設定なら空文字。</summary>
         public string SceneName => _scene.Name;
+
+        /// <summary>
+        /// 同じシーンにいるまま（Runner が最後に読み込んだシーンがこのシーンのとき）このノードに入り直したら、シーンを読み込み直すか（やり直し・ミスからの再開）。
+        /// 既定は false（読み込み直さず、シーンの中の物は前の状態のまま）。
+        /// </summary>
+        public bool Reload
+        {
+            get => _reload;
+            set => _reload = value;
+        }
 
         /// <inheritdoc />
         public VisualTreeAsset Screen

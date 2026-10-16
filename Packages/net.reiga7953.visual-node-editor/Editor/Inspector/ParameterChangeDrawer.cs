@@ -25,10 +25,17 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         private const string MissingLabel = "(missing)";
         private const string ChooseLabel = "(choose)";
 
+        /// <summary>コンポーネントのグラフのフィールド名（Graph Destroy Trigger などの変更の欄は、ここのグラフの Blackboard から選ぶ）。</summary>
+        internal const string ComponentGraphPropertyName = "_graph";
+
+        internal const string NoGraphMessage = "Set the Graph above to choose its parameters.";
+
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
             var serializedObject = property.serializedObject;
-            if (!(serializedObject.targetObject is NodeGraphAsset))
+            var graphProperty = serializedObject.targetObject is NodeGraphAsset ? null : serializedObject.FindProperty(ComponentGraphPropertyName);
+            if (!(serializedObject.targetObject is NodeGraphAsset)
+                && (graphProperty == null || graphProperty.propertyType != SerializedPropertyType.ObjectReference))
             {
                 return new PropertyField(property);
             }
@@ -42,23 +49,43 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 row.Clear();
                 serializedObject.Update();
                 var current = serializedObject.FindProperty(path);
-                if (current != null)
+                var graph = GetGraph(serializedObject);
+                if (current == null)
                 {
-                    Build(row, current, Rebuild);
+                    return;
                 }
+
+                if (graph == null)
+                {
+                    var none = new Label(NoGraphMessage);
+                    none.AddToClassList("vne-parameter-change__none");
+                    row.Add(none);
+                    return;
+                }
+
+                Build(row, current, graph, Rebuild);
             }
 
             Rebuild();
 
-            // Undo などで外から変わったときも、型に合った欄に作り直す
+            // Undo などで外から変わったときも、型に合った欄に作り直す。コンポーネントでは、グラフを変えたときも
             row.TrackPropertyValue(property.FindPropertyRelative(ParameterIdPropertyName), _ => Rebuild());
             row.TrackPropertyValue(property.FindPropertyRelative(OperationPropertyName), _ => Rebuild());
+            if (graphProperty != null)
+            {
+                row.TrackPropertyValue(graphProperty, _ => Rebuild());
+            }
+
             return row;
         }
 
-        private static void Build(VisualElement row, SerializedProperty property, System.Action rebuild)
+        // グラフのアセットの中ならそのグラフ、コンポーネントならその Graph の欄のグラフ（無ければ null）
+        private static NodeGraphAsset GetGraph(SerializedObject serializedObject) =>
+            serializedObject.targetObject as NodeGraphAsset
+            ?? serializedObject.FindProperty(ComponentGraphPropertyName)?.objectReferenceValue as NodeGraphAsset;
+
+        private static void Build(VisualElement row, SerializedProperty property, NodeGraphAsset graph, System.Action rebuild)
         {
-            var graph = (NodeGraphAsset)property.serializedObject.targetObject;
             var idProperty = property.FindPropertyRelative(ParameterIdPropertyName);
             var parameters = graph.Parameters.Where(p => p != null).ToList();
             var parameter = graph.FindParameter(idProperty.stringValue);

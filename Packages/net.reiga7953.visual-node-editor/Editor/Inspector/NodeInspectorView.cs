@@ -20,9 +20,13 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         /// <summary>Scene ノードのシーンのフィールド名（EditMode テストで存在を検証している）。</summary>
         internal const string ScenePropertyName = "_scene";
 
-        /// <summary>Scene ノードのインスペクタに出す、同じシーンへ戻ったときの動き（ランタイムはアクティブなシーンと同じなら読み込まない）。</summary>
+        /// <summary>Scene ノードの Reload のフィールド名（EditMode テストで存在を検証している）。注意はこの欄の下に出す。</summary>
+        internal const string ReloadPropertyName = "_reload";
+
+        /// <summary>Scene ノードのインスペクタに出す、同じシーンへ戻ったときの動き（ランタイムはアクティブなシーンと同じなら読み込まない。Reload なら読み込み直す）。</summary>
         internal const string SceneReloadNote =
-            "Coming back to this scene while it is still loaded does not load it again, so its objects keep their state.";
+            "Coming back to this scene while it is still loaded does not load it again, so its objects keep their state. " +
+            "Turn on Reload to load it again instead (retries, respawns).";
 
         private const string TitlePlaceholder = "(Title)";
         private const string CategoryClassPrefix = "vne-category--";
@@ -95,8 +99,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     field.AddToClassList("vne-inspector-view__field");
                     content.Add(field);
 
-                    // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので、シーンの欄の下に書いておく
-                    if (child.name == ScenePropertyName && asset.Nodes[_index] is SceneNode)
+                    // 同じシーンへ戻ったときの動きは、グラフからは読み取れないので、Reload の欄の下に書いておく
+                    if (child.name == ReloadPropertyName && asset.Nodes[_index] is SceneNode)
                     {
                         var note = new Label(SceneReloadNote);
                         note.AddToClassList("vne-inspector-view__note");
