@@ -24,7 +24,28 @@ namespace Reiga.VisualNodeEditor
                 return;
             }
 
+            Load(GetLoadKey(scene));
+        }
+
+        /// <summary>今いるシーンでも読み込み直す。同じシーンを読み込み中なら何もしない（二重に読み込まない）。</summary>
+        public void ReloadScene(SceneReference scene)
+        {
+            var loadingKey = _loading != null && !_loading.isDone ? _loadingKey : null;
+            if (ShouldReload(scene, loadingKey))
+            {
+                Load(GetLoadKey(scene));
+            }
+        }
+
+        /// <summary>読み込み直しを始めるべきか。シーンが空、または同じシーンを読み込み中（<paramref name="loadingKey"/>）なら false。</summary>
+        public static bool ShouldReload(SceneReference scene, string loadingKey)
+        {
             var key = GetLoadKey(scene);
+            return !string.IsNullOrEmpty(key) && loadingKey != key;
+        }
+
+        private void Load(string key)
+        {
             _loading = SceneManager.LoadSceneAsync(key, LoadSceneMode.Single);
             _loadingKey = _loading != null ? key : null;
         }

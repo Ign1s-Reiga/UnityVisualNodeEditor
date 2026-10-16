@@ -45,6 +45,15 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(scene.FindPropertyRelative(SceneReferenceDrawer.PathPropertyName), Is.Not.Null);
         }
 
+        [Test]
+        public void SceneReloadIsReachable()
+        {
+            var reload = _serializedObject.FindProperty(NodeInspectorView.NodesPropertyName)
+                .GetArrayElementAtIndex(0).FindPropertyRelative(NodeInspectorView.ReloadPropertyName);
+
+            Assert.That(reload?.propertyType, Is.EqualTo(SerializedPropertyType.Boolean));
+        }
+
         [TestCase(typeof(StateNode))]
         [TestCase(typeof(SceneNode))]
         [TestCase(typeof(ContainerNode))]
