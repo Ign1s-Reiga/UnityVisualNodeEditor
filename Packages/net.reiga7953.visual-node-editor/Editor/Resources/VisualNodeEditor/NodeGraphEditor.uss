@@ -389,6 +389,11 @@
   flex-shrink: 0;
 }
 
+.vne-parameter-change__none {
+  color: #8a8a8a;
+  white-space: normal;
+}
+
 .vne-parameter-change__value {
   width: 72px;
   flex-shrink: 0;

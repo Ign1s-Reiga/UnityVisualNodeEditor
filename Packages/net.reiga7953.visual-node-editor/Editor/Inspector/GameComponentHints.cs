@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Reiga.VisualNodeEditor.Editor.Inspector
 {
     /// <summary>
-    /// ゲーム向けのコンポーネント（<see cref="GraphNodeActivator"/>・<see cref="GraphParameterText"/>・<see cref="GraphEventKey"/>）の
+    /// ゲーム向けのコンポーネント（<see cref="GraphNodeActivator"/>・<see cref="GraphParameterText"/>・<see cref="GraphEventKey"/>・<see cref="GraphDestroyTrigger"/> など）の
     /// インスペクタに出す注意（次に何をすればよいか）を決める。
     /// </summary>
     public static class GameComponentHints
@@ -94,6 +94,39 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 {
                     hints.Add($"'{eventName}' is not an event in this graph, so the key will do nothing.");
                 }
+            }
+
+            return hints;
+        }
+
+        /// <summary>
+        /// パラメータを変えてイベントを Raise するコンポーネント（Graph Destroy Trigger・Graph Trigger 2D）の注意。問題が無ければ空。
+        /// </summary>
+        /// <param name="graphEvents">グラフにある Raise できるイベント名。グラフ未設定なら null。</param>
+        /// <param name="eventName">設定されているイベント名。</param>
+        /// <param name="changeCount">パラメータの変更の数（空の行も数える）。</param>
+        /// <param name="changeProblems">変更の問題（パラメータが無いなど。グラフがあるときだけ）。</param>
+        public static List<string> ForReaction(IReadOnlyList<string> graphEvents, string eventName, int changeCount, IEnumerable<string> changeProblems)
+        {
+            var hints = new List<string>();
+            if (string.IsNullOrEmpty(eventName) && changeCount == 0)
+            {
+                hints.Add("Add a parameter change or choose an event, or this does nothing.");
+            }
+
+            if (graphEvents == null && changeCount > 0)
+            {
+                hints.Add("Set the graph to change its parameters. Without it, only the event is raised.");
+            }
+
+            if (!string.IsNullOrEmpty(eventName) && graphEvents != null && graphEvents.Count > 0 && !graphEvents.Contains(eventName, StringComparer.Ordinal))
+            {
+                hints.Add($"'{eventName}' is not an event in this graph, so nothing moves on.");
+            }
+
+            foreach (var problem in changeProblems ?? Enumerable.Empty<string>())
+            {
+                hints.Add($"A parameter change is skipped: {problem}.");
             }
 
             return hints;

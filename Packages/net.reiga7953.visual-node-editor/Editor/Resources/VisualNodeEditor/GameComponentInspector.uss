@@ -1,4 +1,4 @@
-/* Inspectors of the game components: Graph Node Activator, Graph Parameter Text, Graph Event Key */
+/* Inspectors of the game components: Graph Node Activator, Graph Parameter Text, Graph Event Key, Graph Destroy Trigger, Graph Trigger 2D, Graph Spawn Point 2D */
 
 .vne-game-component-inspector__hints {
   margin-top: 6px;
@@ -6,4 +6,32 @@
 
 .vne-game-component-inspector__hints > .unity-help-box {
   margin-bottom: 2px;
+}
+
+/* A parameter change of Graph Destroy Trigger / Graph Trigger 2D (ParameterChangeDrawer; the same rules as in NodeGraphEditor.uss) */
+.vne-parameter-change {
+  flex-direction: row;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.vne-parameter-change__parameter {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 60px;
+}
+
+.vne-parameter-change__operation {
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.vne-parameter-change__value {
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.vne-parameter-change__none {
+  color: #8a8a8a;
+  white-space: normal;
 }
