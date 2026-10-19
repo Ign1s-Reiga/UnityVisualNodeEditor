@@ -386,7 +386,7 @@ Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブ
   インスペクタではグラフの Blackboard から選ぶ。Set Parameter の振る舞いと同じ欄）。グラフが無いのに変更があれば、インスペクタで注意を出し、実行時は変更を飛ばして 1 度だけ警告を出す
 - 変更（上から順）を先に行い、その後でイベントを Raise する（`Lives -= 1` の後に `Died` を起こせば、`Lives <= 0` の条件で Game Over へ分けられる）
 - イベント名は空でもよい（パラメータを変えるだけ。コイン）。Raise しても遷移が無ければ何も言わない（Graph Event Key と同じ）。Runner が無ければ何もしない
-- インスペクタは、イベント名がグラフの Raise できる名前に無ければ注意を出す（グラフにまだ Event ノードが 1 つも無いときも）
+- インスペクタは、イベント名がグラフの Raise できる名前に無ければ注意を出す（グラフにまだ Event ノードが 1 つも無いときも。Graph Event Key も同じ）
 
 `GraphTrigger2D`:
 - 同じ GameObject の Collider2D に触れたもの（`OnTriggerEnter2D` と `OnCollisionEnter2D`。`When` が Exit なら出たとき）を、タグ `_tag` で絞る（空なら何でも）。
@@ -395,18 +395,23 @@ Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブ
   （触れた Collider2D の Rigidbody2D、無ければその GameObject）ごとに、触れているコライダーの組の数を数え、0 → 1 になったとき（Exit なら 1 → 0 になったとき）だけ起こす。
   無効になったら数を捨てる（無効の間に届く Exit は数えない。数えていない物の Exit は無視する）
 - `Once`: 1 度だけ（シーンを読み込み直すと、また 1 度）。`Deactivate`: 起こした後、この GameObject を無効にする（コイン・1 度だけの扉）
-- Collider2D が無いときは、インスペクタで注意を出す（同じ GameObject のもの。Rigidbody2D があれば、子のコライダーも数える。物理の通知は Rigidbody2D の GameObject にも届くため）
+- Collider2D が無いときは、インスペクタで注意を出す（同じ GameObject のもの。Rigidbody2D があれば、その Rigidbody2D に付いた子の有効なコライダーも数える。物理の通知は Rigidbody2D の GameObject にも届くため。無効な子や、自分の Rigidbody2D を持つ子のコライダーは数えない）
 
 `GraphDestroyTrigger`:
-- この GameObject 自身が無効になったとき（`SetActive(false)`。`OnDisable` で `activeSelf` が false）と、壊されたとき（`OnDestroy`）に起こす
-- 親が無効になっただけ（Graph Node Activator で区画ごと隠した・ポーズで親を隠した）、このコンポーネントを切っただけでは起こさない（倒したのではないため）
-- 1 度起こしたら、また有効になるまで起こさない（無効にしてから壊しても 1 回）。プールして使い回す敵は、有効に戻すたびにまた起こせる
-- シーンを閉じるとき（Single の読み込み・Play を終える・アプリを終える）の無効化・破棄では起こさない（`gameObject.scene.isLoaded` が false、または `Application.quitting` の後）
+- 敵の GameObject そのもの（壊される・無効にされる物）に付ける。決めるのは `OnDisable` だけ（そのときの状態で、なぜ無効になったかが分かる）:
+  - この GameObject 自身が無効になった・壊された（`activeSelf` が false。Unity は壊すとき、壊す GameObject を無効にしてから `OnDisable` を呼ぶ）→ 数える
+  - 親が無効になった・親ごと壊された（`activeSelf` は true、`activeInHierarchy` が false。Graph Node Activator で区画ごと隠した・部屋を片付けた）→ 数えない
+  - このコンポーネントを切った（`enabled` が false）→ 数えない
+  - このコンポーネントだけを有効なまま外した（`Destroy(component)`。どちらも有効のまま）→ 数える
+- 隠してから壊したとき・切ってから壊したときは、もう無効なので `OnDisable` が来ず、数えない。数えたくない物は、このコンポーネントを切っておく
+- この Unity の決まりは、`[ExecuteAlways]` の確かめ用コンポーネント（`Tests/Runtime/DisableStateProbe`。Editor だけのアセンブリのコンポーネントは付けられないため）で EditMode テストする
+- 1 度起こしたら、また有効になるまで起こさない。プールして使い回す敵は、有効に戻すたびにまた起こせる
+- シーンを閉じるとき（Single の読み込み・Play を終える・アプリを終える）は起こさない（`gameObject.scene.isLoaded` が false、または `Application.quitting` の後）
 
 `GraphSpawnPoint2D`:
 - 名前 `_pointName`（空なら GameObject の名前）。String パラメータ `_parameter`（既定 `SpawnPoint`、グラフの Blackboard から選ぶ）の値がこの名前なら、
   シーンが始まったとき（`Start`。Runner がまだ始まっていなければ次のフレームにもう一度）に、タグ `_playerTag`（既定 `Player`）の GameObject をこの位置へ置く
-- `Default`: パラメータがこのシーンのどの Spawn Point も指していない（空・別のシーンの名前）ときは、ここに置く（2 つ以上あれば名前の順で最初のもの。同じシーンの、同じグラフ・同じパラメータを見る地点の中で選ぶ）
+- `Default`: パラメータがこのシーンのどの Spawn Point も指していない（空・別のシーンの名前）ときは、ここに置く（2 つ以上あれば名前の順で最初のもの。同じシーンの、同じグラフ・同じパラメータを見る地点の中で選ぶ。グラフは、空なら実行中のグラフと見て比べる（グラフを入れた地点と空の地点が混ざっても、1 つにまとめて選ぶ））
 - プレイヤーに Rigidbody2D があれば、位置を移し、速度と角速度を 0 にする（落ちている途中の勢いを持ち越さない）
 - チェックポイント・扉は Graph Trigger 2D で作る: `SpawnPoint = "Checkpoint 2"`（ミスしたらそこから）、`SpawnPoint = "FromCave"` と `EnterCave` を Raise（次のシーンの FromCave に出る）。
   パラメータなので、セーブ・ロードにも残る
