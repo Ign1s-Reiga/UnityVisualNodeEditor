@@ -386,22 +386,27 @@ Input System 連携（任意、`Integrations/InputSystem/Runtime`、アセンブ
   インスペクタではグラフの Blackboard から選ぶ。Set Parameter の振る舞いと同じ欄）。グラフが無いのに変更があれば、インスペクタで注意を出し、実行時は変更を飛ばして 1 度だけ警告を出す
 - 変更（上から順）を先に行い、その後でイベントを Raise する（`Lives -= 1` の後に `Died` を起こせば、`Lives <= 0` の条件で Game Over へ分けられる）
 - イベント名は空でもよい（パラメータを変えるだけ。コイン）。Raise しても遷移が無ければ何も言わない（Graph Event Key と同じ）。Runner が無ければ何もしない
+- インスペクタは、イベント名がグラフの Raise できる名前に無ければ注意を出す（グラフにまだ Event ノードが 1 つも無いときも）
 
 `GraphTrigger2D`:
 - 同じ GameObject の Collider2D に触れたもの（`OnTriggerEnter2D` と `OnCollisionEnter2D`。`When` が Exit なら出たとき）を、タグ `_tag` で絞る（空なら何でも）。
   触れた Collider2D の GameObject か、その Rigidbody2D の GameObject のタグを見る（プレイヤーのコライダーが子にあってもよい）。タグは文字列で比べる（未定義のタグでもエラーを出さない）
+- 同じ物が 2 つ以上のコライダーで触れても（体と足のコライダーを持つプレイヤー、2 つのコライダーを持つゴール）1 回だけ起こす: 触れている物
+  （触れた Collider2D の Rigidbody2D、無ければその GameObject）ごとに、触れているコライダーの組の数を数え、0 → 1 になったとき（Exit なら 1 → 0 になったとき）だけ起こす。
+  無効になったら数を捨てる（無効の間に届く Exit は数えない。数えていない物の Exit は無視する）
 - `Once`: 1 度だけ（シーンを読み込み直すと、また 1 度）。`Deactivate`: 起こした後、この GameObject を無効にする（コイン・1 度だけの扉）
-- Collider2D が無い・Trigger でも Rigidbody2D がどちらにも無い、などはインスペクタで注意を出す（判定は物理の決まりどおり）
+- Collider2D が無いときは、インスペクタで注意を出す（同じ GameObject のもの。Rigidbody2D があれば、子のコライダーも数える。物理の通知は Rigidbody2D の GameObject にも届くため）
 
 `GraphDestroyTrigger`:
-- この GameObject が無効になったとき（`OnDisable`。`Destroy` されたときも、その前に呼ばれる。このコンポーネントを切ったときも）に起こす
-- シーンを閉じるとき（Single の読み込み・Play を終える・アプリを終える）の無効化では起こさない（`gameObject.scene.isLoaded` が false、または `Application.quitting` の後）
-- 1 度だけにしない（プールして使い回す敵は、倒すたびに起こす）
+- この GameObject 自身が無効になったとき（`SetActive(false)`。`OnDisable` で `activeSelf` が false）と、壊されたとき（`OnDestroy`）に起こす
+- 親が無効になっただけ（Graph Node Activator で区画ごと隠した・ポーズで親を隠した）、このコンポーネントを切っただけでは起こさない（倒したのではないため）
+- 1 度起こしたら、また有効になるまで起こさない（無効にしてから壊しても 1 回）。プールして使い回す敵は、有効に戻すたびにまた起こせる
+- シーンを閉じるとき（Single の読み込み・Play を終える・アプリを終える）の無効化・破棄では起こさない（`gameObject.scene.isLoaded` が false、または `Application.quitting` の後）
 
 `GraphSpawnPoint2D`:
 - 名前 `_pointName`（空なら GameObject の名前）。String パラメータ `_parameter`（既定 `SpawnPoint`、グラフの Blackboard から選ぶ）の値がこの名前なら、
   シーンが始まったとき（`Start`。Runner がまだ始まっていなければ次のフレームにもう一度）に、タグ `_playerTag`（既定 `Player`）の GameObject をこの位置へ置く
-- `Default`: パラメータがこのシーンのどの Spawn Point も指していない（空・別のシーンの名前）ときは、ここに置く（2 つ以上あれば名前の順で最初のもの。同じシーンの、同じパラメータを見る地点の中で選ぶ）
+- `Default`: パラメータがこのシーンのどの Spawn Point も指していない（空・別のシーンの名前）ときは、ここに置く（2 つ以上あれば名前の順で最初のもの。同じシーンの、同じグラフ・同じパラメータを見る地点の中で選ぶ）
 - プレイヤーに Rigidbody2D があれば、位置を移し、速度と角速度を 0 にする（落ちている途中の勢いを持ち越さない）
 - チェックポイント・扉は Graph Trigger 2D で作る: `SpawnPoint = "Checkpoint 2"`（ミスしたらそこから）、`SpawnPoint = "FromCave"` と `EnterCave` を Raise（次のシーンの FromCave に出る）。
   パラメータなので、セーブ・ロードにも残る

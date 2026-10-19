@@ -76,6 +76,44 @@ namespace Reiga.VisualNodeEditor.Physics2D.Tests
         }
 
         [Test]
+        public void ItChoosesOnlyAmongThePointsOfItsGraphAndParameter()
+        {
+            // ほかのグラフの地点（ミニゲームのグラフも SpawnPoint を使う）は、そのグラフのパラメータで選ばれるので混ぜない
+            var main = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            var minigame = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            var others = new GameObject[3];
+            try
+            {
+                var point = _point.AddComponent<GraphSpawnPoint2D>();
+                point.Graph = main;
+                var sameGraph = Point(others, 0, "A Start", main, "SpawnPoint");
+                var otherGraph = Point(others, 1, "0 Minigame", minigame, "SpawnPoint");
+                var otherParameter = Point(others, 2, "B Door", main, "Door");
+
+                Assert.That(point.Candidates(new[] { point, otherGraph, sameGraph, otherParameter }), Is.EqualTo(new[] { sameGraph, point }), "by name");
+            }
+            finally
+            {
+                foreach (var other in others)
+                {
+                    Object.DestroyImmediate(other);
+                }
+
+                Object.DestroyImmediate(main);
+                Object.DestroyImmediate(minigame);
+            }
+        }
+
+        private static GraphSpawnPoint2D Point(GameObject[] made, int index, string name, NodeGraphAsset graph, string parameter)
+        {
+            made[index] = new GameObject(name);
+            var point = made[index].AddComponent<GraphSpawnPoint2D>();
+            point.Graph = graph;
+            point.Parameter = parameter;
+            return point;
+        }
+
+        [Test]
         public void Hints_ForTheParameter_AndTheTag()
         {
             Assert.That(Physics2DHints.ForSpawnPoint(true, true, GraphParameterType.String, "SpawnPoint", "Player"), Is.Empty);

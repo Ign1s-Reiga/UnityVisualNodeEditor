@@ -103,6 +103,24 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void OnlyItsOwnDeactivationOrDestruction_Counts_OnceUntilItIsBack()
+        {
+            var trigger = _boss.AddComponent<GraphDestroyTrigger>();
+            trigger.Graph = _graph;
+            trigger.Changes.Add(new ParameterChange(_enemies.Id, ParameterChangeOperation.Add) { IntValue = -1 });
+            _runner.Start();
+
+            Assert.That(trigger.HandleGone(false, false), Is.False, "a parent was turned off (a section hidden), or only the component");
+            Assert.That(trigger.HandleGone(true, false), Is.True, "turned off itself");
+            Assert.That(trigger.HandleGone(false, true), Is.False, "turned off, then destroyed: once");
+            Assert.That(_runner.GetInt("Enemies"), Is.EqualTo(2));
+
+            trigger.HandleBack();
+            Assert.That(trigger.HandleGone(false, true), Is.True, "a pooled enemy that came back counts again");
+            Assert.That(_runner.GetInt("Enemies"), Is.EqualTo(1));
+        }
+
+        [Test]
         public void TheChangeRows_ChooseFromTheComponentsGraph()
         {
             var trigger = _boss.AddComponent<GraphDestroyTrigger>();
@@ -128,6 +146,8 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(GameComponentHints.ForReaction(new[] { "BossDefeated" }, "BossDefeated", 1, new[] { "its parameter was deleted" }).Single(),
                 Does.Contain("deleted"));
             Assert.That(GameComponentHints.ForReaction(new[] { "BossDefeated" }, "BossDefeated", 0, null), Is.Empty);
+            Assert.That(GameComponentHints.ForReaction(new string[0], "BossDefeated", 0, null).Single(), Does.Contain("no events yet"),
+                "a graph without Event nodes cannot move on either");
         }
 
         [Test]

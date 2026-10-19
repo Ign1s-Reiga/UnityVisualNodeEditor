@@ -148,11 +148,69 @@ namespace Reiga.VisualNodeEditor.Physics2D.Tests
         }
 
         [Test]
+        public void APlayerWithTwoColliders_SetsItOffOnce()
+        {
+            // 体と足のコライダーを持つプレイヤーが触れても、1 回だけ（トゲで 2 つ減らない）
+            _trigger.Changes.Add(new ParameterChange(_coins.Id, ParameterChangeOperation.Add) { IntValue = 1 });
+            _runner.Start();
+            var body = _player.AddComponent<BoxCollider2D>();
+            var feet = _player.AddComponent<CircleCollider2D>();
+
+            Assert.That(_trigger.Began(body), Is.True);
+            Assert.That(_trigger.Began(feet), Is.False);
+            Assert.That(_trigger.Ended(feet), Is.False);
+            Assert.That(_trigger.Ended(body), Is.False);
+            Assert.That(_runner.GetInt("Coins"), Is.EqualTo(1));
+
+            Assert.That(_trigger.Began(feet), Is.True, "touching again after leaving counts again");
+            Assert.That(_runner.GetInt("Coins"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void Exit_SetsItOff_WhenTheLastColliderLeaves()
+        {
+            _trigger.When = GraphTriggerMoment.Exit;
+            _trigger.Changes.Add(new ParameterChange(_coins.Id, ParameterChangeOperation.Add) { IntValue = 1 });
+            _runner.Start();
+            var body = _player.AddComponent<BoxCollider2D>();
+            var feet = _player.AddComponent<CircleCollider2D>();
+
+            Assert.That(_trigger.Began(body), Is.False);
+            Assert.That(_trigger.Began(feet), Is.False);
+            Assert.That(_trigger.Ended(feet), Is.False, "the body still touches");
+            Assert.That(_trigger.Ended(body), Is.True);
+            Assert.That(_trigger.Ended(body), Is.False, "an exit that was not counted is ignored");
+            Assert.That(_runner.GetInt("Coins"), Is.EqualTo(1));
+        }
+
+        [Test]
         public void Hints_ForTheCollider_AndTheTag()
         {
             Assert.That(Physics2DHints.ForTrigger(true, "Player"), Is.Empty);
             Assert.That(Physics2DHints.ForTrigger(false, "Player").Single(), Does.Contain("Collider 2D"));
             Assert.That(Physics2DHints.ForTrigger(true, string.Empty).Single(), Does.Contain("anything"));
+        }
+
+        [Test]
+        public void ChildColliders_UnderARigidbody_Count()
+        {
+            // 物理の通知は、コライダーの Rigidbody 2D の GameObject にも届くので、子のコライダーでよい
+            var root = new GameObject("Hazard");
+            var child = new GameObject("Spikes");
+            try
+            {
+                child.transform.SetParent(root.transform);
+                child.AddComponent<BoxCollider2D>();
+                Assert.That(GraphTrigger2DEditor.HasCollider(root), Is.False, "no Rigidbody 2D: the child's messages do not reach the root");
+
+                root.AddComponent<Rigidbody2D>();
+                Assert.That(GraphTrigger2DEditor.HasCollider(root), Is.True);
+                Assert.That(GraphTrigger2DEditor.HasCollider(child), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
         }
 
         [Test]
