@@ -90,9 +90,11 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 {
                     hints.Add("Choose the event this key raises.");
                 }
-                else if (graphEvents != null && graphEvents.Count > 0 && !graphEvents.Contains(eventName, StringComparer.Ordinal))
+                else if (graphEvents != null && !graphEvents.Contains(eventName, StringComparer.Ordinal))
                 {
-                    hints.Add($"'{eventName}' is not an event in this graph, so the key will do nothing.");
+                    hints.Add(graphEvents.Count == 0
+                        ? $"The graph has no events yet. Add an Event node named '{eventName}' where this key should move the flow on."
+                        : $"'{eventName}' is not an event in this graph, so the key will do nothing.");
                 }
             }
 

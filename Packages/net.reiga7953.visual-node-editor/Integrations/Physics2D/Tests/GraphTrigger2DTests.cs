@@ -206,6 +206,13 @@ namespace Reiga.VisualNodeEditor.Physics2D.Tests
                 root.AddComponent<Rigidbody2D>();
                 Assert.That(GraphTrigger2DEditor.HasCollider(root), Is.True);
                 Assert.That(GraphTrigger2DEditor.HasCollider(child), Is.True);
+
+                child.SetActive(false);
+                Assert.That(GraphTrigger2DEditor.HasCollider(root), Is.False, "an inactive child collider sends nothing");
+
+                child.SetActive(true);
+                child.AddComponent<Rigidbody2D>();
+                Assert.That(GraphTrigger2DEditor.HasCollider(root), Is.False, "a child with its own Rigidbody 2D sends to itself, not to the root");
             }
             finally
             {
