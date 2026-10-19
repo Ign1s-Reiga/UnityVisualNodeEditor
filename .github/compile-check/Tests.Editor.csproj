@@ -5,6 +5,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(PackageDir)Tests/Editor/**/*.cs" />
+    <!-- Test helpers the EditMode tests use (components can't live in an Editor-only assembly). -->
+    <Compile Include="$(PackageDir)Tests/Runtime/**/*.cs" />
     <Reference Include="$(UnityManagedDir)/*.dll" Private="false" />
     <ProjectReference Include="Runtime.csproj" />
     <ProjectReference Include="Editor.csproj" />
