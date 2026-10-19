@@ -6,7 +6,8 @@ namespace Reiga.VisualNodeEditor.Physics2D
     /// <summary>
     /// タグの合う物（既定 <c>Player</c>）が同じ GameObject の Collider 2D に触れたら、パラメータを変え、イベントを Raise するコンポーネント
     /// （ゴール → <c>StageClear</c>、トゲ → <c>Lives -= 1</c> と <c>Died</c>、コイン → <c>Coins += 1</c>、チェックポイント → <c>SpawnPoint = "Checkpoint 2"</c>）。
-    /// Is Trigger のコライダー（通り抜ける）でも、ふつうのコライダー（ぶつかる）でも動く。変更とイベントの決まりは <see cref="GraphReactions"/>。
+    /// Is Trigger のコライダー（通り抜ける）でも、ふつうのコライダー（ぶつかる）でも動く。同じ物（Rigidbody 2D）が 2 つ以上のコライダーで触れても 1 回だけ起こす。
+    /// 変更とイベントの決まりは <see cref="GraphReactions"/>。
     /// </summary>
     [AddComponentMenu("Visual Node Editor/Graph Trigger 2D")]
     public sealed class GraphTrigger2D : MonoBehaviour
@@ -33,6 +34,9 @@ namespace Reiga.VisualNodeEditor.Physics2D
         [SerializeField] private bool _deactivate;
 
         private bool _fired;
+
+        // 触れている物ごとの、触れているコライダーの組の数
+        private readonly Dictionary<Object, int> _contacts = new Dictionary<Object, int>();
 
         /// <summary>送り先のグラフ。null なら実行中のどれか（パラメータは変えられない）。</summary>
         public NodeGraphAsset Graph
@@ -123,36 +127,61 @@ namespace Reiga.VisualNodeEditor.Physics2D
 
         private bool HasTag(GameObject target) => target != null && target.tag == _tag;
 
-        private void OnTriggerEnter2D(Collider2D other)
+        /// <summary>
+        /// コライダーの組が触れ始めた（テストからも呼ぶ）。触れている物（Rigidbody 2D、無ければ GameObject）ごとに組を数え、
+        /// その物の 1 つ目の組で、When が Enter なら起こす（体と足のコライダーを持つプレイヤーでも 1 回）。起こしたら true。
+        /// </summary>
+        internal bool Began(Collider2D other)
         {
-            if (_when == GraphTriggerMoment.Enter)
+            if (other == null || !enabled || !gameObject.activeInHierarchy)
             {
-                Touch(other);
+                return false;
             }
+
+            var key = KeyOf(other);
+            _contacts.TryGetValue(key, out var count);
+            _contacts[key] = count + 1;
+            return count == 0 && _when == GraphTriggerMoment.Enter && Touch(other);
         }
 
-        private void OnTriggerExit2D(Collider2D other)
+        /// <summary>
+        /// コライダーの組が離れた（テストからも呼ぶ）。その物の最後の組で、When が Exit なら起こす。触れ始めを数えていない物は無視する。起こしたら true。
+        /// </summary>
+        internal bool Ended(Collider2D other)
         {
-            if (_when == GraphTriggerMoment.Exit)
+            if (other == null)
             {
-                Touch(other);
+                return false;
             }
+
+            var key = KeyOf(other);
+            if (!_contacts.TryGetValue(key, out var count))
+            {
+                return false;
+            }
+
+            if (count > 1)
+            {
+                _contacts[key] = count - 1;
+                return false;
+            }
+
+            _contacts.Remove(key);
+            return _when == GraphTriggerMoment.Exit && Touch(other);
         }
 
-        private void OnCollisionEnter2D(Collision2D collision)
-        {
-            if (_when == GraphTriggerMoment.Enter)
-            {
-                Touch(collision.collider);
-            }
-        }
+        // 触れている物: コライダーの Rigidbody 2D（同じ体の別のコライダーをまとめる）、無ければコライダーの GameObject
+        private static Object KeyOf(Collider2D other) => other.attachedRigidbody != null ? other.attachedRigidbody : (Object)other.gameObject;
 
-        private void OnCollisionExit2D(Collision2D collision)
-        {
-            if (_when == GraphTriggerMoment.Exit)
-            {
-                Touch(collision.collider);
-            }
-        }
+        // 無効の間に届く Exit は数えないので、数をそろえ直せるよう捨てる
+        private void OnDisable() => _contacts.Clear();
+
+        private void OnTriggerEnter2D(Collider2D other) => Began(other);
+
+        private void OnTriggerExit2D(Collider2D other) => Ended(other);
+
+        private void OnCollisionEnter2D(Collision2D collision) => Began(collision.collider);
+
+        private void OnCollisionExit2D(Collision2D collision) => Ended(collision.collider);
     }
 }

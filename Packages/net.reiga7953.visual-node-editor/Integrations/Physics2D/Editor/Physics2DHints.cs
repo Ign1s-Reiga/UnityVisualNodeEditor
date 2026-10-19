@@ -6,7 +6,7 @@ namespace Reiga.VisualNodeEditor.Physics2D.Editor
     public static class Physics2DHints
     {
         /// <summary>Graph Trigger 2D の、物理まわりの注意（パラメータ・イベントの注意は Graph Destroy Trigger と共通）。問題が無ければ空。</summary>
-        /// <param name="hasCollider">同じ GameObject に Collider 2D があるか。</param>
+        /// <param name="hasCollider">触れたことが届く Collider 2D があるか（同じ GameObject。Rigidbody 2D があれば子も）。</param>
         /// <param name="tag">反応するタグ。</param>
         public static List<string> ForTrigger(bool hasCollider, string tag)
         {

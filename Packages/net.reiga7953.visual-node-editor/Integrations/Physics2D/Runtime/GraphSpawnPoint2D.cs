@@ -149,17 +149,23 @@ namespace Reiga.VisualNodeEditor.Physics2D
 
             var wanted = runner != null && runner.HasParameter(_parameter, GraphParameterType.String) ? runner.GetString(_parameter) : string.Empty;
 
-            // 同じシーンの、同じパラメータを見る地点の中から選ぶ（名前の順。Default が 2 つあれば名前が先のもの）
-            var points = _enabled
-                .Where(point => point != null && point.gameObject.scene == gameObject.scene && point._parameter == _parameter)
-                .OrderBy(point => point.PointName, StringComparer.Ordinal)
-                .ToList();
+            var points = Candidates(_enabled);
             var chosen = Choose(points.Select(point => (point.PointName, point._default)).ToList(), wanted);
             if (chosen >= 0 && points[chosen] == this)
             {
                 Spawn(FindPlayer());
             }
         }
+
+        /// <summary>
+        /// <paramref name="points"/> のうち、この地点と比べて選ぶもの: 同じシーンの、同じグラフ・同じパラメータを見る地点（名前の順。Default が 2 つあれば名前が先のもの）。
+        /// ほかのグラフの地点は、そのグラフのパラメータで選ばれるので混ぜない（テストからも呼ぶ）。
+        /// </summary>
+        internal List<GraphSpawnPoint2D> Candidates(IEnumerable<GraphSpawnPoint2D> points) =>
+            points
+                .Where(point => point != null && point.gameObject.scene == gameObject.scene && point._graph == _graph && point._parameter == _parameter)
+                .OrderBy(point => point.PointName, StringComparer.Ordinal)
+                .ToList();
 
         private void OnEnable() => _enabled.Add(this);
 

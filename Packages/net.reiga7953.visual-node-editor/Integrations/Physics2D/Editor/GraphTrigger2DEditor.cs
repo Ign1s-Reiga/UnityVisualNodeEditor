@@ -41,11 +41,17 @@ namespace Reiga.VisualNodeEditor.Physics2D.Editor
 
         protected override List<string> GetHints()
         {
-            var hints = Physics2DHints.ForTrigger(
-                ((Component)target).TryGetComponent<Collider2D>(out _),
-                serializedObject.FindProperty(TagPropertyName).stringValue);
+            var hints = Physics2DHints.ForTrigger(HasCollider(((Component)target).gameObject), serializedObject.FindProperty(TagPropertyName).stringValue);
             hints.AddRange(GraphDestroyTriggerEditor.GetReactionHints(serializedObject, GraphPropertyName, ChangesPropertyName, EventNamePropertyName));
             return hints;
         }
+
+        /// <summary>
+        /// 触れたことが届くコライダーがあるか: 同じ GameObject の Collider 2D。Rigidbody 2D があれば、子の Collider 2D も
+        /// （物理の通知は、コライダーの Rigidbody 2D の GameObject にも届く）。
+        /// </summary>
+        internal static bool HasCollider(GameObject owner) =>
+            owner.TryGetComponent<Collider2D>(out _)
+            || (owner.TryGetComponent<Rigidbody2D>(out _) && owner.GetComponentInChildren<Collider2D>(true) != null);
     }
 }
