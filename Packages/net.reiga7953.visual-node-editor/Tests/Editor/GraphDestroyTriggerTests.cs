@@ -102,22 +102,90 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(GraphDestroyTrigger.ShouldFire(sceneLoaded, quitting), Is.EqualTo(fires));
         }
 
+        // (コンポーネントが有効か, activeSelf, activeInHierarchy) → 数えるか
+        [TestCase(true, false, false, true, TestName = "Turned off itself counts")]
+        [TestCase(true, true, true, true, TestName = "Only the component removed counts")]
+        [TestCase(true, true, false, false, TestName = "A parent turned off or destroyed does not count")]
+        [TestCase(false, true, true, false, TestName = "The component switched off does not count")]
+        public void WhatCountsAsGone(bool componentEnabled, bool activeSelf, bool activeInHierarchy, bool counts)
+        {
+            Assert.That(GraphDestroyTrigger.CountsAsGone(componentEnabled, activeSelf, activeInHierarchy), Is.EqualTo(counts));
+        }
+
         [Test]
-        public void OnlyItsOwnDeactivationOrDestruction_Counts_OnceUntilItIsBack()
+        public void ItCounts_OnceUntilItIsBack()
         {
             var trigger = _boss.AddComponent<GraphDestroyTrigger>();
             trigger.Graph = _graph;
             trigger.Changes.Add(new ParameterChange(_enemies.Id, ParameterChangeOperation.Add) { IntValue = -1 });
             _runner.Start();
 
-            Assert.That(trigger.HandleGone(false, false), Is.False, "a parent was turned off (a section hidden), or only the component");
-            Assert.That(trigger.HandleGone(true, false), Is.True, "turned off itself");
-            Assert.That(trigger.HandleGone(false, true), Is.False, "turned off, then destroyed: once");
+            Assert.That(trigger.HandleDisabled(true, true, false), Is.False, "a section hidden");
+            Assert.That(trigger.HandleDisabled(true, false, false), Is.True, "turned off itself");
+            Assert.That(trigger.HandleDisabled(true, false, false), Is.False, "once until it is back (turned off, then destroyed)");
             Assert.That(_runner.GetInt("Enemies"), Is.EqualTo(2));
 
             trigger.HandleBack();
-            Assert.That(trigger.HandleGone(false, true), Is.True, "a pooled enemy that came back counts again");
+            Assert.That(trigger.HandleDisabled(true, false, false), Is.True, "a pooled enemy that came back counts again");
             Assert.That(_runner.GetInt("Enemies"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Unity_CallsOnDisable_WithTheStateTheTriggerReads()
+        {
+            // Graph Destroy Trigger の前提: OnDisable のときの状態で、なぜ無効になったかが分かる。
+            // Unity は壊すとき、壊す GameObject を無効にしてから（activeSelf が false）OnDisable を呼ぶので、自分が無効になったのと同じに見える。
+            // 親ごと壊したときの子は、親が無効になったのと同じに見える。もう無効な物を壊しても呼ばない
+            DisableStateProbe.Seen.Clear();
+            var section = new GameObject("Section");
+            var enemy = new GameObject("Enemy");
+            try
+            {
+                enemy.transform.SetParent(section.transform);
+                var probe = enemy.AddComponent<DisableStateProbe>();
+
+                section.SetActive(false);
+                section.SetActive(true);
+                enemy.SetActive(false);
+                enemy.SetActive(true);
+                probe.enabled = false;
+                probe.enabled = true;
+                Object.DestroyImmediate(enemy);
+
+                var inRoom = new GameObject("Enemy in a room");
+                inRoom.transform.SetParent(section.transform);
+                inRoom.AddComponent<DisableStateProbe>();
+                Object.DestroyImmediate(section);
+
+                Assert.That(DisableStateProbe.Seen, Is.EqualTo(new[] { (true, true, false), (true, false, false), (false, true, true), (true, false, false), (true, true, false) }),
+                    "parent hidden, itself turned off, component switched off, itself destroyed, its parent destroyed");
+                Assert.That(DisableStateProbe.Seen.Select(seen => GraphDestroyTrigger.CountsAsGone(seen.Enabled, seen.ActiveSelf, seen.ActiveInHierarchy)),
+                    Is.EqualTo(new[] { false, true, false, true, false }));
+
+                section = new GameObject("Hidden section");
+
+                var hidden = new GameObject("Hidden enemy");
+                hidden.transform.SetParent(section.transform);
+                hidden.AddComponent<DisableStateProbe>();
+                section.SetActive(false);
+                var seenBefore = DisableStateProbe.Seen.Count;
+                Object.DestroyImmediate(section);
+                Assert.That(DisableStateProbe.Seen.Count, Is.EqualTo(seenBefore), "destroying what is already hidden calls nothing, so it does not count");
+            }
+            finally
+            {
+                if (enemy != null)
+                {
+                    Object.DestroyImmediate(enemy);
+                }
+
+                if (section != null)
+                {
+                    Object.DestroyImmediate(section);
+                }
+
+                DisableStateProbe.Seen.Clear();
+            }
         }
 
         [Test]

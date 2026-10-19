@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Reiga.VisualNodeEditor.Editor.Inspector;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -47,11 +48,23 @@ namespace Reiga.VisualNodeEditor.Physics2D.Editor
         }
 
         /// <summary>
-        /// 触れたことが届くコライダーがあるか: 同じ GameObject の Collider 2D。Rigidbody 2D があれば、子の Collider 2D も
-        /// （物理の通知は、コライダーの Rigidbody 2D の GameObject にも届く）。
+        /// 触れたことが届くコライダーがあるか: 同じ GameObject の Collider 2D。Rigidbody 2D があれば、それに付いた子の有効な Collider 2D も
+        /// （物理の通知は、コライダーの Rigidbody 2D の GameObject にも届く）。無効な子や、自分の Rigidbody 2D を持つ子のコライダーは数えない。
         /// </summary>
-        internal static bool HasCollider(GameObject owner) =>
-            owner.TryGetComponent<Collider2D>(out _)
-            || (owner.TryGetComponent<Rigidbody2D>(out _) && owner.GetComponentInChildren<Collider2D>(true) != null);
+        internal static bool HasCollider(GameObject owner)
+        {
+            if (owner.TryGetComponent<Collider2D>(out _))
+            {
+                return true;
+            }
+
+            if (!owner.TryGetComponent<Rigidbody2D>(out var body))
+            {
+                return false;
+            }
+
+            // コライダーが付くのは、親の方へたどって最初の Rigidbody 2D（物理と同じ決まり）
+            return owner.GetComponentsInChildren<Collider2D>().Any(collider => collider.GetComponentInParent<Rigidbody2D>() == body);
+        }
     }
 }

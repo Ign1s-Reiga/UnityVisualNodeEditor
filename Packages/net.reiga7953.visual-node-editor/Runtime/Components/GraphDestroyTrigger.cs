@@ -5,8 +5,10 @@ namespace Reiga.VisualNodeEditor
 {
     /// <summary>
     /// この GameObject が壊された・無効になったら、パラメータを変え、イベントを Raise するコンポーネント（敵を倒したら <c>Enemies -= 1</c>、ボスを倒したら <c>BossDefeated</c>）。
-    /// この GameObject 自身が無効になったとき（<c>SetActive(false)</c>）と、壊されたときに起こす。親が無効になっただけ（区画ごと隠した）・このコンポーネントを切っただけでは起こさない。
-    /// 1 度起こしたら、また有効になるまで起こさない（無効にしてから壊しても 1 回）。プールして使い回す物は、有効に戻すたびにまた起こせる。
+    /// この GameObject 自身が無効になったとき（<c>SetActive(false)</c>）と、壊されたときに起こす（敵の GameObject そのものに付ける）。
+    /// 親が無効になっただけ（区画ごと隠した）・親ごと壊された（部屋を片付けた）・隠してから壊した・このコンポーネントを切っただけでは起こさない
+    /// （数えたくない物は、このコンポーネントを切っておく）。
+    /// 1 度起こしたら、また有効になるまで起こさない。プールして使い回す物は、有効に戻すたびにまた起こせる。
     /// シーンを閉じるとき（別のシーンの読み込み・Play を終える・アプリを終える）は起こさない。変更とイベントの決まりは <see cref="GraphReactions"/>。
     /// </summary>
     [AddComponentMenu("Visual Node Editor/Graph Destroy Trigger")]
@@ -50,12 +52,21 @@ namespace Reiga.VisualNodeEditor
         internal static bool ShouldFire(bool sceneLoaded, bool quitting) => sceneLoaded && !quitting;
 
         /// <summary>
-        /// 無くなったときの処理（テストからも呼ぶ）。自分が無効になった（<paramref name="deactivatedItself"/>）か壊された（<paramref name="destroyed"/>）ときだけ、
-        /// また有効になるまでに 1 度、起こす。シーンを閉じている・アプリを終えているときは起こさない。起こしたら true。
+        /// <c>OnDisable</c> のときの状態から、倒した（無くなった）と数えるか:
+        /// 自分が無効になった・壊された（<paramref name="activeSelf"/> が false。Unity は壊すとき、壊す GameObject を無効にしてから <c>OnDisable</c> を呼ぶ）、
+        /// またはこのコンポーネントだけを外した（どちらも有効のまま）なら数える。
+        /// 親が無効になった・親ごと壊された（<paramref name="activeInHierarchy"/> だけが false）・このコンポーネントを切った（<paramref name="componentEnabled"/> が false）なら数えない。
         /// </summary>
-        internal bool HandleGone(bool deactivatedItself, bool destroyed)
+        internal static bool CountsAsGone(bool componentEnabled, bool activeSelf, bool activeInHierarchy) =>
+            componentEnabled && (!activeSelf || activeInHierarchy);
+
+        /// <summary>
+        /// 無効になったときの処理（テストからも呼ぶ）。数えるとき（<see cref="CountsAsGone"/>）だけ、また有効になるまでに 1 度、起こす。
+        /// シーンを閉じている・アプリを終えているときは起こさない。起こしたら true。
+        /// </summary>
+        internal bool HandleDisabled(bool componentEnabled, bool activeSelf, bool activeInHierarchy)
         {
-            if ((!deactivatedItself && !destroyed) || _gone || !ShouldFire(gameObject.scene.isLoaded, _quitting))
+            if (!CountsAsGone(componentEnabled, activeSelf, activeInHierarchy) || _gone || !ShouldFire(gameObject.scene.isLoaded, _quitting))
             {
                 return false;
             }
@@ -70,10 +81,8 @@ namespace Reiga.VisualNodeEditor
 
         private void OnEnable() => HandleBack();
 
-        // activeSelf が true のままなら、親が無効になった・このコンポーネントを切っただけ（倒したのではない）
-        private void OnDisable() => HandleGone(!gameObject.activeSelf, false);
-
-        private void OnDestroy() => HandleGone(false, true);
+        // 壊すときも、その前にここが呼ばれる（壊す GameObject は無効にされてから）。もう無効な物（隠してから壊した・切ってから壊した）には呼ばれないので、数えない
+        private void OnDisable() => HandleDisabled(enabled, gameObject.activeSelf, gameObject.activeInHierarchy);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ListenForQuit()

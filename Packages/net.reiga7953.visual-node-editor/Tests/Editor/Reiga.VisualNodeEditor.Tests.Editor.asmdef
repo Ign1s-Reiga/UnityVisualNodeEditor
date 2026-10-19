@@ -5,7 +5,8 @@
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
     "Reiga.VisualNodeEditor",
-    "Reiga.VisualNodeEditor.Editor"
+    "Reiga.VisualNodeEditor.Editor",
+    "Reiga.VisualNodeEditor.Tests.Runtime"
   ],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],

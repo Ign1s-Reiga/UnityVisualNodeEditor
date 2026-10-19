@@ -36,6 +36,8 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.That(GameComponentHints.ForEventKey(null, string.Empty, GraphEventKeyAction.Raise, KeyCode.Escape).Single(), Does.Contain("Choose the event"));
             Assert.That(GameComponentHints.ForEventKey(new[] { "Pause" }, "Go", GraphEventKeyAction.Raise, KeyCode.Space).Single(), Does.Contain("'Go'"));
             Assert.That(GameComponentHints.ForEventKey(new[] { "Pause" }, string.Empty, GraphEventKeyAction.Advance, KeyCode.Space), Is.Empty);
+            Assert.That(GameComponentHints.ForEventKey(new string[0], "Pause", GraphEventKeyAction.Raise, KeyCode.Escape).Single(), Does.Contain("no events yet"),
+                "a graph without Event nodes: the key does nothing either");
         }
 
         [Test]

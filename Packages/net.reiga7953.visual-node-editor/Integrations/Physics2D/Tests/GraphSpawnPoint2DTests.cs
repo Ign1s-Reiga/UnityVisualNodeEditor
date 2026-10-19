@@ -104,6 +104,42 @@ namespace Reiga.VisualNodeEditor.Physics2D.Tests
             }
         }
 
+        [Test]
+        public void APointWithoutAGraph_IsGroupedWithTheRunningGraph()
+        {
+            // グラフを入れた地点と空の地点（実行中のどれか）が混ざっても、同じ Runner を見ていれば 1 つにまとめて選ぶ（両方がプレイヤーを動かさない）
+            foreach (var running in GraphRunner.Running.ToList())
+            {
+                running.Stop();
+            }
+
+            var main = ScriptableObject.CreateInstance<NodeGraphAsset>();
+            var entry = new EntryNode();
+            var playing = new StateNode { Title = "Playing" };
+            main.AddNode(entry);
+            main.AddNode(playing);
+            main.AddEdge(new EdgeData(entry.Id, "out", playing.Id, "in"));
+            var runner = new GraphRunner(main);
+            var others = new GameObject[1];
+            try
+            {
+                var point = _point.AddComponent<GraphSpawnPoint2D>();
+                point.Graph = main;
+                var withoutGraph = Point(others, 0, "A Start", null, "SpawnPoint");
+                Assert.That(point.Candidates(new[] { point, withoutGraph }), Is.EqualTo(new[] { point }), "nothing running: an empty graph cannot be matched");
+
+                runner.Start();
+                Assert.That(point.Candidates(new[] { point, withoutGraph }), Is.EqualTo(new[] { withoutGraph, point }));
+                Assert.That(withoutGraph.Candidates(new[] { point, withoutGraph }), Is.EqualTo(new[] { withoutGraph, point }));
+            }
+            finally
+            {
+                runner.Stop();
+                Object.DestroyImmediate(others[0]);
+                Object.DestroyImmediate(main);
+            }
+        }
+
         private static GraphSpawnPoint2D Point(GameObject[] made, int index, string name, NodeGraphAsset graph, string parameter)
         {
             made[index] = new GameObject(name);

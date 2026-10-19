@@ -159,13 +159,20 @@ namespace Reiga.VisualNodeEditor.Physics2D
 
         /// <summary>
         /// <paramref name="points"/> のうち、この地点と比べて選ぶもの: 同じシーンの、同じグラフ・同じパラメータを見る地点（名前の順。Default が 2 つあれば名前が先のもの）。
-        /// ほかのグラフの地点は、そのグラフのパラメータで選ばれるので混ぜない（テストからも呼ぶ）。
+        /// ほかのグラフの地点は、そのグラフのパラメータで選ばれるので混ぜない。グラフが空の地点は、実行中のグラフを見るものとして比べる
+        /// （グラフを入れた地点と空の地点が混ざっていても、同じ Runner を見ていれば 1 つにまとめる）。テストからも呼ぶ。
         /// </summary>
-        internal List<GraphSpawnPoint2D> Candidates(IEnumerable<GraphSpawnPoint2D> points) =>
-            points
-                .Where(point => point != null && point.gameObject.scene == gameObject.scene && point._graph == _graph && point._parameter == _parameter)
+        internal List<GraphSpawnPoint2D> Candidates(IEnumerable<GraphSpawnPoint2D> points)
+        {
+            var graph = Resolve(_graph);
+            return points
+                .Where(point => point != null && point.gameObject.scene == gameObject.scene && Resolve(point._graph) == graph && point._parameter == _parameter)
                 .OrderBy(point => point.PointName, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        // 空のグラフは「実行中のどれか」なので、そのグラフとして比べる（実行中のものが無ければ空のまま）
+        private static NodeGraphAsset Resolve(NodeGraphAsset graph) => graph != null ? graph : GraphRunner.FindRunning()?.Graph;
 
         private void OnEnable() => _enabled.Add(this);
 
