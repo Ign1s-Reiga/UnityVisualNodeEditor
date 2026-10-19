@@ -119,9 +119,11 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 hints.Add("Set the graph to change its parameters. Without it, only the event is raised.");
             }
 
-            if (!string.IsNullOrEmpty(eventName) && graphEvents != null && graphEvents.Count > 0 && !graphEvents.Contains(eventName, StringComparer.Ordinal))
+            if (!string.IsNullOrEmpty(eventName) && graphEvents != null && !graphEvents.Contains(eventName, StringComparer.Ordinal))
             {
-                hints.Add($"'{eventName}' is not an event in this graph, so nothing moves on.");
+                hints.Add(graphEvents.Count == 0
+                    ? $"The graph has no events yet. Add an Event node named '{eventName}' where the flow should move on."
+                    : $"'{eventName}' is not an event in this graph, so nothing moves on.");
             }
 
             foreach (var problem in changeProblems ?? Enumerable.Empty<string>())
