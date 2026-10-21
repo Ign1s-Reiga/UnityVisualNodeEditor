@@ -290,7 +290,8 @@ Build Settings の確認は `EditorBuildSettings` を読むため Editor 側（`
   - 一致する遷移が無ければ何もせず false を返す
 - 待機ノードに入り終えたときと、パラメータの値が変わったときに、そのノードから出ている自動の Event の条件を調べ、満たせば進む（「条件付き遷移」参照）
 - `Advance()`: 現在のノードから Event 以外のノードへ出ている最初のエッジの先へ進む（イベントを介さない「次へ」）
-- 遷移先が複数ある場合は、アセット内のエッジの順で最初のものを使う
+- 遷移先が複数ある場合は、アセット内のエッジの順（同じノードから出ているエッジの並び。インスペクタの Transitions で並べ替える）で最初のものを使う。
+  前のエッジがあるために選ばれることの無いエッジは、検証で Warning にする（「条件付き遷移」の「検証」）
 - コンテナ・コンテナの Entry / Exit は通過ノード。コンテナに入って中の Entry から続け、Exit で出て親の階層の対応する出力ポートから続ける（「コンテナ」の「ランタイムの進み方」参照）
 - 通過ノードだけで輪になっている場合（Event → Event → …）は無限ループせず、警告を出して止める
 - 通知（`NodeEntered` など）の中で `Stop()` したら、そのノードの残りの処理（シーンの読み込み・イベントの通知）は行わない
@@ -604,13 +605,23 @@ Event ノードに宣言的な条件を持たせるだけにし、ロジック�
 | Error | 条件のパラメータが無い（削除された） |
 | Error | 比較がパラメータの型に合わない（Bool に `>` など） |
 | Warning | 条件の無い自動の Event より後ろ（同じノードからのエッジの順）にある自動の Event（選ばれることが無い） |
+| Warning | 同じ名前で条件の無い Raise の Event より後ろにある、その名前の Raise の Event（選ばれることが無い。例: `Finish` の後ろの `Finish if Affection >= 60`） |
+| Warning | Event 以外のノードへのエッジより後ろにある、Event 以外のノードへのエッジ（`Advance` と Entry は最初のものにしか進まない） |
+| Warning | Event から出ている 2 本目以降のエッジ（Event は最初のエッジの先にしか進まない） |
 | Warning | 別の Event から繋がっている Event の条件・自動（使われない） |
+
+- 「選ばれることが無い」エッジは、同じノードから出ているエッジの順だけで決める（`TransitionOrder`。Runtime。検証とインスペクタの Transitions で同じ判定を使う）。
+  上の 3 つは Event 以外のノード（待機ノード・Entry・コンテナの Entry）から、4 つ目は Event から出ているエッジが対象。コンテナ（出口ごとのエッジ）は対象外
+- 問題は選ばれない側のノード（4 つ目は Event 自身）に付け、どのノードの Transitions で並べ替えればよいかをメッセージに書く
+- 同じ行き先への重複したエッジは 1 本として数える（重複は別の Warning）
 
 ### エディタ
 
 - Event のインスペクタ: Trigger（Raise / Automatic）と Conditions の一覧。行ごとに、パラメータ（Blackboard から選ぶドロップダウン。名前は打たない）、
   比較（パラメータの型で使えるものだけ）、値（型に合った欄。Bool は無し）、削除ボタン。「+」で追加する（最初のパラメータと、その型の最初の比較）。すべて Undo 対応
 - 条件は ID でパラメータを指すので、改名には追従する。削除されたパラメータを指す条件は「(missing)」と出す（検証で Error）
+- 待機ノードなどのインスペクタ: Transitions の一覧（「エディタ UI」の「インスペクタ」）で、出ているエッジを調べる順に見て、ドラッグで並べ替える
+  （同じ名前の Event を条件違いで並べたとき、どれが先に選ばれるかをグラフの見た目からは読み取れないため）
 - ノードの表示: 条件をサマリー行に出す（例: `if Affection >= 5 and Met`。タイトルを付けていればイベント名と並べて `Done if …`）。
   自動の Event は札に印を付ける（USS クラス `vne-node--automatic`）。名前の無い自動の Event のタイトルは `Auto`
 - Now running: Raise のボタンは、その名前で条件を満たす Event が無ければ薄く出し（USS クラス `vne-runtime-panel__action--blocked`）、
@@ -651,6 +662,10 @@ ADV のセーブスロット（「続きから」）のために、Runner の状
   3. 入るノードが Scene ノードでなく、保存したシーンが今のシーン（読み込み中ならそのシーン）と違えば、そのシーンを読み込む
   4. 保存したノードに入る（`OnEnter`・`NodeEntered`。Scene ノードならシーンを読み込み、そのあと自動遷移を調べる）
   - 遷移の通知の中から呼ばれたら、その遷移の後に行う（`Raise` と同じ）
+- `EnteredFromSave`: 今のノードに `RestoreState` で入ったか。入るとき（振る舞いの `OnEnter`・`NodeEntered` より前）に true にし、次のノードに入るか止まるまで true のまま
+  （ロードで読み込んだシーンのオブジェクトの `Start` からも見られるように。呼び出しの間だけの印にしない）。
+  ロードでもノードに入り直すので、入ったときの初期化（盤を新しく作るなど）は走る。ゲームのコードはこれで分け、セーブの値（パラメータ・Extras。ノードに入る前に戻してある）から作り直す。
+  MCP の `get_runtime_state` にも出す（`enteredFromSave`）
 - Runner は最後に読み込みを頼んだシーン（`LastScene`）を覚える（シーンを持たない待機ノードで保存しても、ロードで同じシーンに戻れるように）
 
 ### コンポーネントとエディタ
@@ -888,6 +903,20 @@ Puzzle: Entry → [Scene: Main] ─(自動)→ [State: Title]（画面 Title、L
 - 作れなければ、作った画面・Panel Settings・シーンを消し、ノードからも外す（ノードに入れるのはファイルがそろってから）。シーン無しで作るときも、画面と Panel Settings は作り、グラフのノードに入れる（自分のシーンの Graph Runner に UIDocument と Graph Screen Host を足せば動く）
 - シーン無しで作るか尋ねるとき・シーンを作れなかったときのメッセージは、スクリプトを付ける先を Starter ごとに書く（uGUI 版は「盤」、UI Toolkit 版は「UIDocument と Graph Screen Host の付いた Graph Runner」。盤に付けると画面が出ない）
 
+## コードからグラフを組み立てる（`NodeGraphBuilder`）
+
+Editor の公開 API。自前の Starter・テスト・自動の組み立てのために、ノードを置いて繋ぐ手順（親のコンテナ・位置・ポート名 `out` / `in`・コンテナの中の Entry）を 1 回の呼び出しにまとめる。
+ゲームの Starter（Snake・スライドパズル）もこれで組み立てる（Starter の内部の `StarterGraphBuilder` を公開したもの）。
+
+- `new NodeGraphBuilder()`: 新しいグラフ（`NodeGraphFactory.CreateNew`。Entry とセーブキー入り）。まだアセットとして保存していないので、保存は `AssetDatabase.CreateAsset`
+- `new NodeGraphBuilder(graph)`: 既存のグラフに足す（`Entry` はルートの Entry。無ければ null）。Undo の記録と `EditorUtility.SetDirty` は呼び出し側が行う
+- `AddParameter(parameter)` / `AddParameter(name, type)`、`Add(node, x, y, parent)`、`AddEvent(eventName, x, y, parent, automatic)`、
+  `AddContainer(title, x, y, parent, exits...)`（出口と中の Entry 付き）、`EntryOf(container)`、`AddExit(container, exitName, x, y)`、
+  `Connect(from, to)`（`out` → `in`）、`Connect(from, viaEvent, to)`、`ConnectExit(container, exitName, to)`、`SetOnEnter(node, changes...)`（Set Parameter の振る舞い）
+- 繋いだ順が、同じノードからの遷移を調べる順になる（条件の無い Event は最後に繋ぐ）
+- 位置は呼び出し側が決める（自動では並べない）。検証はしない（組み立てたら `GraphValidator.Validate` で確かめる）。
+  コンテナ・Exit・出口の名前が無いなど、組み立て方の誤りは例外にする（黙って繋がないグラフを作らない）
+
 ## Build Settings 連携
 
 - `BuildSettingsSync`（Editor）: グラフが参照するシーンのうち、Build Settings に無い・無効なものを求め、追加・有効化する
@@ -1060,6 +1089,10 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - ヘッダー: カテゴリ色のアイコン + 型の表示名（小さい文字）+ タイトル入力欄。タイトルが空なら薄い文字のプレースホルダー `(Title)` を出す
 - その下に残りのフィールドを `PropertyField` で並べる。ラベルはフィールド名から生成した英語で統一する
   （エディタの言語設定によって `displayName` が一部だけ翻訳され、言語が混ざるのを避ける）
+- Transitions（`TransitionListView`）: 行き先が 2 つ以上あるノード（コンテナを除く）に、出ているエッジを調べる順（アセット内の順）に並べる。
+  行は種類（`Raise` / `Auto` / `Next`）・行き先（Event ならタイトルと条件、`→` でその先のノード）。ドラッグで並べ替える（`NodeGraphAsset.MoveEdge`、Undo 可）。
+  選ばれることの無い行は薄く出し（USS クラス `vne-transition-list__row--hidden`）、理由をツールチップに出す（検証と同じ `TransitionOrder` の判定）。
+  グラフで繋いだ・外した、Undo したなど、アセットが変わったら作り直す。見出しの下に「上から調べ、最初に当てはまるものに進む」と書く
 - ラベル幅はパネル幅に対する割合、入力欄は縮められるようにし、幅 220px でも全フィールドを操作できるようにする
 - 編集はすべて `SerializedObject` のバインディング経由（Undo が効く）。変更を検知したらノード表示と検証結果を更新する
 
@@ -1159,12 +1192,12 @@ Claude Code などの AI エージェントが、グラフを読み・組み立�
 | `add_node` | ノードを作る（型は表示名 `Scene` / `State` / `Event` / `Container` / `Exit` / `Note` / `Entry`、メニューのパス、クラス名のどれでも）。親のコンテナ・位置・タイトル・イベント名・シーン・本文を指定できる。コンテナは中に Entry / Exit も作る（エディタと同じ）。置けない階層なら理由を返す |
 | `update_node` | タイトル・イベント名・シーン・説明・本文・位置・トリガーと条件を変える。組み込み以外のノード型（Yarn の Dialogue ノードなど）の値は `fields`（`get_graph` の `fields` と同じ名前） |
 | `remove_node` | ノードを消す（コンテナなら中身ごと。コンテナの Entry は単独では消さない。エディタと同じ） |
-| `connect` / `disconnect` | エッジを足す・消す。ポートは省略すると `out` → `in`。コンテナの出力は出口の名前でも指せる。階層をまたぐ・無いポート・重複は理由を返す |
+| `connect` / `disconnect` | エッジを足す・消す。ポートは省略すると `out` → `in`。コンテナの出力は出口の名前でも指せる。階層をまたぐ・無いポート・重複は理由を返す。足したエッジは後ろに付く（同じノードからの遷移はこの順で調べるので、条件の無い Event は最後に繋ぐ。説明にも書く） |
 | `group_into_container` | 選んだノードをコンテナにまとめる（Group into Container と同じ規則。まとめられなければ理由） |
 | `add_parameter` | Blackboard にパラメータ（名前・型・既定値）を足す（条件付き遷移のフラグ。Yarn 連携では Yarn の `$Name` と同じもの） |
 | `validate_graph` | 問題の一覧（重要度・種類・メッセージ・ノード）。エディタの問題一覧と同じ |
 | `open_graph` | グラフを Visual Node Editor のウィンドウで開く（Computer Use で画面を確かめるとき用） |
-| `get_runtime_state` | Play 中、そのグラフを動かしている Runner の今いるノード・場所（`Stage › Play`）・起こせる操作・パラメータの値。Play 中でなければそう返す |
+| `get_runtime_state` | Play 中、そのグラフを動かしている Runner の今いるノード・場所（`Stage › Play`）・起こせる操作・パラメータの値・セーブから入ったか（`enteredFromSave`）。Play 中でなければそう返す |
 | `send_event` | Play 中、イベントを Raise する（または Advance する）。Now running パネルのボタンと同じ |
 
 - 書き換えるツールは、エディタでの操作と同じく `Undo.RecordObject` で記録し（エディタで Undo できる）、終わったらアセットを保存する（エージェントの変更が保存し忘れで消えないように）

@@ -169,6 +169,19 @@ ADV・パズルに続いて、2D アクションもこのツールで作れる�
 - [x] `ParameterChangeDrawer` をコンポーネント（`_graph` のグラフ）でも使えるようにする
 - [x] README・Wiki
 
+## 作って分かった改善（1.1.0）
+
+Codex に 3 マッチパズルのギャルゲーを作らせて出た改善点のうち、1〜3 を入れる（ユーザーの回答）。設計は `docs/01-architecture.md` の該当の節。
+
+- [x] 遷移の優先順を見えるようにし、選ばれない分岐を警告する: 同じ名前で条件の無い Raise の Event の後ろの Event・2 つ目以降の Advance の行き先・Event の 2 本目以降のエッジを Warning に。
+      インスペクタに Transitions の一覧（ドラッグで並べ替え）。条件の無い `Finish` が `Finish if Affection >= 60` より前にあっても、検証が 0 件だったため
+- [x] `GraphRunner.EnteredFromSave`: ロードでもノードに入り直して初期化（盤を作るなど）が走るので、ゲームのコードがセーブから入ったかで分けられるようにする
+- [x] `NodeGraphBuilder`（Editor の公開 API）: コードでの組み立てに、ノードの作成・位置・`in` / `out` のポート名を毎回書かなくて済むように。Starter もこれを使う
+- [x] README・Wiki
+
+後回し（候補）: 流れのテストをエディタで繰り返す（「Affection 80 で 2 勝 → 恋愛エンド」のような、パラメータを入れ・イベントを起こし・行き着くノードを確かめるシナリオを保存し、グラフのウィンドウから流し直す）。
+`GraphRunner` は MonoBehaviour に依存しないので、今は EditMode テスト（`NodeGraphBuilder` で組んだグラフでも）で書ける。
+
 ## M3: ゲームから使う
 - [x] `GraphQuery`（遷移先の列挙など）のランタイム API
 - [x] `GraphRunner` によるシーン遷移の実行（`SceneManager`）
