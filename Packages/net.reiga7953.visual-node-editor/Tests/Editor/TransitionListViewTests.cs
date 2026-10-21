@@ -119,6 +119,22 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Move_WhenTheListIsOutOfDate_OnlyReloads()
+        {
+            var first = Connect(_story, _romance);
+            Connect(_story, _normal);
+            var list = new TransitionListView(_graph, _story);
+
+            // MCP やグラフで繋ぎ足されたが、一覧はまだ作り直していない（行の位置がアセットの位置と合わない）
+            var added = Add(new StateNode { Title = "Added" });
+            Connect(_story, added);
+
+            Assert.That(list.Move(first, 1), Is.False);
+            Assert.That(Targets(), Is.EqualTo(new[] { _romance.Id, _normal.Id, added.Id }), "nothing moved");
+            Assert.That(list.Items, Has.Count.EqualTo(3), "reloaded");
+        }
+
+        [Test]
         public void ContainersAndNotes_HaveNoList()
         {
             Assert.That(TransitionListView.Supports(_story), Is.True);

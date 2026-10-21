@@ -29,6 +29,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         private readonly Dictionary<EdgeData, HiddenTransition> _hidden = new();
         private readonly ListView _list;
 
+        /// <summary><paramref name="asset"/> の <paramref name="node"/> から出ているエッジの一覧を作る（<see cref="Supports"/> のノードに使う）。</summary>
         public TransitionListView(NodeGraphAsset asset, NodeData node)
         {
             _asset = asset;
@@ -78,9 +79,9 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         public void Reload()
         {
             _items.Clear();
-            _items.AddRange(_asset.Edges.Where(e => e != null && e.FromNodeId == _node.Id));
+            _items.AddRange(OutgoingOf(_node.Id));
             _hidden.Clear();
-            foreach (var hidden in TransitionOrder.FindHidden(_node, _items, _asset.FindNode))
+            foreach (var hidden in TransitionOrder.FindHidden(_node, OutgoingOf, _asset.FindNode))
             {
                 _hidden[hidden.Edge] = hidden;
             }
@@ -90,22 +91,22 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
         }
 
         /// <summary>
-        /// <paramref name="edge"/> を、このノードから出ているエッジの <paramref name="index"/> 番目へ移す（Undo 可）。
-        /// 一覧が古く（Undo の後など）エッジがもう無ければ、作り直すだけで false。
+        /// 一覧の <paramref name="edge"/> を、このノードから出ているエッジの <paramref name="index"/> 番目へ移す（Undo 可）。
+        /// 一覧が古ければ（作り直す前に、グラフ・MCP・Undo でこのノードのエッジが足された・消された・差し替わった）、
+        /// 一覧の位置がアセットの位置と合わないので、動かさずに作り直して false。
         /// </summary>
         internal bool Move(EdgeData edge, int index)
         {
-            var current = edge == null
-                ? null
-                : _asset.Edges.Contains(edge) ? edge : _asset.FindEdge(edge.FromNodeId, edge.FromPort, edge.ToNodeId, edge.ToPort);
-            if (current == null || current.FromNodeId != _node.Id)
+            // ListView は並べ替え済みなので、順は比べずに、同じエッジがそろっているかだけを見る
+            var current = OutgoingOf(_node.Id).ToList();
+            if (edge == null || !_items.Contains(edge) || current.Count != _items.Count || current.Except(_items).Any())
             {
                 Reload();
                 return false;
             }
 
             Undo.RecordObject(_asset, "Reorder Transitions");
-            _asset.MoveEdge(current, index);
+            _asset.MoveEdge(edge, index);
             EditorUtility.SetDirty(_asset);
             Reload();
             Changed?.Invoke();
@@ -153,6 +154,8 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 .FirstOrDefault(n => n != null);
             return next != null ? "→ " + NodeDisplay.GetNodeLabel(next) : "→ (only notifies; stays here)";
         }
+
+        private IEnumerable<EdgeData> OutgoingOf(string nodeId) => _asset.Edges.Where(e => e != null && e.FromNodeId == nodeId);
 
         private void OnItemIndexChanged(int oldIndex, int newIndex)
         {
