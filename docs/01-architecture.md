@@ -826,6 +826,55 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
   - どちらかのシーンを作れなければ、作ったシーンを消してエラーを出す（片方だけ残さない。グラフの Scene ノードも空に戻す）。グラフと Yarn のファイルはそのまま使え、グラフは開く
   - カメラ・EventSystem・Canvas・文字・ボタンの組み立ては、ゲームの Starter と共有する（`StarterScenes`。下の「ゲームの Starter」）
 
+## Unity Localization 連携（任意）
+
+翻訳の仕組み（文字列テーブル・言語の切り替え・CSV の書き出し / 読み込み・訳の抜けの確認）は Unity Localization と Yarn Spinner に任せ、このパッケージでは持たない（同じものを二重に作らない）。
+このパッケージが画面に出す文字は、ほぼパラメータの値（`GraphParameterText` / `GraphParameterLabel` の書式 `Score: {0}`）だけなので、
+パラメータを Smart Strings の変数として読めるようにする（訳した文字列の中に値を入れ、値が変わったら出し直す）。
+
+- 対象: Unity Localization 1.5 以上（パッケージ `com.unity.localization`。開発用プロジェクトでは 1.5.13）
+- 置き場: パッケージの `Integrations/Localization/`（`Runtime` / `Tests`）。Unity Localization が入っていないプロジェクトではコンパイルされない。
+  asmdef の `versionDefines` で `com.unity.localization` 1.5.0 以上があれば `VNE_LOCALIZATION` を定義し、`defineConstraints` でそれを要求する。Localization のランタイム（`Unity.Localization`）を使う
+
+| asmdef | 名前空間 | 中身 |
+|---|---|---|
+| `Reiga.VisualNodeEditor.Localization` | `Reiga.VisualNodeEditor.Localization` | `GraphParameterVariable`・`GraphParameterGroup` |
+| `Reiga.VisualNodeEditor.Localization.Tests` | `Reiga.VisualNodeEditor.Localization.Tests` | EditMode テスト |
+
+### グラフのパラメータを Smart Strings で読む
+
+どちらも `[Serializable]` で、Localized String の Local Variables・Global Variables Group の追加のメニューに `[DisplayName]` の名前で出る
+（Localization が `IVariable` の型を `TypeCache` で集めて出す。抽象でもジェネリックでもない型はすべて出るので、内部用の `IVariable` は作らない）。
+
+- `GraphParameterVariable`（「Graph Parameter」。`IVariableValueChanged`）: パラメータ 1 つ。欄はグラフ（空なら実行中のどれか。`GraphParameterText` と同じ）と
+  パラメータ名（`[GraphParameterName]`）。Local Variables に `score` などの名前で足し、文字列に `{score}` と書く
+- `GraphParameterGroup`（「Graph Parameters」。`IVariableGroup`）: グラフのパラメータ全部。欄はグラフ。Local Variables に `graph` などの名前で足し、`{graph.Score}` と書く。
+  名前ごとに `GraphParameterVariable` を作って返す（同じ名前には同じもの。Localized String が同じ変数を二重に聞かないように）。
+  グラフを指定していれば、そのグラフに無い名前は返さない（Smart Strings の書式エラーになり、打ち間違いに気づける）。グラフが空なら、どの名前も返す（Runner が始まるまで、あるか分からないため）。
+  `Graph` を替えたら、作った変数のグラフも替える（インスペクタで替えた場合は、次に名前を引いたときに合わせる。そのときは知らせない。文字列を作っている最中なので）
+- 多くの文字列で使うなら、Global Variables Group（`VariablesGroupAsset`）に足し、Localization Settings の Smart Format の Persistent Variables Source に登録する（`{global.graph.Score}`）。
+  uGUI・TextMeshPro（`Localize String Event`）でも、UI Toolkit（UI Builder の Localized String のバインディング）でも同じ
+- 値: そのグラフを実行中の Runner（`GraphRunner.FindRunning`）の値。Runner が無ければグラフの初期値（エディタのプレビューにも初期値が出る）。どちらにも無ければ null（空の文字）
+- 書式は Smart Strings のもの（`{graph.Gold:N0}`、bool なら `{graph.Cleared:クリア|未クリア}`）。数は選んでいるロケールの書き方になる（`GraphParameterText` は InvariantCulture）
+- 出し直し: Localized String が聞いている間（`ValueChanged` に登録がある間）だけ Runner を聞き、次のときに `ValueChanged` を出す（Localized String が文字列を作り直す）:
+  そのパラメータが変わった（`ParameterChanged`）、そのグラフの Runner が始まった・止まった（`GraphRunner.Started` / `Stopped`。値を読む Runner が替わる）、`Graph` / `Parameter` を替えた。
+  登録が無くなったら Runner から外れる（Localized String は文字列を作り直すたびに聞き直す）
+- エディタ: Localization は Local Variables を IMGUI（`EditorGUI.PropertyField`）で描くので、`GraphParameterNameDrawer` に IMGUI の描き方（入力欄と、グラフのパラメータ名を選ぶ「▾」）を足す
+  （UI Toolkit の欄しか無いと「No GUI Implemented」になる。UI Toolkit のインスペクタ・UI Builder では今まで通り選べる欄）
+- 検証はしない（文字列テーブルの中の `{graph.X}` を確かめるには、すべてのテーブルを読む必要があるため。名前の誤りは Localization の書式エラーで分かる）
+
+### 翻訳の受け持ち
+
+- 会話の行: Yarn Spinner（Yarn Project の Use Unity Localisation System と String Table Collection、Dialogue Runner の Unity Localised Line Provider）。
+  ADV Starter は Yarn の既定（翻訳なし）のまま作る。手順は Wiki の「翻訳と Unity Localization」
+- 画面の文字: Unity Localization（Localize String Event・UI Builder のバインディング）。パラメータの値は上の Graph Parameter / Graph Parameters
+- 言語によって変えないもの（ID として扱う）: Event 名・ノードのタイトル・パラメータ名・Yarn のノード名・セーブのスロット名。エディタの表示は英語のまま（日本語化は未決事項）
+
+### CI
+
+- CI では Localization 連携をコンパイルしない（Unity Localization が uGUI・TextMeshPro を参照し、Unity の外でコンパイルできないため。Yarn 連携と同じ）。
+  開発用プロジェクト（Unity Localization 1.5.13 入り）での EditMode テストで確かめる（`Integrations/Localization/Tests`）
+
 ## ゲームの Starter（Snake・スライドパズル）
 
 `Assets > Create > Visual Node Editor > Snake Starter` / `Sliding Puzzle Starter`。ADV Starter と同じく、選んでいるフォルダにひな形を作ってグラフを開き、
