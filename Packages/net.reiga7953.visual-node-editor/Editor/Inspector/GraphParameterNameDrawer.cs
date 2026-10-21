@@ -3,6 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
 
 namespace Reiga.VisualNodeEditor.Editor.Inspector
 {
@@ -24,9 +25,11 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 return;
             }
 
-            var choices = GetChoices(ChoiceTextField.FindSiblingGraph(property));
+            // 描くたびに名前の一覧は作らない（「▾」を押したときに作る）
+            var graph = ChoiceTextField.FindSiblingGraph(property);
+            var hasChoices = HasChoices(graph);
             var field = position;
-            if (choices.Count > 0)
+            if (hasChoices)
             {
                 field.width -= MenuButtonWidth + 2f;
             }
@@ -40,7 +43,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             }
 
             EditorGUI.EndProperty();
-            if (choices.Count == 0)
+            if (!hasChoices)
             {
                 return;
             }
@@ -48,7 +51,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             var button = new Rect(field.xMax + 2f, position.y, MenuButtonWidth, EditorGUIUtility.singleLineHeight);
             if (EditorGUI.DropdownButton(button, new GUIContent("▾", "Pick one of the graph's parameters"), FocusType.Passive, EditorStyles.miniButton))
             {
-                ShowMenu(button, property, choices);
+                ShowMenu(button, property, GetChoices(graph));
             }
         }
 
@@ -70,31 +73,62 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 ? new List<string>()
                 : graph.Parameters.Where(p => p != null && !string.IsNullOrEmpty(p.Name)).Select(p => p.Name).Distinct().ToList();
 
-        // 選んだら、その時点の SerializedObject に書く（メニューは後のフレームで閉じるので、プロパティは持ち越さない）
+        // 名前の付いたパラメータが 1 つでもあるか（GetChoices と違い、一覧を作らない）
+        internal static bool HasChoices(NodeGraphAsset graph)
+        {
+            if (graph == null)
+            {
+                return false;
+            }
+
+            var parameters = graph.Parameters;
+            for (var i = 0; i < parameters.Count; i++)
+            {
+                if (parameters[i] != null && !string.IsNullOrEmpty(parameters[i].Name))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // 選んだら、対象のオブジェクトから SerializedObject を作り直して書く（メニューは後のフレームで閉じ、
+        // その間にインスペクタが作り直されると、描いたときの SerializedObject は捨てられているため）
         private static void ShowMenu(Rect button, SerializedProperty property, List<string> choices)
         {
-            var serializedObject = property.serializedObject;
+            var targets = property.serializedObject.targetObjects;
             var path = property.propertyPath;
-            var current = property.stringValue;
+            var current = property.hasMultipleDifferentValues ? null : property.stringValue;
             var menu = new GenericMenu();
             foreach (var choice in choices)
             {
                 var picked = choice;
-                menu.AddItem(new GUIContent(choice), choice == current, () =>
-                {
-                    serializedObject.Update();
-                    var target = serializedObject.FindProperty(path);
-                    if (target == null)
-                    {
-                        return;
-                    }
-
-                    target.stringValue = picked;
-                    serializedObject.ApplyModifiedProperties();
-                });
+                menu.AddItem(new GUIContent(choice), choice == current, () => Write(targets, path, picked));
             }
 
             menu.DropDown(button);
+        }
+
+        internal static void Write(Object[] targets, string path, string value)
+        {
+            var alive = targets.Where(target => target != null).ToArray();
+            if (alive.Length == 0)
+            {
+                return;
+            }
+
+            using (var serializedObject = new SerializedObject(alive))
+            {
+                var property = serializedObject.FindProperty(path);
+                if (property == null || property.propertyType != SerializedPropertyType.String)
+                {
+                    return;
+                }
+
+                property.stringValue = value;
+                serializedObject.ApplyModifiedProperties();
+            }
         }
     }
 }

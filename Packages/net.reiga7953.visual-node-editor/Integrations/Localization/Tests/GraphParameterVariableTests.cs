@@ -79,10 +79,51 @@ namespace Reiga.VisualNodeEditor.Localization.Tests
 
             _runner.SetFloat("Speed", 2f);
             Assert.That(_changes, Is.EqualTo(1), "other parameters do not count");
+        }
+
+        [Test]
+        public void AStoppedRunner_KeepsItsLastValues_UntilAnotherStarts()
+        {
+            _variable.ValueChanged += OnChanged;
+            _runner.Start();
+            _runner.SetInt("Score", 3);
+            _changes = 0;
 
             _runner.Stop();
-            Assert.That(_changes, Is.EqualTo(2), "the runner it read stopped (back to the start value)");
+            Assert.That(_changes, Is.EqualTo(0), "nothing else runs: the text keeps the last value");
+            Assert.That(_variable.Value, Is.EqualTo(3));
+
+            // Localized String は文字列を作り直すたびに聞き直す
+            _variable.ValueChanged -= OnChanged;
+            _variable.ValueChanged += OnChanged;
+            Assert.That(_variable.Value, Is.EqualTo(3), "still the last value after listening again");
+
+            _next = new GraphRunner(_graph);
+            _next.Start();
+            Assert.That(_changes, Is.EqualTo(1), "a new runner of the graph");
             Assert.That(_variable.Value, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void WithoutAGraph_AnotherRunnerStarting_ChangesNothing()
+        {
+            _variable.Graph = null;
+            _runner.Start();
+            _variable.ValueChanged += OnChanged;
+            var other = LocalizationTestGraph.Create(score: 5);
+            var otherRunner = new GraphRunner(other);
+            try
+            {
+                otherRunner.Start();
+
+                Assert.That(_changes, Is.EqualTo(0), "still reads the same runner");
+                Assert.That(_variable.Value, Is.EqualTo(0));
+            }
+            finally
+            {
+                otherRunner.Stop();
+                Object.DestroyImmediate(other);
+            }
         }
 
         [Test]

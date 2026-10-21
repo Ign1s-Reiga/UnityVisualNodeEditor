@@ -6,3 +6,6 @@ using System.Runtime.CompilerServices;
 
 // Yarn Spinner 連携のテストから、セーブの置き場（GraphSaveSlots.RootOverride）を差し替えるため
 [assembly: InternalsVisibleTo("Reiga.VisualNodeEditor.YarnSpinner.Tests")]
+
+// Localization 連携の変数が、Runner の追い方（GraphRunnerFollower）を UI Toolkit のコントロールと共有するため
+[assembly: InternalsVisibleTo("Reiga.VisualNodeEditor.Localization")]
