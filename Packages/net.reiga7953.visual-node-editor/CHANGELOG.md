@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0] - 2026-10-22
+Codex にこのツールで 2D のターン制ストラテジーを作らせて分かった改善のうち、翻訳の連携。翻訳の仕組み（文字列テーブル・言語の切り替え・CSV・訳の抜けの確認）は Unity Localization と Yarn Spinner のものを使う。
+
+- 追加: Unity Localization 連携（任意。`Integrations/Localization`。Unity Localization 1.5 以上が入っているときだけコンパイルされる）。
+  Smart Strings の変数 **Graph Parameters**（`GraphParameterGroup`。`{graph.Score}`）と **Graph Parameter**（`GraphParameterVariable`。パラメータ 1 つ）を、
+  Localized String の Local Variables や Variables Group に足すと、訳した文字列の中にパラメータの値が出る。
+  値は実行中の Graph Runner のもの（動く前はグラフの初期値）で、値が変わる・Runner が始まる / 止まると出し直される。グラフに無い名前は書式エラーになる
+- 修正: `[GraphParameterName]` の欄が IMGUI で描かれると（Unity Localization の Local Variables など）「No GUI Implemented」になっていた。入力欄と、グラフのパラメータ名を選ぶ「▾」を出す
+
 ## [1.1.2] - 2026-10-21
 - 修正: `NodeGraphBuilder.Connect(from, viaEvent, to)` で 2 本目のエッジが繋げないとき、1 本目だけ足して例外にしていた（片方だけ繋がった Event が残る）。2 本とも繋げるか確かめてから足す
 - 変更: `NodeGraphBuilder.Connect` で、Note から・へ繋ごうとしたら例外にする（Note はポートを持たない）
