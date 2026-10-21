@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-10-22
+- 変更: Graph Parameters / Graph Parameter（Unity Localization 連携）は、Runner が止まっても、ほかの Runner が始まるまでは最後の値のまま出す（結果の画面で `Score: 0` に戻らない。Graph Parameter Text・Label と同じ）
+- 変更: Graph Parameters / Graph Parameter が文字列を作り直させるのは、使っているパラメータが変わったときと、値を読む Runner が替わったときだけにする（グラフを指定していない変数が、ほかの Runner が始まるたびに作り直させていた）
+- 修正: IMGUI の `[GraphParameterName]` の「▾」で名前を選んだとき、メニューを開いている間にインスペクタが作り直されると書き込めなかった。また、パラメータ名の一覧を描くたびに作らず、開いたときに作る
+
 ## [1.2.0] - 2026-10-22
 Codex にこのツールで 2D のターン制ストラテジーを作らせて分かった改善のうち、翻訳の連携。翻訳の仕組み（文字列テーブル・言語の切り替え・CSV・訳の抜けの確認）は Unity Localization と Yarn Spinner のものを使う。
 
