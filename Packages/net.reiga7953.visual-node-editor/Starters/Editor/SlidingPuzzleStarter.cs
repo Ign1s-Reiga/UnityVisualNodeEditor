@@ -1,3 +1,4 @@
+using Reiga.VisualNodeEditor.Editor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -62,7 +63,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         internal override NodeGraphAsset BuildGraph()
         {
-            var builder = new StarterGraphBuilder();
+            var builder = new NodeGraphBuilder();
             var level = AddLevelParameter(builder);
 
             // ルート: Title → Game（シーン。Level = 1）→ Levels → All Clear → Title
@@ -77,7 +78,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         }
 
         /// <summary>パラメータ（Level・Moves）を足し、Level を返す（uGUI 版と UI Toolkit 版で同じ）。</summary>
-        internal static GraphParameter AddLevelParameter(StarterGraphBuilder builder)
+        internal static GraphParameter AddLevelParameter(NodeGraphBuilder builder)
         {
             var level = builder.AddParameter(new GraphParameter(LevelParameter, GraphParameterType.Int) { IntValue = 1 });
             builder.AddParameter(new GraphParameter(MovesParameter, GraphParameterType.Int));
@@ -88,7 +89,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// ルートの <paramref name="x"/> から右へ、Levels（中身ごと）と All Clear（Title で <paramref name="title"/>）を足し、Levels を返す。
         /// Levels の Quit も <paramref name="title"/> へ戻る（uGUI 版と UI Toolkit 版で同じ）。
         /// </summary>
-        internal static ContainerNode AddLevels(StarterGraphBuilder builder, GraphParameter level, NodeData title, float x)
+        internal static ContainerNode AddLevels(NodeGraphBuilder builder, GraphParameter level, NodeData title, float x)
         {
             var moves = builder.Graph.FindParameterByName(MovesParameter);
             var levels = builder.AddContainer(LevelsContainer, x, 0f, null, AllClearExit, QuitExit);
@@ -113,7 +114,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             builder.SetOnEnter(shuffle, new ParameterChange(moves.Id) { IntValue = 0 });
             var playing = builder.Add(new StateNode { Title = PlayingNode, Description = "Tiles slide only here." }, 750f, 0f, levelContainer);
             var paused = builder.Add(new StateNode { Title = PausedNode }, 1250f, -150f, levelContainer);
-            builder.TimeScaleWhileOn(paused, 0f);
+            paused.AddBehaviour(new TimeScaleBehaviour { TimeScale = 0f });
             var solved = builder.Add(new StateNode { Title = SolvedNode }, 1250f, 150f, levelContainer);
             builder.Connect(builder.EntryOf(levelContainer), shuffle);
             builder.Connect(shuffle, builder.AddEvent(string.Empty, 500f, 0f, levelContainer, automatic: true), playing);

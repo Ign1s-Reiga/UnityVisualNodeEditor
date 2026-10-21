@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Reiga.VisualNodeEditor.Editor;
 using UnityEditor;
 using UnityEngine;
 
@@ -28,7 +29,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         internal override NodeGraphAsset BuildGraph()
         {
-            var builder = new StarterGraphBuilder();
+            var builder = new NodeGraphBuilder();
             var level = SlidingPuzzleStarter.AddLevelParameter(builder);
             var title = AddMainAndTitle(builder);
             builder.SetOnEnter(title, new ParameterChange(level.Id) { IntValue = 1 });
