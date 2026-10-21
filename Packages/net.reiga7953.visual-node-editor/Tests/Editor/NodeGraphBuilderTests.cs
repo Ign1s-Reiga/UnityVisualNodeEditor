@@ -91,6 +91,14 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.Throws<ArgumentException>(() => builder.ConnectExit(stage, "Lose", builder.Entry));
             Assert.Throws<ArgumentNullException>(() => builder.Connect(null, stage));
             Assert.Throws<ArgumentNullException>(() => builder.Add<StateNode>(null, 0f, 0f));
+
+            // ポートの無い向きには繋がない（Runner が辿らないエッジを黙って作らない）
+            var title = builder.Add(new StateNode { Title = "Title" }, 0f, 0f);
+            Assert.That(Assert.Throws<ArgumentException>(() => builder.Connect(stage, title)).Message, Does.Contain("ConnectExit"));
+            Assert.Throws<ArgumentException>(() => builder.Connect(builder.AddExit(stage, "Clear", 0f, 0f), title));
+            Assert.Throws<ArgumentException>(() => builder.Connect(title, builder.Entry));
+            Assert.Throws<ArgumentException>(() => builder.ConnectExit(stage, "Clear", builder.EntryOf(stage)));
+            Assert.That(builder.Graph.Edges, Is.Empty);
         }
 
         [Test]
@@ -109,7 +117,9 @@ namespace Reiga.VisualNodeEditor.Tests
 
             Assert.That(builder.Entry, Is.SameAs(entry));
             Assert.That(graph.Edges.Select(e => e.ToNodeId), Is.EqualTo(new[] { title.Id, credits.Id }));
-            Assert.That(GraphValidator.Validate(graph).Single().NodeId, Is.EqualTo(credits.Id), "connected last, so never reached");
+            var issue = GraphValidator.Validate(graph).Single();
+            Assert.That(issue.Message, Does.Contain("'Credits' is never reached"), "connected last, so never reached");
+            Assert.That(issue.NodeId, Is.EqualTo(entry.Id), "on the node to reorder");
         }
 
         private NodeGraphBuilder Builder()
