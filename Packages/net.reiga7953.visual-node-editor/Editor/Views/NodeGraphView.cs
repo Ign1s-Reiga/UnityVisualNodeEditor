@@ -53,6 +53,9 @@ namespace Reiga.VisualNodeEditor.Editor.Views
         // Populate やプログラムからの変更中は、GraphView のコールバックをアセットへ書き戻さない
         private bool _suppressSync;
 
+        // 付け替え中のエッジが出ているノードと、そのノードのエッジの中での位置（RememberReconnecting）
+        private (string FromNodeId, int Index)? _reconnecting;
+
         public NodeGraphView()
         {
             SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
@@ -1094,6 +1097,7 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             if (change.elementsToRemove != null && change.elementsToRemove.Count > 0)
             {
                 Undo.RecordObject(_asset, "Delete Graph Elements");
+                RememberReconnecting(change.elementsToRemove);
                 foreach (var element in change.elementsToRemove)
                 {
                     switch (element)
@@ -1119,11 +1123,20 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             if (change.edgesToCreate != null && change.edgesToCreate.Count > 0)
             {
                 Undo.RecordObject(_asset, "Connect Ports");
+                EdgeData added = null;
                 foreach (var edge in change.edgesToCreate)
                 {
-                    AddEdgeData(edge);
+                    added = AddEdgeData(edge);
                 }
 
+                // エッジの付け替え: 同じノードから出るなら、元のエッジがあった順の位置に戻す（遷移を調べる順を変えない）
+                if (_reconnecting is { } reconnecting && change.edgesToCreate.Count == 1 && added != null
+                    && added.FromNodeId == reconnecting.FromNodeId)
+                {
+                    _asset.MoveEdge(added, reconnecting.Index);
+                }
+
+                _reconnecting = null;
                 changed = true;
             }
 
@@ -1392,16 +1405,39 @@ namespace Reiga.VisualNodeEditor.Editor.Views
             }
         }
 
-        private void AddEdgeData(Edge edge)
+        /// <summary>エッジをアセットに足し、足した <see cref="EdgeData"/> を返す（同じエッジがもうあれば足さずに null）。</summary>
+        private EdgeData AddEdgeData(Edge edge)
         {
-            if (!TryGetEdgeKey(edge, out var fromId, out var toId))
+            if (!TryGetEdgeKey(edge, out var fromId, out var toId)
+                || _asset.FindEdge(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)) != null)
+            {
+                return null;
+            }
+
+            var data = new EdgeData(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input));
+            _asset.AddEdge(data);
+            return data;
+        }
+
+        /// <summary>
+        /// エッジの端を別のポートへ付け替えると、GraphView は古いエッジを消して（1 本だけの削除）から、同じ操作の中で新しいエッジを作る。
+        /// 消すエッジが 1 本だけなら、それが同じノードから出ているエッジの何番目かを覚えておく（作られたら、その位置に戻す）。
+        /// 覚えるのはこの操作の間だけ（ただの削除の後に、別の操作で繋いだエッジを動かさないように）。
+        /// </summary>
+        private void RememberReconnecting(IReadOnlyList<GraphElement> removed)
+        {
+            _reconnecting = null;
+            if (removed.Count != 1 || !(removed[0] is Edge edge) || !TryGetEdgeKey(edge, out var fromId, out var toId))
             {
                 return;
             }
 
-            if (_asset.FindEdge(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)) == null)
+            var data = _asset.FindEdge(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input));
+            var index = _asset.Edges.Where(e => e != null && e.FromNodeId == fromId).ToList().IndexOf(data);
+            if (index >= 0)
             {
-                _asset.AddEdge(new EdgeData(fromId, NodeView.GetPortId(edge.output), toId, NodeView.GetPortId(edge.input)));
+                _reconnecting = (fromId, index);
+                EditorApplication.delayCall += () => _reconnecting = null;
             }
         }
 
