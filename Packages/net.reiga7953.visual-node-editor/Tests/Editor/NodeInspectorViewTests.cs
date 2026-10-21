@@ -52,6 +52,33 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void Show_ANodeThatGoesSeveralWays_ListsItsTransitions()
+        {
+            var play = new StateNode { Title = "Play" };
+            var win = new EventNode { EventName = "Win" };
+            var lose = new EventNode { EventName = "Lose" };
+            var stage = new ContainerNode();
+            foreach (var node in new NodeData[] { play, win, lose, stage })
+            {
+                _graph.AddNode(node);
+            }
+
+            _graph.AddEdge(new EdgeData(play.Id, "out", win.Id, "in"));
+            _graph.AddEdge(new EdgeData(play.Id, "out", lose.Id, "in"));
+            var inspector = new NodeInspectorView();
+
+            inspector.Show(_graph, play.Id);
+            Assert.That(inspector.Q<TransitionListView>().IsShown, Is.True);
+            Assert.That(inspector.Q<TransitionListView>().Items.Select(e => e.ToNodeId), Is.EqualTo(new[] { win.Id, lose.Id }));
+
+            inspector.Show(_graph, win.Id);
+            Assert.That(inspector.Q<TransitionListView>().IsShown, Is.False, "no edges out");
+
+            inspector.Show(_graph, stage.Id);
+            Assert.That(inspector.Q<TransitionListView>(), Is.Null, "containers lead out per exit");
+        }
+
+        [Test]
         public void Show_UnknownNode_ShowsNothing()
         {
             var inspector = new NodeInspectorView();

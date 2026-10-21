@@ -147,7 +147,9 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                 "connect",
                 "Connect an output port to an input port. Both nodes must be in the same container (or both at the root). " +
                 "Put an Event node between two waiting nodes (Scene/State) so GraphRunner.Raise(eventName) can take the transition; " +
-                "a waiting node connected straight to another node is taken by Advance().",
+                "a waiting node connected straight to another node is taken by Advance(). " +
+                "New edges go after the node's existing ones, and transitions are checked in that order (the first that matches wins), " +
+                "so connect an Event without conditions after the ones with conditions that share its name.",
                 McpSchema.Object(edgeProperties, GraphArgument, "from", "to"),
                 args =>
                 {

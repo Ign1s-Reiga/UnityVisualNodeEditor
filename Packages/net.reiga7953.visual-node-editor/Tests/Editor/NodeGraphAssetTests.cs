@@ -14,6 +14,27 @@ namespace Reiga.VisualNodeEditor.Tests
         public void TearDown() => Object.DestroyImmediate(_graph);
 
         [Test]
+        public void MoveEdge_ReordersOnlyTheEdgesOfTheSameNode()
+        {
+            var a1 = new EdgeData("a", "out", "x", "in");
+            var b1 = new EdgeData("b", "out", "x", "in");
+            var a2 = new EdgeData("a", "out", "y", "in");
+            var a3 = new EdgeData("a", "out", "z", "in");
+            foreach (var edge in new[] { a1, b1, a2, a3 })
+            {
+                _graph.AddEdge(edge);
+            }
+
+            Assert.That(_graph.MoveEdge(a3, 0), Is.True);
+            Assert.That(_graph.Edges, Is.EqualTo(new[] { a3, b1, a1, a2 }), "b keeps its place");
+
+            Assert.That(_graph.MoveEdge(a3, 99), Is.True, "past the end goes last");
+            Assert.That(_graph.Edges, Is.EqualTo(new[] { a1, b1, a2, a3 }));
+
+            Assert.That(_graph.MoveEdge(new EdgeData("a", "out", "x", "in"), 0), Is.False, "not in the graph");
+        }
+
+        [Test]
         public void RemoveNode_RemovesConnectedEdges()
         {
             var a = new EntryNode();

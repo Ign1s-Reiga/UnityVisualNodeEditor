@@ -371,6 +371,80 @@
   margin-top: 4px;
 }
 
+/* Outgoing edges of a node in the order they are checked (TransitionListView) */
+
+.vne-transition-list {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top-width: 1px;
+  border-top-color: #191919;
+}
+
+.vne-transition-list--few {
+  display: none;
+}
+
+.vne-transition-list__header {
+  margin-left: 3px;
+  -unity-font-style: bold;
+}
+
+.vne-transition-list__hint {
+  margin-left: 3px;
+  margin-bottom: 4px;
+  color: #9a9a9a;
+  white-space: normal;
+}
+
+.vne-transition-list__list {
+  max-height: 240px;
+}
+
+.vne-transition-list__row {
+  flex-direction: row;
+  align-items: center;
+  padding: 2px 2px 2px 0;
+}
+
+.vne-transition-list__row--hidden {
+  opacity: 0.45;
+}
+
+.vne-transition-list__number {
+  width: 16px;
+  flex-shrink: 0;
+  -unity-text-align: middle-right;
+  color: #9a9a9a;
+}
+
+.vne-transition-list__kind {
+  width: 40px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  font-size: 10px;
+  color: #9a9a9a;
+}
+
+.vne-transition-list__texts {
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.vne-transition-list__label {
+  white-space: normal;
+}
+
+.vne-transition-list__destination {
+  font-size: 10px;
+  color: #8a8a8a;
+  white-space: normal;
+}
+
+.vne-transition-list__destination--empty {
+  display: none;
+}
+
 /* One change of the Set Parameter behaviour (ParameterChangeDrawer) */
 .vne-parameter-change {
   flex-direction: row;
