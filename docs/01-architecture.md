@@ -925,8 +925,9 @@ Editor の公開 API。自前の Starter・テスト・自動の組み立ての�
   `Connect(from, to)`（`out` → `in`）、`Connect(from, viaEvent, to)`、`ConnectExit(container, exitName, to)`、`SetOnEnter(node, changes...)`（Set Parameter の振る舞い）
 - 繋いだ順が、同じノードからの遷移を調べる順になる（条件の無い Event は最後に繋ぐ）
 - 位置は呼び出し側が決める（自動では並べない）。検証はしない（組み立てたら `GraphValidator.Validate` で確かめる）。
-  コンテナ・Exit・出口の名前が無い、ポートの無い向きに繋ぐ（コンテナから `Connect`。出口からは `ConnectExit`、Exit ノードから、Entry へ）など、
-  組み立て方の誤りは例外にする（黙って繋がない・Runner が辿らないエッジを作らない）
+  コンテナ・Exit・出口の名前が無い、ポートの無い向きに繋ぐ（コンテナから `Connect`。出口からは `ConnectExit`、Exit ノードから、Entry へ、Note から・へ）など、
+  組み立て方の誤りは例外にする（黙って繋がない・Runner が辿らないエッジを作らない）。Event を挟む `Connect(from, viaEvent, to)` は、
+  2 本とも繋げるか確かめてから足す（片方だけ繋がった Event を残さない）
 
 ## Build Settings 連携
 
