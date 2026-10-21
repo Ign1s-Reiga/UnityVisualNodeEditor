@@ -76,6 +76,12 @@ public class PlayerMovement : NodeBehaviour
 - `Graph Event Key`: キーを押したら Raise / Advance する（Esc → Pause）。キーは `GraphInput.GetKeyDown(KeyCode)` で読み、旧 Input Manager でも Input System でも動く
 - `Graph Event Button`: ボタンのクリックで Raise / Advance / Save / Load する
 
+## 翻訳（Unity Localization 連携）
+
+Unity Localization 1.5 以上が入っていると、Smart Strings の変数 **Graph Parameters**（`{graph.Score}`）と **Graph Parameter**（パラメータ 1 つ）が使える。
+Localize String Event や UI Builder の Localized String のバインディングの Local Variables に足すと、訳した文字列の中にパラメータの値が出て、値が変わるたびに出し直される。
+翻訳の仕組み（テーブル・言語の切り替え・CSV）は Unity Localization のものを使う。Event 名・ノードのタイトル・パラメータ名は訳さない。
+
 ## 2D アクション向けの部品
 
 - `Graph Trigger 2D`: タグの合う物（既定 `Player`）が同じ GameObject の Collider 2D に触れたら、パラメータを変え（上から順）、イベントを Raise する（ゴール・トゲ・コイン・チェックポイント）。Once・Deactivate（触れたら消す）

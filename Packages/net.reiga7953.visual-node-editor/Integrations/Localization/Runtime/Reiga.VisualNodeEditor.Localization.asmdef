@@ -1,0 +1,23 @@
+{
+  "name": "Reiga.VisualNodeEditor.Localization",
+  "rootNamespace": "Reiga.VisualNodeEditor.Localization",
+  "references": [
+    "Reiga.VisualNodeEditor",
+    "Unity.Localization"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": ["VNE_LOCALIZATION"],
+  "versionDefines": [
+    {
+      "name": "com.unity.localization",
+      "expression": "1.5.0",
+      "define": "VNE_LOCALIZATION"
+    }
+  ],
+  "noEngineReferences": false
+}
