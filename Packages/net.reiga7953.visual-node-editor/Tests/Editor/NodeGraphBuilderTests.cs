@@ -98,6 +98,16 @@ namespace Reiga.VisualNodeEditor.Tests
             Assert.Throws<ArgumentException>(() => builder.Connect(builder.AddExit(stage, "Clear", 0f, 0f), title));
             Assert.Throws<ArgumentException>(() => builder.Connect(title, builder.Entry));
             Assert.Throws<ArgumentException>(() => builder.ConnectExit(stage, "Clear", builder.EntryOf(stage)));
+
+            var note = builder.Add(new NoteNode(), 0f, 0f);
+            Assert.That(Assert.Throws<ArgumentException>(() => builder.Connect(note, title)).Message, Does.Contain("Note"));
+            Assert.Throws<ArgumentException>(() => builder.Connect(title, note));
+
+            // Event を挟むときは、2 本とも繋げるときだけ足す（片方だけ繋がった Event を残さない）
+            var go = builder.AddEvent("Go", 0f, 0f);
+            Assert.Throws<ArgumentException>(() => builder.Connect(title, go, builder.Entry));
+            Assert.Throws<ArgumentException>(() => builder.Connect(stage, go, title));
+            Assert.Throws<ArgumentNullException>(() => builder.Connect(title, null, title));
             Assert.That(builder.Graph.Edges, Is.Empty);
         }
 

@@ -33,6 +33,7 @@ namespace Reiga.VisualNodeEditor.Editor
     {
         private const string In = NodeView.InputPortName;
         private const string Out = NodeView.OutputPortName;
+        private const string NoteHasNoPorts = "A Note has no ports: it only holds text and is not part of the flow.";
 
         /// <summary>新しいグラフ（<see cref="NodeGraphFactory.CreateNew"/>。Entry とセーブキー入り。まだアセットとして保存していない）を組み立てる。</summary>
         public NodeGraphBuilder()
@@ -124,38 +125,36 @@ namespace Reiga.VisualNodeEditor.Editor
 
         /// <summary><paramref name="from"/> の out から <paramref name="to"/> の in へ繋ぐ（そのノードから出ているエッジの最後に足す）。</summary>
         /// <exception cref="ArgumentException">
-        /// <paramref name="from"/> に out が無い（コンテナは出口から出るので <see cref="ConnectExit"/> を使う。Exit ノードは出口へ進むだけ）、
-        /// または <paramref name="to"/> に in が無い（Entry）。
+        /// <paramref name="from"/> に out が無い（コンテナは出口から出るので <see cref="ConnectExit"/> を使う。Exit ノードは出口へ進むだけ。Note はポートを持たない）、
+        /// または <paramref name="to"/> に in が無い（Entry・Note）。
         /// </exception>
         public void Connect(NodeData from, NodeData to)
         {
-            switch (from)
-            {
-                case null:
-                    throw new ArgumentNullException(nameof(from));
-                case ContainerNode container:
-                    throw new ArgumentException(
-                        $"Container '{container.Title}' leads out through its exits. Use ConnectExit(container, exitName, to).", nameof(from));
-                case ContainerExitNode _:
-                    throw new ArgumentException("An Exit node has no output: the flow leaves the container through the exit it stands for.", nameof(from));
-            }
-
-            Graph.AddEdge(new EdgeData(from.Id, Out, CheckInput(to).Id, In));
+            CheckOutput(from, nameof(from));
+            CheckInput(to, nameof(to));
+            Graph.AddEdge(new EdgeData(from.Id, Out, to.Id, In));
         }
 
-        /// <summary><paramref name="from"/> → <paramref name="via"/>（Event）→ <paramref name="to"/>。</summary>
+        /// <summary>
+        /// <paramref name="from"/> → <paramref name="via"/>（Event）→ <paramref name="to"/>。
+        /// どちらかのエッジが繋げなければ、どちらも足さずに例外にする（片方だけ繋がったグラフを残さない）。
+        /// </summary>
         public void Connect(NodeData from, EventNode via, NodeData to)
         {
+            CheckOutput(from, nameof(from));
+            CheckInput(via, nameof(via));
+            CheckInput(to, nameof(to));
             Connect(from, via);
             Connect(via, to);
         }
 
         /// <summary>コンテナの出口 <paramref name="exitName"/> から <paramref name="to"/> へ繋ぐ。</summary>
-        /// <exception cref="ArgumentException">その名前の出口が無い。</exception>
+        /// <exception cref="ArgumentException">その名前の出口が無い、または <paramref name="to"/> に in が無い。</exception>
         public void ConnectExit(ContainerNode container, string exitName, NodeData to)
         {
             var exit = FindExit(container, exitName);
-            Graph.AddEdge(new EdgeData(container.Id, exit.Id, CheckInput(to).Id, In));
+            CheckInput(to, nameof(to));
+            Graph.AddEdge(new EdgeData(container.Id, exit.Id, to.Id, In));
         }
 
         /// <summary><paramref name="node"/> に入ったとき、<paramref name="changes"/> を行う Set Parameter の振る舞いを付ける。</summary>
@@ -171,15 +170,39 @@ namespace Reiga.VisualNodeEditor.Editor
             node.AddBehaviour(behaviour);
         }
 
-        // 繋ぐ先に in があるか（Entry は流れの始まりなので、入ってくるエッジを持たない）
-        private static NodeData CheckInput(NodeData to) => to switch
+        // 繋ぐ元に out があるか（Runner が辿らないエッジを作らない）
+        private static void CheckOutput(NodeData from, string paramName)
         {
-            null => throw new ArgumentNullException(nameof(to)),
-            EntryNode _ => throw new ArgumentException("An Entry has no input: it is where the flow starts.", nameof(to)),
-            ContainerEntryNode _ => throw new ArgumentException(
-                "A container's Entry has no input: connect to the container, and the flow goes on from its Entry.", nameof(to)),
-            _ => to,
-        };
+            switch (from)
+            {
+                case null:
+                    throw new ArgumentNullException(paramName);
+                case ContainerNode container:
+                    throw new ArgumentException(
+                        $"Container '{container.Title}' leads out through its exits. Use ConnectExit(container, exitName, to).", paramName);
+                case ContainerExitNode _:
+                    throw new ArgumentException("An Exit node has no output: the flow leaves the container through the exit it stands for.", paramName);
+                case NoteNode _:
+                    throw new ArgumentException(NoteHasNoPorts, paramName);
+            }
+        }
+
+        // 繋ぐ先に in があるか（Entry は流れの始まりなので、入ってくるエッジを持たない）
+        private static void CheckInput(NodeData to, string paramName)
+        {
+            switch (to)
+            {
+                case null:
+                    throw new ArgumentNullException(paramName);
+                case EntryNode _:
+                    throw new ArgumentException("An Entry has no input: it is where the flow starts.", paramName);
+                case ContainerEntryNode _:
+                    throw new ArgumentException(
+                        "A container's Entry has no input: connect to the container, and the flow goes on from its Entry.", paramName);
+                case NoteNode _:
+                    throw new ArgumentException(NoteHasNoPorts, paramName);
+            }
+        }
 
         private static ContainerExit FindExit(ContainerNode container, string exitName)
         {
