@@ -44,11 +44,11 @@ UPM パッケージ `net.reiga7953.visual-node-editor` として開発してい�
 | グラフでできること | 使うもの |
 |---|---|
 | Yarn のノードを流れの中で再生する | `ADV/Dialogue` ノード（会話が終わると完了イベント `Done` → 無ければ次のノードへ） |
-| フラグでルートを分ける | Event ノードの条件（`Affection >= 3` など。同じ名前の Event を条件違いで並べる） |
+| フラグでルートを分ける | Event ノードの条件（`Affection >= 3` など。同じ名前の Event を条件違いで並べ、条件の無いものを最後に。順はノードのインスペクタの Transitions で並べ替える） |
 | フラグを満たしたら自動で進む | Event ノードのトリガー Automatic |
 | Yarn からグラフを動かす | Yarn のコマンド `<<graph_event 名前>>`（すぐ）/ `<<graph_next 名前>>`（会話が終わったら） |
 | フラグを Yarn と共有する | Blackboard のパラメータ `Name` = Yarn の `$Name` |
-| セーブ・ロード | Graph Event Button の Save / Load、`GraphRunnerBehaviour.SaveSlot` / `LoadSlot`、`GraphSaveSlots` |
+| セーブ・ロード | Graph Event Button の Save / Load、`GraphRunnerBehaviour.SaveSlot` / `LoadSlot`、`GraphSaveSlots`（ロードで入ったかはゲームのコードから `GraphRunner.EnteredFromSave`） |
 
 Yarn はノードの途中から再開できないので、会話の途中でセーブすると、ロードしたときにその会話の最初から（入る前のフラグで）やり直す。
 既読管理・バックログ・オート / スキップ・立ち絵などは Yarn Spinner の Presenter とゲーム側で行う。
