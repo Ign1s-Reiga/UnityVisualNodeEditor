@@ -187,11 +187,11 @@ Codex に 3 マッチパズルのギャルゲーを作らせて出た改善点�
 Codex に 2D のターン制ストラテジーを作らせて出た改善点（翻訳・キャラクターの表示・内容の検証とプレビュー・エディタの日本語化）のうち、
 翻訳の小さな連携と、検証の足し方の説明を入れる（ユーザーの回答）。設計は `docs/01-architecture.md` の「Unity Localization 連携（任意）」。
 
-- [ ] Unity Localization 連携（任意。`Integrations/Localization`）: グラフのパラメータを Smart Strings の変数にする（`Graph Parameter` / `Graph Parameters`。`{graph.Score}` が値の変化で出し直される）。
+- [x] Unity Localization 連携（任意。`Integrations/Localization`）: グラフのパラメータを Smart Strings の変数にする（`Graph Parameter` / `Graph Parameters`。`{graph.Score}` が値の変化で出し直される）。
       翻訳の仕組み（テーブル・CSV・訳の抜けの確認・言語のプレビュー）は Unity Localization と Yarn Spinner のものを使い、持たない
-- [ ] Wiki: ADV の翻訳（Yarn Spinner と Unity Localization の設定）と、言語によって変えない名前（Event 名・ノードのタイトル・パラメータ名）
-- [ ] Wiki: ゲームの内容の確認を問題の一覧に足す（`IGraphIssueCheck` の例。立ち絵や表情の割り当ての抜けなど）
-- [ ] README
+- [x] Wiki: ADV の翻訳（Yarn Spinner と Unity Localization の設定）と、言語によって変えない名前（Event 名・ノードのタイトル・パラメータ名）
+- [x] Wiki: ゲームの内容の確認を問題の一覧に足す（`IGraphIssueCheck` の例。立ち絵や表情の割り当ての抜けなど）
+- [x] README
 
 持たない: キャラクターの表示（表情・立ち絵・顔の切り抜き。グラフに関わらず、Yarn Spinner の Presenter とゲーム側で行う）、
 実際のフォントと大きさでの会話のプレビュー（文字の抜け・はみ出しは TextMeshPro とゲームの UI の確認）。

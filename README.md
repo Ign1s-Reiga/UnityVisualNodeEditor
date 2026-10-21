@@ -54,6 +54,17 @@ Yarn はノードの途中から再開できないので、会話の途中でセ
 既読管理・バックログ・オート / スキップ・立ち絵などは Yarn Spinner の Presenter とゲーム側で行う。
 詳しくは [docs/01-architecture.md](docs/01-architecture.md) の「条件付き遷移」「セーブ・ロード」「Yarn Spinner 連携（任意）」を参照。
 
+## 翻訳する（Unity Localization 連携）
+
+翻訳は Unity Localization（画面の文字）と Yarn Spinner（会話）で行い、このパッケージは翻訳の仕組みを持たない。
+ゲームのプロジェクトに Unity Localization 1.5 以上（`com.unity.localization`）を入れると、このパッケージの Localization 連携（`Integrations/Localization`）が有効になり、
+グラフのパラメータの値を訳した文字列の中に出せる（入れていなければコンパイルされず、影響しない）。
+
+1. Localize String Event（または UI Builder の Localized String のバインディング）の Local Variables に **Graph Parameters** を名前 `graph` で足し、Graph にグラフを入れる
+2. 文字列テーブルの訳を Smart にして `スコア: {graph.Score}` / `Score: {graph.Score}` と書く。値が変わるたびに出し直され、Runner が動く前はグラフの初期値が出る
+
+Event 名・ノードのタイトル・パラメータ名は ID なので訳さない。会話の翻訳（Yarn Spinner と Unity Localization の繋ぎ方）と、訳の抜けを問題の一覧に出す例は Wiki の「翻訳と Unity Localization」を参照。
+
 ## スネーク・パズルを作る（ゲームの Starter）
 
 遊び（蛇の動き・タイルの入れ替え）は C# に書き、タイトル・プレイ中・ポーズ・ゲームオーバー・クリア・レベル・スコアはグラフで扱う。
