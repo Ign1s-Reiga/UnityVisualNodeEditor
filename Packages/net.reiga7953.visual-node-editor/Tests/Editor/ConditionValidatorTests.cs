@@ -86,6 +86,77 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void ARaiseEventAfterAnUnconditionedOneWithTheSameName_NeverFires()
+        {
+            // Codex のエンディングの分岐: 条件の無い Finish が先にあると、Finish if Affection >= 60 は選ばれない
+            var normal = Add(new EventNode { EventName = "Finish" });
+            var romance = Add(new EventNode { EventName = "Finish", Title = "Romance" });
+            romance.AddCondition(new TransitionCondition(_affection.Id, ConditionOperator.GreaterOrEqual) { IntValue = 60 });
+            Connect(_play, normal);
+            Connect(_play, romance);
+
+            var issue = Issues().Single();
+            Assert.That(issue.NodeId, Is.EqualTo(romance.Id));
+            Assert.That(issue.Severity, Is.EqualTo(GraphIssueSeverity.Warning));
+            Assert.That(issue.Message, Does.Contain("'Romance' never fires from 'Play'").And.Contain("Transitions list of 'Play'"));
+        }
+
+        [Test]
+        public void ARaiseEventWithConditionsBeforeTheUnconditionedOne_IsFine()
+        {
+            var romance = Add(new EventNode { EventName = "Finish" });
+            romance.AddCondition(new TransitionCondition(_affection.Id, ConditionOperator.GreaterOrEqual) { IntValue = 60 });
+            Connect(_play, romance);
+            Connect(_play, Add(new EventNode { EventName = "Finish" }));
+            Connect(_play, Add(new EventNode { EventName = "Retry" }));
+
+            Assert.That(Issues(), Is.Empty);
+        }
+
+        [Test]
+        public void ASecondNodeReachedWithoutAnEvent_IsNeverReached()
+        {
+            var first = Add(new StateNode { Title = "First" });
+            var second = Add(new StateNode { Title = "Second" });
+            Connect(_play, first);
+            Connect(_play, Add(new EventNode { EventName = "Go" }));
+            Connect(_play, second);
+
+            var issue = Issues().Single();
+            Assert.That(issue.NodeId, Is.EqualTo(second.Id));
+            Assert.That(issue.Message, Does.Contain("'Second' is never reached from 'Play'").And.Contain("'First'"));
+        }
+
+        [Test]
+        public void TheSecondEdgeOfAnEvent_IsNeverUsed()
+        {
+            var go = Add(new EventNode { EventName = "Go" });
+            Connect(_play, go);
+            Connect(go, Add(new StateNode { Title = "First" }));
+            Connect(go, Add(new StateNode { Title = "Second" }));
+
+            var issue = Issues().Single();
+            Assert.That(issue.NodeId, Is.EqualTo(go.Id), "on the Event itself");
+            Assert.That(issue.Message, Does.Contain("'Go' only goes on to 'First'").And.Contain("'Second'"));
+        }
+
+        [Test]
+        public void DuplicatedEdgesAndContainerExits_AreNotHiddenTransitions()
+        {
+            var done = Add(new EventNode { EventName = "Done" });
+            Connect(_play, done);
+            Connect(_play, done);
+
+            // コンテナの出口ごとのエッジは対象外
+            var stage = Add(new ContainerNode { Title = "Stage" });
+            var exit = stage.Exits.First();
+            _graph.AddEdge(new EdgeData(stage.Id, exit.Id, _play.Id, "in"));
+            _graph.AddEdge(new EdgeData(stage.Id, exit.Id, done.Id, "in"));
+
+            Assert.That(Issues().Where(i => i.Message.Contains("never")), Is.Empty);
+        }
+
+        [Test]
         public void AutomaticEvents_NeedNoName()
         {
             var automatic = Add(new EventNode { Trigger = EventTriggerMode.Automatic });

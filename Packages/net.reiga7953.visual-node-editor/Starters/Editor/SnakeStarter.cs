@@ -1,3 +1,4 @@
+using Reiga.VisualNodeEditor.Editor;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -49,7 +50,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
 
         internal override NodeGraphAsset BuildGraph()
         {
-            var builder = new StarterGraphBuilder();
+            var builder = new NodeGraphBuilder();
             var score = AddParameters(builder);
 
             // ルート: Title → Game（シーン）→ Round → Game Over → Retry / Title
@@ -63,7 +64,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         }
 
         /// <summary>パラメータ（Score・HighScore・Speed）を足し、Score を返す（uGUI 版と UI Toolkit 版で同じ）。</summary>
-        internal static GraphParameter AddParameters(StarterGraphBuilder builder)
+        internal static GraphParameter AddParameters(NodeGraphBuilder builder)
         {
             var score = builder.AddParameter(new GraphParameter(ScoreParameter, GraphParameterType.Int));
             builder.AddParameter(new GraphParameter(HighScoreParameter, GraphParameterType.Int));
@@ -75,7 +76,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// ルートの <paramref name="x"/> から右へ、Round（中身ごと）と Game Over（Retry で Round、Title で <paramref name="title"/>）を足し、Round を返す。
         /// Round の Quit も <paramref name="title"/> へ戻る（uGUI 版と UI Toolkit 版で同じ）。
         /// </summary>
-        internal static ContainerNode AddRound(StarterGraphBuilder builder, GraphParameter score, NodeData title, float x)
+        internal static ContainerNode AddRound(NodeGraphBuilder builder, GraphParameter score, NodeData title, float x)
         {
             var round = builder.AddContainer(RoundContainer, x, 0f, null, GameOverExit, QuitExit);
             var gameOver = builder.Add(new StateNode { Title = GameOverNode, Description = "Shows the score, Retry and Title." }, x + 250f, 0f);
@@ -89,7 +90,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
             builder.SetOnEnter(ready, new ParameterChange(score.Id) { IntValue = 0 });
             var playing = builder.Add(new StateNode { Title = PlayingNode, Description = "The game script moves the snake only here." }, 750f, 0f, round);
             var paused = builder.Add(new StateNode { Title = PausedNode }, 1250f, -150f, round);
-            builder.TimeScaleWhileOn(paused, 0f);
+            paused.AddBehaviour(new TimeScaleBehaviour { TimeScale = 0f });
             builder.Connect(builder.EntryOf(round), ready);
             builder.Connect(ready, builder.AddEvent(GoEvent, 500f, 0f, round), playing);
             builder.Connect(playing, builder.AddEvent(PauseEvent, 1000f, -150f, round), paused);

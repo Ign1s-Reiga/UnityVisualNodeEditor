@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Reiga.VisualNodeEditor.Editor;
 using Reiga.VisualNodeEditor.Editor.Play;
 using Reiga.VisualNodeEditor.Editor.Scenes;
 using UnityEditor;
@@ -61,7 +62,7 @@ namespace Reiga.VisualNodeEditor.Starters.Editor
         /// <summary>
         /// グラフの頭: Entry → Scene ノード <c>Main</c> ─(自動)→ State ノード <c>Title</c>。Title を返す（Start のイベントから先は呼ぶ側が繋ぐ）。
         /// </summary>
-        internal static StateNode AddMainAndTitle(StarterGraphBuilder builder)
+        internal static StateNode AddMainAndTitle(NodeGraphBuilder builder)
         {
             var main = builder.Add(new SceneNode { Title = MainSceneNode }, 250f, 0f);
             var title = builder.Add(new StateNode { Title = TitleNode, Description = "The title screen. Press Start or Enter." }, 750f, 0f);

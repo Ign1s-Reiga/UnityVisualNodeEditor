@@ -33,6 +33,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
 
         private SerializedObject _serializedObject;
         private int _index = -1;
+        private TransitionListView _transitions;
 
         public NodeInspectorView()
         {
@@ -59,6 +60,7 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
             NodeId = null;
             _index = -1;
             _serializedObject = null;
+            _transitions = null;
 
             _index = asset != null && nodeId != null ? IndexOfNode(asset, nodeId) : -1;
             if (_index < 0)
@@ -142,6 +144,14 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                     break;
             }
 
+            // 出ているエッジの順が遷移を調べる順なので、並べ替えられる一覧を出す（行き先が 2 つ以上のときだけ見える）
+            if (TransitionListView.Supports(asset.Nodes[_index]))
+            {
+                _transitions = new TransitionListView(asset, asset.Nodes[_index]);
+                _transitions.Changed += OnTransitionsChanged;
+                content.Add(_transitions);
+            }
+
             Add(content);
             content.Bind(_serializedObject);
             content.TrackSerializedObjectValue(_serializedObject, OnSerializedObjectChanged);
@@ -204,7 +214,18 @@ namespace Reiga.VisualNodeEditor.Editor.Inspector
                 return;
             }
 
+            // グラフで繋いだ・外した、Undo したなど、エッジが変わっていれば一覧に出す
+            _transitions?.Reload();
             NodeChanged?.Invoke(NodeId);
+        }
+
+        /// <summary>Transitions で並べ替えたら、ノードの表示と検証結果を直してもらう（ポートは変わらないので、グラフは作り直さない）。</summary>
+        private void OnTransitionsChanged()
+        {
+            if (NodeId != null)
+            {
+                NodeChanged?.Invoke(NodeId);
+            }
         }
 
         private void OnStructureChanged()

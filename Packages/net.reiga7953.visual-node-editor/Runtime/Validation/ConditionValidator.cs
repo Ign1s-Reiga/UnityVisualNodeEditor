@@ -33,7 +33,7 @@ namespace Reiga.VisualNodeEditor
 
             var validEdges = edges.Where(e => e != null && nodesById.ContainsKey(e.FromNodeId ?? string.Empty) && nodesById.ContainsKey(e.ToNodeId ?? string.Empty)).ToList();
             CheckUnusedConditions(events, validEdges, nodesById, issues);
-            CheckUnreachableAutomatic(present, validEdges, nodesById, issues);
+            CheckHiddenTransitions(present, validEdges, nodesById, issues);
             return issues;
         }
 
@@ -73,30 +73,33 @@ namespace Reiga.VisualNodeEditor
             }
         }
 
-        // 条件の無い自動の Event より後ろ（エッジの順）の自動の Event は、選ばれることが無い
-        private static void CheckUnreachableAutomatic(
+        // 前のエッジがあるために選ばれることの無いエッジ（条件の無い自動の Event・同じ名前で条件の無い Event の後ろ、2 つ目以降の Advance の行き先、Event の 2 本目以降）。
+        // 問題は選ばれない行き先に付ける。Event の 2 本目以降は Event 自身に付ける（行き先はほかから来ることもあるので）
+        private static void CheckHiddenTransitions(
             IEnumerable<NodeData> nodes, IReadOnlyList<EdgeData> edges, IReadOnlyDictionary<string, NodeData> nodesById, List<GraphIssue> issues)
         {
+            var outgoing = new Dictionary<string, List<EdgeData>>();
+            foreach (var edge in edges)
+            {
+                if (!outgoing.TryGetValue(edge.FromNodeId, out var list))
+                {
+                    outgoing.Add(edge.FromNodeId, list = new List<EdgeData>());
+                }
+
+                list.Add(edge);
+            }
+
             foreach (var node in nodes)
             {
-                EventNode always = null;
-                var seen = new HashSet<string>();
-                foreach (var edge in edges.Where(e => e.FromNodeId == node.Id))
+                if (!outgoing.TryGetValue(node.Id, out var list))
                 {
-                    if (!(nodesById[edge.ToNodeId] is EventNode target) || !target.IsAutomatic || !seen.Add(target.Id))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (always != null)
-                    {
-                        issues.Add(new GraphIssue(GraphIssueSeverity.Warning,
-                            $"'{target.Title}' never fires from '{node.Title}': the automatic Event '{always.Title}' before it has no conditions.", target.Id));
-                    }
-                    else if (target.Conditions.Count == 0)
-                    {
-                        always = target;
-                    }
+                foreach (var hidden in TransitionOrder.FindHidden(node, list, id => nodesById.TryGetValue(id, out var found) ? found : null))
+                {
+                    var anchor = hidden.Reason == HiddenTransitionReason.EventFollowsFirstEdge ? node.Id : hidden.Target.Id;
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Warning, TransitionOrder.Describe(node, hidden), anchor));
                 }
             }
         }

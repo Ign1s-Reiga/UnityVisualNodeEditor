@@ -286,6 +286,13 @@ namespace Reiga.VisualNodeEditor
         public bool IsRunning { get; private set; }
 
         /// <summary>
+        /// 今のノードに、セーブから（<see cref="RestoreState"/> で）入ったか。入るとき（振る舞いの OnEnter・<see cref="NodeEntered"/> より前）に true になり、
+        /// 次のノードに入るか止まるまで true のまま（ロードで読み込んだシーンのオブジェクトの Start からも見られる）。
+        /// ロードでもノードに入り直すので、入ったときの初期化（盤を新しく作るなど）をこれで分け、セーブの値（パラメータ・<see cref="Extras"/>。入る前に戻してある）から作り直す。
+        /// </summary>
+        public bool EnteredFromSave { get; private set; }
+
+        /// <summary>
         /// パラメータ（Blackboard）に無い値の置き場（Yarn Spinner の変数など、アドオンが使う）。
         /// <see cref="Start"/> で空になり、セーブ（<see cref="CaptureState"/>）に含まれる。
         /// </summary>
@@ -473,6 +480,7 @@ namespace Reiga.VisualNodeEditor
 
             var current = Current;
             Current = null;
+            EnteredFromSave = false;
             if (current != null)
             {
                 ExitBehaviours();
@@ -606,6 +614,7 @@ namespace Reiga.VisualNodeEditor
                 }
 
                 Current = null;
+                EnteredFromSave = false;
             }
 
             // Start() と同じく、振る舞いはアセットの値から複製し直す
@@ -625,7 +634,7 @@ namespace Reiga.VisualNodeEditor
                 _sceneLoader?.LoadScene(LastScene);
             }
 
-            if (Enter(node, generation))
+            if (Enter(node, generation, fromSave: true))
             {
                 RequestAutomaticCheck();
             }
@@ -882,8 +891,9 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>
         /// ノードに入る。通知の中で止められた・再開された（世代が変わった）ら、残りの処理をせず false を返す。
+        /// <paramref name="fromSave"/> はセーブから再開するとき（<see cref="EnteredFromSave"/>）。
         /// </summary>
-        private bool Enter(NodeData node, int generation)
+        private bool Enter(NodeData node, int generation, bool fromSave = false)
         {
             var previous = Current;
             if (previous != null)
@@ -910,6 +920,7 @@ namespace Reiga.VisualNodeEditor
             }
 
             Current = node;
+            EnteredFromSave = fromSave;
             _entryCount++;
             if (!EnterBehaviours(node, generation))
             {

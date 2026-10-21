@@ -54,7 +54,8 @@ and to reload MCP servers in Claude Code (`/mcp`). The project's `.mcp.json` alr
 - A flag is a Blackboard parameter: `add_parameter` (`name`, `type` Bool/Int/Float/String, optional `default`).
 - An Event can carry `conditions` (all must hold), e.g. `[{"parameter": "Affection", "op": ">=", "value": 3}]`.
   To branch, connect several Events **with the same name** from one waiting node: the most specific first, one without conditions last.
-  `Raise("Done")` takes the first one whose conditions hold.
+  `Raise("Done")` takes the first one whose conditions hold. The order is the order you `connect` them (new edges go last);
+  if `validate_graph` says an Event "never fires", `disconnect` the one without conditions and `connect` it again so it moves to the end.
 - `trigger: "Automatic"` makes an Event fire by itself as soon as its conditions hold (checked when the node is entered and when
   a parameter changes); it needs no name. One without conditions moves on right away (e.g. Scene "Story" → straight into a container).
 

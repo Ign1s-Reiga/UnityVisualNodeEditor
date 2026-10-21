@@ -33,6 +33,10 @@ runner.Raise("StartGame");
 - Scene・State ノードで止まり、Entry・Event ノードは通過する。`Advance()` はイベントを介さずに次のノードへ進む
 - Play 中は、グラフウィンドウで実行中のノードが緑色に強調される
 - Blackboard（View メニュー）で定義したパラメータは、実行中に `runner.GetInt("Lives")` / `runner.SetInt("Lives", 2)` のように読み書きできる（値は Runner ごと、`Start()` のたびに既定値へ戻る）
+- 同じノードから出ている遷移は、上から（繋いだ順に）調べて最初に当てはまるものに進む。順はノードのインスペクタの Transitions で見て、ドラッグで並べ替える
+  （同じ名前の Event を条件違いで並べるときは、条件の無いものを最後に。前の遷移のために選ばれない分岐は、検証で Warning になる）
+- セーブから再開（`RestoreState` / `LoadSlot`）すると、保存したノードに入り直す（振る舞いの OnEnter・`NodeEntered` も呼ばれる）。
+  入ったときの初期化（盤を新しく作るなど）は `runner.EnteredFromSave` で分け、パラメータ・`Extras` から作り直す
 
 詳しい規則はリポジトリの `docs/01-architecture.md`「ランタイム実行（GraphRunner）」を参照。
 
@@ -86,6 +90,24 @@ public class PlayerMovement : NodeBehaviour
 `Assets > Create > Visual Node Editor > Snake Starter` / `Sliding Puzzle Starter` で、グラフ・Title と Game のシーン・ゲームのスクリプトを作る。
 スクリプトはコンパイル後に Game のシーンの盤へ自動で付き、ツールバーの Play ですぐ遊べる（uGUI が必要）。書き出したスクリプトは自由に書き換えてよい。
 `Snake Starter (UI Toolkit)` / `Sliding Puzzle Starter (UI Toolkit)` は、1 つのシーンで、画面を UI Toolkit（UXML / USS。UI Builder で直せる）にしてノードに付ける。
+
+## コードからグラフを組み立てる
+
+エディタのコード（自前の Starter・テスト・自動の組み立て）では `NodeGraphBuilder` を使う。ノードの位置・親のコンテナ・ポート名をまとめて指定できる。
+
+```csharp
+var builder = new NodeGraphBuilder(); // Entry 入りの新しいグラフ
+var affection = builder.AddParameter("Affection", GraphParameterType.Int);
+var story = builder.Add(new StateNode { Title = "Story" }, 250f, 0f);
+builder.Connect(builder.Entry, story);
+var loved = builder.AddEvent("Finish", 500f, -100f);
+loved.AddCondition(new TransitionCondition(affection.Id, ConditionOperator.GreaterOrEqual) { IntValue = 60 });
+builder.Connect(story, loved, builder.Add(new StateNode { Title = "Romance" }, 750f, -100f));
+builder.Connect(story, builder.AddEvent("Finish", 500f, 100f), builder.Add(new StateNode { Title = "Normal" }, 750f, 100f)); // 条件の無いものは最後に
+AssetDatabase.CreateAsset(builder.Graph, "Assets/Story.asset");
+```
+
+`GraphRunner` は MonoBehaviour に依存しないので、組んだグラフの流れは EditMode テストで確かめられる（`SetInt` → `Raise` → `Current`）。
 
 ## UI Toolkit の画面（UI Builder）
 

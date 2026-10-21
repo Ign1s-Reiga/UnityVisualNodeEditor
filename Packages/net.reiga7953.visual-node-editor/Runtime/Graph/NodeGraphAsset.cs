@@ -193,6 +193,40 @@ namespace Reiga.VisualNodeEditor
             return true;
         }
 
+        /// <summary>
+        /// <paramref name="edge"/> を、同じノードから出ているエッジ（アセット内の順）の中で <paramref name="index"/> 番目へ移す（範囲外は端に寄せる）。
+        /// 同じノードからの遷移はこの順で調べる（最初に当てはまるものに進む）ので、優先順を変えるのに使う。ほかのノードのエッジの位置は変えない。
+        /// <paramref name="edge"/> が無ければ何もせず false。
+        /// </summary>
+        public bool MoveEdge(EdgeData edge, int index)
+        {
+            if (edge == null || !_edges.Contains(edge))
+            {
+                return false;
+            }
+
+            // 同じノードのエッジが占めている位置に、並べ替えた順で入れ直す
+            var slots = new List<int>();
+            var siblings = new List<EdgeData>();
+            for (var i = 0; i < _edges.Count; i++)
+            {
+                if (_edges[i] != null && _edges[i].FromNodeId == edge.FromNodeId)
+                {
+                    slots.Add(i);
+                    siblings.Add(_edges[i]);
+                }
+            }
+
+            siblings.Remove(edge);
+            siblings.Insert(Mathf.Clamp(index, 0, siblings.Count), edge);
+            for (var i = 0; i < slots.Count; i++)
+            {
+                _edges[slots[i]] = siblings[i];
+            }
+
+            return true;
+        }
+
         public void AddGroup(GroupData group) => _groups.Add(group);
 
         public bool RemoveGroup(GroupData group) => _groups.Remove(group);
