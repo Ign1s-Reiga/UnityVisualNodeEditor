@@ -9,6 +9,7 @@ namespace Reiga.VisualNodeEditor.Tests
     {
         private NodeGraphAsset _graph;
         private GraphParameter _affection;
+        private EntryNode _entry;
         private StateNode _play;
 
         [SetUp]
@@ -17,9 +18,9 @@ namespace Reiga.VisualNodeEditor.Tests
             _graph = ScriptableObject.CreateInstance<NodeGraphAsset>();
             _affection = new GraphParameter("Affection", GraphParameterType.Int);
             _graph.AddParameter(_affection);
-            var entry = Add(new EntryNode());
+            _entry = Add(new EntryNode());
             _play = Add(new StateNode { Title = "Play" });
-            Connect(entry, _play);
+            Connect(_entry, _play);
         }
 
         [TearDown]
@@ -123,8 +124,52 @@ namespace Reiga.VisualNodeEditor.Tests
             Connect(_play, second);
 
             var issue = Issues().Single();
-            Assert.That(issue.NodeId, Is.EqualTo(second.Id));
+            Assert.That(issue.NodeId, Is.EqualTo(_play.Id), "on the node to reorder: Second may be reached from elsewhere");
             Assert.That(issue.Message, Does.Contain("'Second' is never reached from 'Play'").And.Contain("'First'"));
+        }
+
+        [Test]
+        public void AnAutomaticEventWithoutConditions_LeavesBeforeAnythingElseCanHappen()
+        {
+            var next = Add(new StateNode { Title = "Next" });
+            var auto = Add(new EventNode { Trigger = EventTriggerMode.Automatic, Title = "Onward" });
+            var pause = Add(new EventNode { EventName = "Pause" });
+            var credits = Add(new StateNode { Title = "Credits" });
+            Connect(_play, pause);
+            Connect(_play, credits);
+            Connect(_play, auto);
+            Connect(auto, next);
+
+            var issues = Issues();
+            Assert.That(issues.Select(i => i.NodeId), Is.EquivalentTo(new[] { pause.Id, _play.Id }));
+            Assert.That(issues.Single(i => i.NodeId == pause.Id).Message,
+                Does.Contain("'Pause' is never taken from 'Play'").And.Contain("'Onward' has no conditions"));
+            Assert.That(issues.Single(i => i.NodeId == _play.Id).Message, Does.Contain("'Credits' is never taken"));
+        }
+
+        [Test]
+        public void AnAutomaticEventThatOnlyNotifiesOrHasConditions_DoesNotLeave()
+        {
+            var notify = Add(new EventNode { Trigger = EventTriggerMode.Automatic, EventName = "Entered" });
+            var guarded = Add(new EventNode { Trigger = EventTriggerMode.Automatic, Title = "Guarded" });
+            guarded.AddCondition(new TransitionCondition(_affection.Id, ConditionOperator.Greater));
+            Connect(guarded, Add(new StateNode { Title = "Next" }));
+            Connect(_play, guarded);
+            Connect(_play, notify);
+            Connect(_play, Add(new EventNode { EventName = "Pause" }));
+
+            Assert.That(Issues(), Is.Empty);
+        }
+
+        [Test]
+        public void AnEntryThatGoesOnToANode_NeverWaitsForItsEvents()
+        {
+            var skip = Add(new EventNode { EventName = "Skip" });
+            Connect(_entry, skip);
+
+            var issue = Issues().Single();
+            Assert.That(issue.NodeId, Is.EqualTo(skip.Id));
+            Assert.That(issue.Message, Does.Contain("an Entry goes straight on to its first connected node that is not an Event, 'Play'"));
         }
 
         [Test]

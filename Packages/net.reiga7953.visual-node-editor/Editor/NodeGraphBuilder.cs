@@ -123,19 +123,24 @@ namespace Reiga.VisualNodeEditor.Editor
             }, x, y, parent);
 
         /// <summary><paramref name="from"/> の out から <paramref name="to"/> の in へ繋ぐ（そのノードから出ているエッジの最後に足す）。</summary>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="from"/> に out が無い（コンテナは出口から出るので <see cref="ConnectExit"/> を使う。Exit ノードは出口へ進むだけ）、
+        /// または <paramref name="to"/> に in が無い（Entry）。
+        /// </exception>
         public void Connect(NodeData from, NodeData to)
         {
-            if (from == null)
+            switch (from)
             {
-                throw new ArgumentNullException(nameof(from));
+                case null:
+                    throw new ArgumentNullException(nameof(from));
+                case ContainerNode container:
+                    throw new ArgumentException(
+                        $"Container '{container.Title}' leads out through its exits. Use ConnectExit(container, exitName, to).", nameof(from));
+                case ContainerExitNode _:
+                    throw new ArgumentException("An Exit node has no output: the flow leaves the container through the exit it stands for.", nameof(from));
             }
 
-            if (to == null)
-            {
-                throw new ArgumentNullException(nameof(to));
-            }
-
-            Graph.AddEdge(new EdgeData(from.Id, Out, to.Id, In));
+            Graph.AddEdge(new EdgeData(from.Id, Out, CheckInput(to).Id, In));
         }
 
         /// <summary><paramref name="from"/> → <paramref name="via"/>（Event）→ <paramref name="to"/>。</summary>
@@ -150,12 +155,7 @@ namespace Reiga.VisualNodeEditor.Editor
         public void ConnectExit(ContainerNode container, string exitName, NodeData to)
         {
             var exit = FindExit(container, exitName);
-            if (to == null)
-            {
-                throw new ArgumentNullException(nameof(to));
-            }
-
-            Graph.AddEdge(new EdgeData(container.Id, exit.Id, to.Id, In));
+            Graph.AddEdge(new EdgeData(container.Id, exit.Id, CheckInput(to).Id, In));
         }
 
         /// <summary><paramref name="node"/> に入ったとき、<paramref name="changes"/> を行う Set Parameter の振る舞いを付ける。</summary>
@@ -170,6 +170,16 @@ namespace Reiga.VisualNodeEditor.Editor
             behaviour.Changes.AddRange(changes ?? Array.Empty<ParameterChange>());
             node.AddBehaviour(behaviour);
         }
+
+        // 繋ぐ先に in があるか（Entry は流れの始まりなので、入ってくるエッジを持たない）
+        private static NodeData CheckInput(NodeData to) => to switch
+        {
+            null => throw new ArgumentNullException(nameof(to)),
+            EntryNode _ => throw new ArgumentException("An Entry has no input: it is where the flow starts.", nameof(to)),
+            ContainerEntryNode _ => throw new ArgumentException(
+                "A container's Entry has no input: connect to the container, and the flow goes on from its Entry.", nameof(to)),
+            _ => to,
+        };
 
         private static ContainerExit FindExit(ContainerNode container, string exitName)
         {

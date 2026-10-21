@@ -73,8 +73,8 @@ namespace Reiga.VisualNodeEditor
             }
         }
 
-        // 前のエッジがあるために選ばれることの無いエッジ（条件の無い自動の Event・同じ名前で条件の無い Event の後ろ、2 つ目以降の Advance の行き先、Event の 2 本目以降）。
-        // 問題は選ばれない行き先に付ける。Event の 2 本目以降は Event 自身に付ける（行き先はほかから来ることもあるので）
+        // 選ばれることの無いエッジ（条件の無い自動の Event・同じ名前で条件の無い Event の後ろ、2 つ目以降の Advance の行き先、Event の 2 本目以降、
+        // 入るとすぐに出ていくノード・待たない Entry の遷移）。問題は選ばれない Event か、並べ替えるノードに付ける（TransitionOrder.AnchorOf）
         private static void CheckHiddenTransitions(
             IEnumerable<NodeData> nodes, IReadOnlyList<EdgeData> edges, IReadOnlyDictionary<string, NodeData> nodesById, List<GraphIssue> issues)
         {
@@ -89,17 +89,14 @@ namespace Reiga.VisualNodeEditor
                 list.Add(edge);
             }
 
-            foreach (var node in nodes)
-            {
-                if (!outgoing.TryGetValue(node.Id, out var list))
-                {
-                    continue;
-                }
+            IEnumerable<EdgeData> OutgoingOf(string id) => outgoing.TryGetValue(id, out var list) ? list : Enumerable.Empty<EdgeData>();
+            NodeData FindNode(string id) => nodesById.TryGetValue(id, out var found) ? found : null;
 
-                foreach (var hidden in TransitionOrder.FindHidden(node, list, id => nodesById.TryGetValue(id, out var found) ? found : null))
+            foreach (var node in nodes.Where(n => outgoing.ContainsKey(n.Id)))
+            {
+                foreach (var hidden in TransitionOrder.FindHidden(node, OutgoingOf, FindNode))
                 {
-                    var anchor = hidden.Reason == HiddenTransitionReason.EventFollowsFirstEdge ? node.Id : hidden.Target.Id;
-                    issues.Add(new GraphIssue(GraphIssueSeverity.Warning, TransitionOrder.Describe(node, hidden), anchor));
+                    issues.Add(new GraphIssue(GraphIssueSeverity.Warning, TransitionOrder.Describe(node, hidden), TransitionOrder.AnchorOf(node, hidden)));
                 }
             }
         }

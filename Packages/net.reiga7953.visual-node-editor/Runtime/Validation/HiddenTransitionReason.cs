@@ -14,5 +14,11 @@ namespace Reiga.VisualNodeEditor
 
         /// <summary>Event から出ている 2 本目以降のエッジ（Event は最初のエッジの先にしか進まない）。</summary>
         EventFollowsFirstEdge,
+
+        /// <summary>条件が無く先へ進む自動の Event があるので、ノードに入るとすぐに出ていく（Raise・Advance は選ばれない）。</summary>
+        LeavesRightAway,
+
+        /// <summary>Entry は Event 以外の行き先があれば、待たずにそこへ進む（Entry から出ている Event は起こせない）。</summary>
+        EntryGoesOn,
     }
 }
