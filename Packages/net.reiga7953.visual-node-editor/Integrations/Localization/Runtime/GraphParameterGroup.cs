@@ -11,7 +11,7 @@ namespace Reiga.VisualNodeEditor.Localization
     /// グラフのパラメータ（Blackboard）全部を、Unity Localization の Smart Strings で読む変数のまとまり。
     /// Localized String の Local Variables（または Global Variables Group）に <c>graph</c> などの名前で足し、文字列に <c>{graph.Score}</c> と書く。
     /// <para>
-    /// 名前ごとに <see cref="GraphParameterVariable"/> を返すので、値が変わる・Runner が始まる / 止まると文字列が作り直される。
+    /// 名前ごとに <see cref="GraphParameterVariable"/> を返すので、値が変わる・値を読む Runner が替わると文字列が作り直される（Runner が止まっても最後の値のまま）。
     /// グラフを指定していれば、そのグラフに無い名前は返さない（Smart Strings の書式エラーになる）。
     /// </para>
     /// </summary>
@@ -19,7 +19,7 @@ namespace Reiga.VisualNodeEditor.Localization
     [DisplayName("Graph Parameters")]
     public sealed class GraphParameterGroup : IVariableGroup, IVariable
     {
-        [Tooltip("The graph whose running Graph Runner gives the values (the start values while none runs). Empty: any running graph.")]
+        [Tooltip("The graph whose running Graph Runner gives the values (after it stops, its last values; before any runs, the start values). Empty: any running graph.")]
         [SerializeField] private NodeGraphAsset _graph;
 
         [NonSerialized] private Dictionary<string, GraphParameterVariable> _variables;
