@@ -74,6 +74,10 @@ Position などエディタ専用の情報も Runtime の型に持たせる（Un
 - 追加: 検索ウィンドウ（`NodeSearchWindow`、`[NodeMenu]` のパスで階層化）で選んだ型を生成し、アセットと View の両方に追加
 - 編集: `graphViewChanged` コールバックで以下を即座にアセットへ反映し、`EditorUtility.SetDirty`
   - `edgesToCreate` → `EdgeData` を追加
+    - エッジの端を別のポートへ付け替えると、GraphView は古いエッジ 1 本の削除と新しいエッジの作成を、同じ操作の中で続けて知らせる。
+      新しいエッジが古いエッジと同じノードから出ていれば、そのノードのエッジの中で古いエッジがあった位置に入れる（遷移を調べる順を変えない）。
+      覚えておくのはその操作の間だけ（`EditorApplication.delayCall` で忘れる。エッジを消した後に別の操作で繋いだエッジは、これまでどおり最後に付く）。
+      空き地へ落としてノードを作って繋ぐとき（検索を挟む）は、最後に付く
   - `elementsToRemove` → `NodeView` / `Edge` / `GroupView` / `StickyNoteView` に対応するデータを削除
   - `movedElements` → `NodeData.Position` / `GroupData.Position` / `StickyNoteData.Rect` の位置を更新
   - データの特定は常に ID（エッジはポート対の 4 つ組）で行い、View が保持するインスタンスの同一性には頼らない
@@ -608,11 +612,17 @@ Event ノードに宣言的な条件を持たせるだけにし、ロジック�
 | Warning | 同じ名前で条件の無い Raise の Event より後ろにある、その名前の Raise の Event（選ばれることが無い。例: `Finish` の後ろの `Finish if Affection >= 60`） |
 | Warning | Event 以外のノードへのエッジより後ろにある、Event 以外のノードへのエッジ（`Advance` と Entry は最初のものにしか進まない） |
 | Warning | Event から出ている 2 本目以降のエッジ（Event は最初のエッジの先にしか進まない） |
+| Warning | 条件が無く先へ進む自動の Event があるノードの、Raise の Event と Event 以外の行き先（入るとすぐに自動の Event で出ていくので選ばれない） |
+| Warning | Event 以外の行き先がある Entry（コンテナの Entry も）から出ている Event（Entry は待たずにその行き先へ進むので起こせない） |
 | Warning | 別の Event から繋がっている Event の条件・自動（使われない） |
 
-- 「選ばれることが無い」エッジは、同じノードから出ているエッジの順だけで決める（`TransitionOrder`。Runtime。検証とインスペクタの Transitions で同じ判定を使う）。
-  上の 3 つは Event 以外のノード（待機ノード・Entry・コンテナの Entry）から、4 つ目は Event から出ているエッジが対象。コンテナ（出口ごとのエッジ）は対象外
-- 問題は選ばれない側のノード（4 つ目は Event 自身）に付け、どのノードの Transitions で並べ替えればよいかをメッセージに書く
+- 「選ばれることが無い」エッジは、同じノードから出ているエッジの順と、自動の Event・Entry の進み方で決める（`TransitionOrder`。Runtime。検証とインスペクタの Transitions で同じ判定を使う）。
+  4 つ目は Event から、それ以外は Event 以外のノード（待機ノード・Entry・コンテナの Entry）から出ているエッジが対象。コンテナ（出口ごとのエッジ）は対象外
+- 「入るとすぐに出ていく」は、条件の無い自動の Event が先へ進む（出力エッジがある）ときだけ。それより前の自動の Event もすべて先へ進むときに限る
+  （先の無い自動の Event は通知だけしてノードに留まるので、条件を満たしても出ていかないことがある）。
+  入ったときの振る舞い・`NodeEntered` の中で Raise すると自動の Event より先に進めるが、その使い方は数えない
+- 問題は、選ばれない Event（ふつうは 1 つのノードからしか来ない）か、並べ替えるノード（Event 以外の行き先はほかから来ることもあるので、行き先ではなく出ているノード。Event の 2 本目以降は Event 自身）に付け、
+  どのノードの Transitions で並べ替えればよいかをメッセージに書く（`TransitionOrder.AnchorOf`）
 - 同じ行き先への重複したエッジは 1 本として数える（重複は別の Warning）
 
 ### エディタ
@@ -915,7 +925,8 @@ Editor の公開 API。自前の Starter・テスト・自動の組み立ての�
   `Connect(from, to)`（`out` → `in`）、`Connect(from, viaEvent, to)`、`ConnectExit(container, exitName, to)`、`SetOnEnter(node, changes...)`（Set Parameter の振る舞い）
 - 繋いだ順が、同じノードからの遷移を調べる順になる（条件の無い Event は最後に繋ぐ）
 - 位置は呼び出し側が決める（自動では並べない）。検証はしない（組み立てたら `GraphValidator.Validate` で確かめる）。
-  コンテナ・Exit・出口の名前が無いなど、組み立て方の誤りは例外にする（黙って繋がないグラフを作らない）
+  コンテナ・Exit・出口の名前が無い、ポートの無い向きに繋ぐ（コンテナから `Connect`。出口からは `ConnectExit`、Exit ノードから、Entry へ）など、
+  組み立て方の誤りは例外にする（黙って繋がない・Runner が辿らないエッジを作らない）
 
 ## Build Settings 連携
 
@@ -1092,7 +1103,8 @@ GraphView / Node は自身に既定の USS を持つ。同じ詳細度のルー�
 - Transitions（`TransitionListView`）: 行き先が 2 つ以上あるノード（コンテナを除く）に、出ているエッジを調べる順（アセット内の順）に並べる。
   行は種類（`Raise` / `Auto` / `Next`）・行き先（Event ならタイトルと条件、`→` でその先のノード）。ドラッグで並べ替える（`NodeGraphAsset.MoveEdge`、Undo 可）。
   選ばれることの無い行は薄く出し（USS クラス `vne-transition-list__row--hidden`）、理由をツールチップに出す（検証と同じ `TransitionOrder` の判定）。
-  グラフで繋いだ・外した、Undo したなど、アセットが変わったら作り直す。見出しの下に「上から調べ、最初に当てはまるものに進む」と書く
+  グラフで繋いだ・外した、Undo したなど、アセットが変わったら作り直す。作り直す前にドラッグされ、一覧のエッジがアセットと合わなければ、動かさずに作り直す
+  （一覧の位置とアセットの位置がずれ、違う順に入れてしまうため）。見出しの下に「上から調べ、最初に当てはまるものに進む」と書く
 - ラベル幅はパネル幅に対する割合、入力欄は縮められるようにし、幅 220px でも全フィールドを操作できるようにする
 - 編集はすべて `SerializedObject` のバインディング経由（Undo が効く）。変更を検知したらノード表示と検証結果を更新する
 
