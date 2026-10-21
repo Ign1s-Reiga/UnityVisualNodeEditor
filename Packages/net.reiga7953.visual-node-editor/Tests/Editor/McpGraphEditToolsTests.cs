@@ -420,6 +420,7 @@ namespace Reiga.VisualNodeEditor.Tests
             var state = McpTestClient.CallToolForObject(_protocol, "get_runtime_state", Args(("graph", _path)));
             var running = (Dictionary<string, object>)((List<object>)state["runners"]).Single();
             Assert.That(running["location"], Is.EqualTo("Title"));
+            Assert.That(running["enteredFromSave"], Is.EqualTo(false));
             Assert.That(((List<object>)running["actions"]).Cast<Dictionary<string, object>>().Select(a => a["event"]), Is.EqualTo(new[] { "StartGame" }));
 
             var wrong = McpTestClient.CallTool(_protocol, "send_event", Args(("event", "Finish")));

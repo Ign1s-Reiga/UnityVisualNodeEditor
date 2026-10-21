@@ -23,7 +23,8 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
             yield return new McpTool(
                 "get_runtime_state",
                 "While a graph runs (Play mode): where each running graph is (current node and the containers it is in, e.g. 'Stage › Play'), " +
-                "what can happen next (events it can raise, or Advance), and the current parameter values.",
+                "what can happen next (events it can raise, or Advance), the current parameter values, " +
+                "and whether the current node was entered by loading a save (enteredFromSave).",
                 McpSchema.Object(new Dictionary<string, object>
                 {
                     [GraphArgument] = McpSchema.String("Only this graph (asset path). Optional; by default every running graph."),
@@ -106,6 +107,7 @@ namespace Reiga.VisualNodeEditor.Editor.Mcp
                         ["type"] = NodeDisplay.GetTypeDisplayName(current.GetType()),
                     },
                 ["location"] = RuntimePanel.GetLocation(runner),
+                ["enteredFromSave"] = runner.EnteredFromSave,
                 ["actions"] = RuntimeActions.For(runner.Query, current).Select(a => new Dictionary<string, object>
                 {
                     ["kind"] = a.Kind,

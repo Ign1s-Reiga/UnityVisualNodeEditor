@@ -66,6 +66,48 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         [Test]
+        public void EnteredFromSave_IsSetBeforeTheNodeIsEntered_AndStaysUntilItIsLeft()
+        {
+            var runner = Started();
+            runner.Raise("Go");
+            var state = runner.CaptureState();
+            Assert.That(runner.EnteredFromSave, Is.False, "entered by Raise");
+
+            var entered = new List<string>();
+            var exited = new List<string>();
+            runner.NodeEntered += node => entered.Add($"{Name(node)}:{runner.EnteredFromSave}");
+            runner.NodeExited += node => exited.Add($"{Name(node)}:{runner.EnteredFromSave}");
+
+            Assert.That(runner.RestoreState(state), Is.True);
+            Assert.That(runner.EnteredFromSave, Is.True, "still true after the call, for objects of the loaded scene");
+            runner.Raise("End");
+
+            Assert.That(entered, Is.EqualTo(new[] { "Chapter:True", "End:False", "Ending:False" }));
+            Assert.That(exited, Is.EqualTo(new[] { "Chapter:False", "Chapter:True", "End:False" }));
+            Assert.That(runner.EnteredFromSave, Is.False);
+        }
+
+        [Test]
+        public void EnteredFromSave_IsSeenByBehavioursOnEnter_AndClearedByStop()
+        {
+            SaveFlagProbeBehaviour.Seen.Clear();
+            _chapter.AddBehaviour(new SaveFlagProbeBehaviour());
+            var runner = Started();
+            runner.Raise("Go");
+            var state = runner.CaptureState();
+            runner.Stop();
+
+            var restored = New();
+            restored.RestoreState(state);
+            Assert.That(restored.EnteredFromSave, Is.True);
+            restored.Stop();
+
+            Assert.That(SaveFlagProbeBehaviour.Seen, Is.EqualTo(new[] { false, true }));
+            Assert.That(restored.EnteredFromSave, Is.False);
+            Assert.That(runner.EnteredFromSave, Is.False);
+        }
+
+        [Test]
         public void Capture_NeedsARunningGraph()
         {
             Assert.Throws<InvalidOperationException>(() => New().CaptureState());
@@ -273,6 +315,8 @@ namespace Reiga.VisualNodeEditor.Tests
         }
 
         private EventNode Event(string name) => Add(new EventNode { EventName = name });
+
+        private static string Name(NodeData node) => node is EventNode eventNode ? eventNode.EventName : node.Title;
 
         private T Add<T>(T node) where T : NodeData
         {
