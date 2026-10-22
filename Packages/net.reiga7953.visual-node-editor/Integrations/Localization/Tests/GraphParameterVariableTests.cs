@@ -105,6 +105,44 @@ namespace Reiga.VisualNodeEditor.Localization.Tests
         }
 
         [Test]
+        public void RestartingTheSameRunner_TellsTheText()
+        {
+            _variable.ValueChanged += OnChanged;
+            _runner.Start();
+            _runner.SetInt("Score", 3);
+            _runner.Stop();
+            _changes = 0;
+
+            // リトライなど: Start はパラメータを初期値に戻してから Started を出す
+            _runner.Start();
+
+            Assert.That(_changes, Is.EqualTo(1), "the parameters went back to their start values");
+            Assert.That(_variable.Value, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ReadingTheValueFirst_DoesNotHideTheNewRunner()
+        {
+            // グループの変数は文字列の間で共有される: ほかの文字列が先に作り直して値を読んでも、知らせる
+            object read = null;
+            Action<GraphRunner> readFirst = runner => read = _variable.Value;
+            GraphRunner.Started += readFirst;
+            try
+            {
+                _variable.ValueChanged += OnChanged;
+
+                _runner.Start();
+
+                Assert.That(read, Is.EqualTo(0), "the value was read before the variable heard of the runner");
+                Assert.That(_changes, Is.EqualTo(1));
+            }
+            finally
+            {
+                GraphRunner.Started -= readFirst;
+            }
+        }
+
+        [Test]
         public void WithoutAGraph_AnotherRunnerStarting_ChangesNothing()
         {
             _variable.Graph = null;
