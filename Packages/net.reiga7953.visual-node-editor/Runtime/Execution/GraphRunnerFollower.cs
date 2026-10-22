@@ -4,7 +4,8 @@ namespace Reiga.VisualNodeEditor
 {
     /// <summary>
     /// グラフ（null なら実行中のどれか）を実行中の Runner を探して追い、その Runner のノードの出入り・パラメータの変化を伝える
-    /// （UI Toolkit の Graph Button・Graph Parameter Label・Graph Node Panel が使う）。
+    /// （UI Toolkit の Graph Button・Graph Parameter Label・Graph Node Panel・Graph Screen Host と、Localization 連携の Graph Parameter が使う。
+    /// 知らせ方を変えるときは、Localization 連携のテストも確かめる）。
     /// Runner は最初のシーンに残り、画面が先に出ることもあるので、<see cref="GraphRunner.Started"/> / <see cref="GraphRunner.Stopped"/> で探し直す。
     /// </summary>
     internal sealed class GraphRunnerFollower

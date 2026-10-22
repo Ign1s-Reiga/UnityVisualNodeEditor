@@ -12,7 +12,7 @@ namespace Reiga.VisualNodeEditor.Localization
     /// グラフのパラメータをまとめて読むなら <see cref="GraphParameterGroup"/>（<c>{graph.Score}</c>）。
     /// <para>
     /// 値は、そのグラフを実行中の Runner のもの。実行中のものが無ければ、最後に値を読んだ Runner（止まったときの値のまま）、それも無ければグラフの初期値。
-    /// 文字列が使っている間（<see cref="ValueChanged"/> に登録がある間）だけ Runner を追い、値が変わる・値を読む Runner が替わると <see cref="ValueChanged"/> を出す
+    /// 文字列が使っている間（<see cref="ValueChanged"/> に登録がある間）だけ Runner を追い、値が変わる・追う Runner が替わる（止まった Runner がもう一度始まるときも）と <see cref="ValueChanged"/> を出す
     /// （Localized String が文字列を作り直す）。
     /// </para>
     /// </summary>
@@ -29,6 +29,7 @@ namespace Reiga.VisualNodeEditor.Localization
         [NonSerialized] private Action<IVariable> _valueChanged;
         [NonSerialized] private GraphRunnerFollower _follower;
         [NonSerialized] private GraphRunner _source;
+        [NonSerialized] private GraphRunner _followed;
         [NonSerialized] private bool _quiet;
 
         /// <summary>空の変数（Local Variables の追加のメニューから作るとき）。</summary>
@@ -45,7 +46,7 @@ namespace Reiga.VisualNodeEditor.Localization
             _parameter = parameter ?? string.Empty;
         }
 
-        /// <summary>値が変わったとき（パラメータが変わった・値を読む Runner が替わった・<see cref="Graph"/> か <see cref="Parameter"/> を替えた）。</summary>
+        /// <summary>値が変わったとき（パラメータが変わった・追う Runner が替わった・<see cref="Graph"/> か <see cref="Parameter"/> を替えた）。</summary>
         public event Action<IVariable> ValueChanged
         {
             add
@@ -62,6 +63,7 @@ namespace Reiga.VisualNodeEditor.Localization
                 if (_valueChanged == null && IsListening)
                 {
                     Follower.Stop();
+                    _followed = null;
                 }
             }
         }
@@ -182,11 +184,25 @@ namespace Reiga.VisualNodeEditor.Localization
             return _source;
         }
 
-        // Runner が始まった・止まった: 値を読む Runner が替わったときだけ知らせる（止まってほかに無ければ、最後の値のまま）
+        // Runner が始まった・止まった: 追う Runner が替わったときだけ知らせる（止まってほかに無ければ、最後の値のまま）。
+        // 止まった Runner がもう一度始まったときも替わったとみなす（Start はパラメータを初期値に戻してから Started を出し、その間は聞いていない）。
+        // 前に追っていた Runner と比べる。_source は値を読むたびに替わり、共有している変数をほかの文字列が先に読むと、替わったことが見えなくなる
         private void OnRunnerChanged()
         {
-            var before = _source;
-            if (FindSource() != before && !_quiet)
+            var runner = Follower.Runner;
+            if (runner == _followed)
+            {
+                return;
+            }
+
+            _followed = runner;
+            if (runner == null)
+            {
+                return;
+            }
+
+            _source = runner;
+            if (!_quiet)
             {
                 _valueChanged?.Invoke(this);
             }
