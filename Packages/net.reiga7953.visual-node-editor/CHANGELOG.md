@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.2.2] - 2026-10-22
+- 修正: Graph Parameters / Graph Parameter（Unity Localization 連携）で、止まった Runner をもう一度始めると（リトライなど）、文字が前の値のまま出し直されなかった（1.2.1 から）。パラメータが初期値に戻るので出し直す
+- 修正: Graph Parameters の変数を複数の文字列で使っているとき、Runner が替わっても、ほかの文字列が先に値を読むと、残りの文字列が出し直されないことがあった
+
 ## [1.2.1] - 2026-10-22
 - 変更: Graph Parameters / Graph Parameter（Unity Localization 連携）は、Runner が止まっても、ほかの Runner が始まるまでは最後の値のまま出す（結果の画面で `Score: 0` に戻らない。Graph Parameter Text・Label と同じ）
 - 変更: Graph Parameters / Graph Parameter が文字列を作り直させるのは、使っているパラメータが変わったときと、値を読む Runner が替わったときだけにする（グラフを指定していない変数が、ほかの Runner が始まるたびに作り直させていた）
