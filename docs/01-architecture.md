@@ -854,14 +854,17 @@ Yarn の `VariableStorageBehaviour`。DialogueRunner の Variable Storage に設
   `Graph` を替えたら、作った変数のグラフも替える（インスペクタで替えた場合は、次に名前を引いたときに合わせる。そのときは知らせない。文字列を作っている最中なので）
 - 多くの文字列で使うなら、Global Variables Group（`VariablesGroupAsset`）に足し、Localization Settings の Smart Format の Persistent Variables Source に登録する（`{global.graph.Score}`）。
   uGUI・TextMeshPro（`Localize String Event`）でも、UI Toolkit（UI Builder の Localized String のバインディング）でも同じ
-- 値: そのグラフを実行中の Runner（`GraphRunner.FindRunning`）の値。実行中のものが無ければ、最後に値を読んだ Runner（止まっていても、値は止まったときのまま残る）の値
+- 値: そのグラフを実行中の Runner（`GraphRunner.FindRunning`）の値。実行中のものが無ければ、最後に値を読んだ・追った Runner（止まっていても、値は止まったときのまま残る）の値
   （結果の画面などで、Runner が止まっても最後の値を出したままにする。Graph Parameter Text / Label が文字をそのまま残すのと同じ）。
   一度も Runner を読んでいなければ（`Graph` を替えた後を含む）グラフの初期値（エディタのプレビューにも初期値が出る）。どれにも無ければ null（空の文字）
 - 書式は Smart Strings のもの（`{graph.Gold:N0}`、bool なら `{graph.Cleared:クリア|未クリア}`）。数は選んでいるロケールの書き方になる（`GraphParameterText` は InvariantCulture）
 - 出し直し: Localized String が聞いている間（`ValueChanged` に登録がある間）だけ Runner を追い（`GraphRunnerFollower`。Runtime の internal を `InternalsVisibleTo` で見せる）、
   次のときに `ValueChanged` を出す（Localized String が文字列を作り直す）:
-  追っている Runner のそのパラメータが変わった（`ParameterChanged`）、値を読む Runner が替わった（Runner が始まった・止まってほかのものに替わった。
-  同じ Runner のまま・止まってほかに無いときは出さない。グラフが空なら、どのグラフの Runner が始まっても調べるため）、`Graph` / `Parameter` を替えた。
+  追っている Runner のそのパラメータが変わった（`ParameterChanged`）、追う Runner が替わった（Runner が始まった・止まってほかのものに替わった・止まった Runner がもう一度始まった）、
+  `Graph` / `Parameter` を替えた。止まった Runner がもう一度始まったとき（リトライなど）も出す（`Start` はパラメータを初期値に戻してから `Started` を出し、その間は誰も聞いていないため）。
+  止まってほかに無いとき、グラフが空でほかの Runner が始まっても追う Runner が同じままのときは出さない。
+  替わったかは、前に追っていた Runner と比べる（値を読むときに覚える Runner とは比べない。グループの変数は文字列の間で共有されるので、
+  ほかの文字列が先に値を読むと、替わったことが見えなくなるため）。
   登録が無くなったら Runner から外れる（Localized String は文字列を作り直すたびに聞き直す）
 - エディタ: Localization は Local Variables を IMGUI（`EditorGUI.PropertyField`）で描くので、`GraphParameterNameDrawer` に IMGUI の描き方（入力欄と、グラフのパラメータ名を選ぶ「▾」）を足す
   （UI Toolkit の欄しか無いと「No GUI Implemented」になる。UI Toolkit のインスペクタ・UI Builder では今まで通り選べる欄）。
